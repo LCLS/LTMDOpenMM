@@ -38,7 +38,7 @@
 #include "jama_eig.h"
 #include <algorithm>
 #include <vector>
-#include <vecLib/clapack.h>
+//#include <vecLib/clapack.h>
 
 using namespace OpenMM;
 using namespace std;
@@ -48,7 +48,7 @@ static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<
     decomp.getRealEigenvalues(values);
     decomp.getV(vectors);
 }
-
+/*
 static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
     long int n = matrix.dim1();
     char jobz = 'V';
@@ -70,7 +70,7 @@ static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1
         for (int j = 0; j < n; j++)
             vectors[i][j] = a[i+j*n];
 }
-
+*/
 void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors) {
     Context& context = contextImpl.getOwner();
     bool isDoublePrecision = context.getPlatform().supportsDoublePrecision();
@@ -80,7 +80,38 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     int numParticles = positions.size();
     int n = 3*numParticles;
 
+    /*********************************************************************/
+    /*                                                                   */
+    /* Block Hessian Code (Cickovski/Sweet)                              */
+    /*                                                                   */
+    /*********************************************************************/
+
+    TNT::Array2D<float> hessian(n,n); // Hessian matrix
+                                      // Initial residue data (where in OpenMM?)
+    int num_residues = 0;
+    vector<int> blocks;
+    for (int i = 0; i < numParticles; i++) {
+       if (int(system.getParticleMass(i)) == 14) // N-terminus end (hack for now?)
+          {
+             num_residues++;
+             blocks.push_back(i);
+          }
+    }
+    
+    cout << "Running block Hessian with " << num_residues << endl;
+    // For now I am assuming residues per block is 1.
+    // We can make this customizable later.
+    
+    
+    
+    
+    
+
+    /*********************************************************************/
+
     // Construct the mass weighted Hessian.
+    
+
 
     TNT::Array2D<float> h(n, n);
     for (int i = 0; i < numParticles; i++) {
@@ -119,7 +150,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
     TNT::Array1D<float> d;
     TNT::Array2D<float> eigen;
-    findEigenvaluesLapack(h, d, eigen);
+    findEigenvaluesJama(h, d, eigen);
+    //findEigenvaluesLapack(h, d, eigen);
     vector<pair<float, int> > sortedEigenvalues(n);
     for (int i = 0; i < n; i++)
         sortedEigenvalues[i] = make_pair(fabs(d[i]), i);
