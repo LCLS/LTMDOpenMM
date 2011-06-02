@@ -54,6 +54,8 @@ public:
     double getMaxEigenvalue() const {
         return maxEigenvalue;
     }
+    unsigned int blockNumber(int);
+    bool inSameBlock(int, int, int, int);
 private:
     class TreeNode;
     static double getDelta(double value, bool isDoublePrecision);
@@ -68,6 +70,7 @@ private:
     std::vector<std::vector<double> > projection;
     std::vector<std::vector<Vec3> > eigenvectors;
     double maxEigenvalue;
+    std::vector<int> blocks;
 };
 
 class NormalModeAnalysis::TreeNode {

@@ -36,6 +36,7 @@
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/internal/ForceImpl.h"
 #include "jama_eig.h"
+#include "tnt_array2d_utils.h"
 #include <algorithm>
 #include <vector>
 //#include <vecLib/clapack.h>
@@ -71,6 +72,23 @@ static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1
             vectors[i][j] = a[i+j*n];
 }
 */
+
+unsigned int NormalModeAnalysis::blockNumber(int p) {
+    unsigned int block = 0;
+    while (blocks[block] < p) block++;
+    return block;
+}
+
+bool NormalModeAnalysis::inSameBlock(int p1, int p2, int p3=-1, int p4=-1) {
+    if (blockNumber(p1) != blockNumber(p2)) return false;
+    
+    if (p3 != -1 && blockNumber(p3) != blockNumber(p1)) return false;
+  
+    if (p4 != -1 && blockNumber(p4) != blockNumber(p1)) return false;
+ 
+    return true;   // They're all the same!
+}
+
 void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors) {
     Context& context = contextImpl.getOwner();
     bool isDoublePrecision = context.getPlatform().supportsDoublePrecision();
@@ -89,7 +107,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     TNT::Array2D<float> hessian(n,n); // Hessian matrix
                                       // Initial residue data (where in OpenMM?)
     int num_residues = 0;
-    vector<int> blocks;
     for (int i = 0; i < numParticles; i++) {
        if (int(system.getParticleMass(i)) == 14) // N-terminus end (hack for now?)
           {
@@ -99,36 +116,133 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
     
     cout << "Running block Hessian with " << num_residues << endl;
-    // For now I am assuming residues per block is 1.
-    // We can make this customizable later.
-    
-    
-    
-    
-    
+ 
+    System* blockSystem = new System();
 
+    // Copying: (1) PBC vecs, (2) positions and (3) masses.
+    // Need to remove some bonds, angles and dihedrals.
+
+    for (int i = 0; i < numParticles; i++) {
+       blockSystem->addParticle(system.getParticleMass(i));
+    } 
+    
+    // COM
+    blockSystem->addForce(&system.getForce(0));    
+
+    HarmonicBondForce hf;
+    cout << system.getNumForces() << endl;
+    const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(1));
+    for (int i = 0; i < ohf->getNumBonds(); i++) {
+        // For our system, add bonds between atoms in the same block
+        int particle1, particle2;
+        double length, k;
+        ohf->getBondParameters(i, particle1, particle2, length, k);
+        if (inSameBlock(particle1, particle2)) {
+           hf.addBond(particle1, particle2, length, k);
+        }
+    }
+    blockSystem->addForce(&hf);
+
+    HarmonicAngleForce af;
+    const HarmonicAngleForce* ahf = dynamic_cast<const HarmonicAngleForce*>(&system.getForce(2));
+    for (int i = 0; i < ahf->getNumAngles(); i++) {
+        // For our system, add bonds between atoms in the same block
+        int particle1, particle2, particle3;
+        double angle, k;
+        ahf->getAngleParameters(i, particle1, particle2, particle3, angle, k);
+        if (inSameBlock(particle1, particle2, particle3)) {
+           af.addAngle(particle1, particle2, particle3, angle, k);
+        }
+    }
+    blockSystem->addForce(&af);
+
+    PeriodicTorsionForce ptf;
+    const PeriodicTorsionForce* optf = dynamic_cast<const PeriodicTorsionForce*>(&system.getForce(3));
+    for (int i = 0; i < optf->getNumTorsions(); i++) {
+        // For our system, add bonds between atoms in the same block
+        int particle1, particle2, particle3, particle4, periodicity;
+        double phase, k;
+        optf->getTorsionParameters(i, particle1, particle2, particle3, particle4, periodicity, phase, k);
+        if (inSameBlock(particle1, particle2, particle3, particle4)) {
+           ptf.addTorsion(particle1, particle2, particle3, particle4, periodicity, phase, k);
+        }
+    }
+    blockSystem->addForce(&ptf);
+
+    RBTorsionForce rbtf;
+    const RBTorsionForce* orbtf = dynamic_cast<const RBTorsionForce*>(&system.getForce(4));
+    for (int i = 0; i < orbtf->getNumTorsions(); i++) {
+        // For our system, add bonds between atoms in the same block
+        int particle1, particle2, particle3, particle4;
+        double c0, c1, c2, c3, c4, c5;
+        orbtf->getTorsionParameters(i, particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
+        if (inSameBlock(particle1, particle2, particle3, particle4)) {
+           rbtf.addTorsion(particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
+        }
+    }
+    
+    blockSystem->addForce(&rbtf);
+
+    CustomNonbondedForce* customNonbonded = new CustomNonbondedForce("(step(block1-block2)*step(block2-block1))*(4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r); q=q1*q2; sigma=0.5*(sigma1+sigma2); eps=sqrt(eps1*eps2)");
+    const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(5));
+    customNonbonded->addPerParticleParameter("block");
+    customNonbonded->addPerParticleParameter("q");
+    customNonbonded->addPerParticleParameter("sigma");
+    customNonbonded->addPerParticleParameter("eps");
+    
+    vector<double> params(4);
+
+    for (int i = 0; i < nbf->getNumParticles(); i++) {
+        double charge, sigma, epsilon;
+        nbf->getParticleParameters(i, charge, sigma, epsilon);
+        params[0] = blockNumber(i);   // block #
+        params[1] = charge;
+        params[2] = sigma;
+        params[3] = epsilon;
+        customNonbonded->addParticle(params);
+    }
+ 
+    for (int i = 0; i < nbf->getNumExceptions(); i++) {
+        int p1, p2;
+        double cp, sig, eps;
+        nbf->getExceptionParameters(i, p1, p2, cp, sig, eps);
+        customNonbonded->addExclusion(p1, p2);
+    }   
+
+    customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
+    blockSystem->addForce(customNonbonded);   
+
+
+    Context blockContext(*blockSystem, context.getIntegrator());
+    blockContext.setPositions(state.getPositions());
+    //blockContext.setVelocities(state.getVelocities());
+    
     /*********************************************************************/
 
     // Construct the mass weighted Hessian.
     
-
-
     TNT::Array2D<float> h(n, n);
+    cout << "Numparticles: " << numParticles << endl;
     for (int i = 0; i < numParticles; i++) {
+        cout << i << endl;
         Vec3 pos = positions[i];
         for (int j = 0; j < 3; j++) {
             double delta = getDelta(positions[i][j], isDoublePrecision);
             positions[i][j] = pos[j]-delta;
-            context.setPositions(positions);
-            vector<Vec3> forces1 = context.getState(State::Forces).getForces();
+            blockContext.setPositions(positions);
+            vector<Vec3> forces1 = blockContext.getState(State::Forces).getForces();
+            //context.setPositions(positions);
+            //vector<Vec3> forces1 = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j]+delta;
-            context.setPositions(positions);
-            vector<Vec3> forces2 = context.getState(State::Forces).getForces();
+            blockContext.setPositions(positions);
+            vector<Vec3> forces2 = blockContext.getState(State::Forces).getForces();
+            //context.setPositions(positions);
+            //vector<Vec3> forces2 = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j];
             int col = i*3+j;
             int row = 0;
             for (int k = 0; k < numParticles; k++) {
-                double scale = 1.0/(2*delta*sqrt(system.getParticleMass(i)*system.getParticleMass(k)));
+                double scale = 1.0/(2*delta*sqrt(blockSystem->getParticleMass(i)*blockSystem->getParticleMass(k)));
                 h[row++][col] = (forces1[k][0]-forces2[k][0])*scale;
                 h[row++][col] = (forces1[k][1]-forces2[k][1])*scale;
                 h[row++][col] = (forces1[k][2]-forces2[k][2])*scale;
@@ -146,25 +260,105 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
 
+    cout << "PRINTING HESSIAN: " << endl << endl;
+
+    
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            cout << h[i][j] << " ";
+        }
+        cout << endl;
+    }
+
+
+    // Diagonalize each block Hessian, get Eigenvectors
+    // Note: The eigenvalues will be placed in one large array, because
+    //       we must sort them to get k
+    vector<float> Di;
+    vector<TNT::Array1D<float> > bigD(blocks.size());
+    vector<TNT::Array2D<float> > bigQ(blocks.size());
+    for (int i = 0; i < blocks.size(); i++) {
+       // 1. Determine the starting and ending index for the block
+       int startatom = 3*blocks[i];
+       int endatom = 3* ((i == blocks.size()-1) ? numParticles-1  : blocks[i+1]);
+       
+       // 2. Get the block Hessian i
+       TNT::Array2D<float> h_tilde(endatom-startatom+1, endatom-startatom+1);
+       
+       // 3. Diagonalize, and get eigenvectors
+       TNT::Array1D<float> di;
+       TNT::Array2D<float> Qi;
+       findEigenvaluesJama(h_tilde, di, Qi);
+
+       // 4. Copy eigenvalues to big array
+       for (int j = 0; j < di.dim(); j++)
+          Di.push_back(di[j]);
+
+       // 5. Push eigenvectors into matrix
+       bigD.push_back(di);
+       bigQ.push_back(Qi);
+    }
+
     // Sort the eigenvectors by the absolute value of the eigenvalue.
+    vector<pair<float, int> > sortedEvalues(Di.size());
+    for (int i = 0; i < Di.size(); i++)
+       sortedEvalues[i] = make_pair(fabs(Di[i]), i);
+    sort(sortedEvalues.begin(), sortedEvalues.end()); 
+    int bdof = 12;
+    float cutEigen = sortedEvalues[12*blocks.size()].first;  // This is the cutoff eigenvalue
 
-    TNT::Array1D<float> d;
-    TNT::Array2D<float> eigen;
-    findEigenvaluesJama(h, d, eigen);
-    //findEigenvaluesLapack(h, d, eigen);
-    vector<pair<float, int> > sortedEigenvalues(n);
-    for (int i = 0; i < n; i++)
-        sortedEigenvalues[i] = make_pair(fabs(d[i]), i);
-    sort(sortedEigenvalues.begin(), sortedEigenvalues.end());
-    maxEigenvalue = sortedEigenvalues[n-1].first;
+    // Build E.
+    // For each Qi:
+    //    Sort individual eigenvalues.
+    //    Find some k such that k is the index of the largest eigenvalue less or equal to cutEigen
+    //    Put those first k eigenvectors into E.
+    vector<TNT::Array1D<float> > bigE;
+    
+    
+    for (int i = 0; i < bigQ.size(); i++) {
+        vector<pair<float, int> > sE(bigD[i].dim());
+        int k = 0;
+        for (int j = 0; i < bigD[j].dim(); j++) {
+           sE[j] = make_pair(fabs(bigD[i][j]), j);
+           if (bigD[i][j] <= cutEigen) k++;
+        }
+        sort(sE.begin(), sE.end());
+ 
+        // Put the eigenvectors in the corresponding order
+        // into E.
+        for (int j = 0; j < k; j++) {
+           bigE.push_back(TNT::Array1D<float>(bigQ[i].dim2(), bigQ[i][sE[j].second]));
+        }
+    }
+ 
+    // Inefficient, needs to improve.   
+    int m = bigE.size();
+    TNT::Array2D<float> E(n, m);
+    TNT::Array2D<float> E_transpose(m, n);
+    for (int i = 0; i < m; i++)
+       for (int j = 0; j < n; j++) {
+          E[j][i] = bigE[i][j];
+          E_transpose[i][j] = bigE[i][j];
+       }
 
+    // Compute S
+    TNT::Array2D<float> S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
+
+    // Diagonalize S
+    TNT::Array1D<float> dS;
+    TNT::Array2D<float> Q;
+    findEigenvaluesJama(S, dS, Q);
+    
+    // Compute U, set of approximate eigenvectors.
+    TNT::Array2D<float> U = E*Q;
+
+    
     // Record the eigenvectors.
-
-    eigenvectors.resize(numVectors, vector<Vec3>(numParticles));
-    for (int i = 0; i < numVectors; i++) {
-        int index = sortedEigenvalues[i].second;
+    int nV = U.dim2();
+    eigenvectors.resize(nV, vector<Vec3>(numParticles));
+    for (int i = 0; i < nV; i++) {
         for (int j = 0; j < numParticles; j++)
-            eigenvectors[i][j] = Vec3(eigen[3*j][index], eigen[3*j+1][index], eigen[3*j+2][index]);
+            eigenvectors[i][j] = Vec3(U[3*j][i], U[3*j+1][i], U[3*j+2][i]);
     }
 }
 
