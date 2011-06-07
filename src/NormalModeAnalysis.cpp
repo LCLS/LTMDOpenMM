@@ -40,7 +40,7 @@
 #include <algorithm>
 #include <vector>
 //#include <vecLib/clapack.h>
-
+#include <fstream>
 using namespace OpenMM;
 using namespace std;
 
@@ -278,16 +278,29 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     vector<TNT::Array1D<float> > bigD(blocks.size());
     vector<TNT::Array2D<float> > bigQ(blocks.size());
     for (int i = 0; i < blocks.size(); i++) {
+       cout << "Diagonalizing block: " << i << endl;   
+ 
        // 1. Determine the starting and ending index for the block
        int startatom = 3*blocks[i];
-       int endatom = 3* ((i == blocks.size()-1) ? numParticles-1  : blocks[i+1]);
-       
+       int endatom;
+       if (i == blocks.size()-1)
+          endatom = 3*numParticles-1;
+       else
+          endatom = 3*blocks[i+1] - 1; 
+
        // 2. Get the block Hessian i
        TNT::Array2D<float> h_tilde(endatom-startatom+1, endatom-startatom+1);
+       int xpos = 0;
+       for (int j = startatom; j <= endatom; j++) {
+          int ypos = 0;
+          for (int k = startatom; k <= endatom; k++)
+             h_tilde[xpos][ypos++] = h[j][k];
+          xpos++;
+       }
        
        // 3. Diagonalize, and get eigenvectors
-       TNT::Array1D<float> di;
-       TNT::Array2D<float> Qi;
+       TNT::Array1D<float> di(endatom-startatom+1);
+       TNT::Array2D<float> Qi(endatom-startatom+1, endatom-startatom+1);
        findEigenvaluesJama(h_tilde, di, Qi);
 
        // 4. Copy eigenvalues to big array
@@ -299,13 +312,22 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        bigQ.push_back(Qi);
     }
 
+    cout << "Size of Di: " << Di.size() << endl;
+    cout << "Size of bigD: " << bigD.size() << endl;
+    cout << "Size of bigQ: " << bigQ.size() << endl;
     // Sort the eigenvectors by the absolute value of the eigenvalue.
+
+    //***********************************************************
+    // This section here is only to find the cuttoff eigenvalue.
     vector<pair<float, int> > sortedEvalues(Di.size());
     for (int i = 0; i < Di.size(); i++)
        sortedEvalues[i] = make_pair(fabs(Di[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
     int bdof = 12;
-    float cutEigen = sortedEvalues[12*blocks.size()].first;  // This is the cutoff eigenvalue
+    cout << "Number of eigenvalues is: " << sortedEvalues.size() << endl;
+    float cutEigen = sortedEvalues[bdof*blocks.size()].first;  // This is the cutoff eigenvalue
+    cout << "Cutoff eigenvalue is: " << cutEigen << endl;
+    //***********************************************************
 
     // Build E.
     // For each Qi:
@@ -316,21 +338,39 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     
     
     for (int i = 0; i < bigQ.size(); i++) {
+        cout << "Putting eigenvector " << i << " into E" << endl;
+        cout << "BigD dim: " << bigD[i].dim() << endl;
         vector<pair<float, int> > sE(bigD[i].dim());
         int k = 0;
-        for (int j = 0; i < bigD[j].dim(); j++) {
+        
+        for (int j = 0; j < bigD[i].dim(); j++) {
            sE[j] = make_pair(fabs(bigD[i][j]), j);
            if (bigD[i][j] <= cutEigen) k++;
         }
+
         sort(sE.begin(), sE.end());
  
         // Put the eigenvectors in the corresponding order
         // into E.
-        for (int j = 0; j < k; j++) {
-           bigE.push_back(TNT::Array1D<float>(bigQ[i].dim2(), bigQ[i][sE[j].second]));
+        for (int a = 0; a < k; a++) {
+           int startatom = blocks[i]*3;
+           int endatom;
+           if (i == blocks.size()-1)
+             endatom = 3*numParticles-1;
+           else
+             endatom = 3*blocks[i+1] - 1; 
+           TNT::Array1D<float> entryE(n);
+           int pos = 0;
+           for (int j = 0; j < startatom; j++) // Pad beginning
+              entryE[pos++] = 0;
+           for (int j = 0; j < bigQ[i].dim2(); j++) // Eigenvector entries
+              entryE[pos++] = bigQ[i][sE[j].second][j];  
+           for (int j = endatom; j < n; j++)  // Pad end
+              entryE[pos++] = 0;
+           bigE.push_back(entryE);
         }
     }
- 
+    cout << "Size of bigE: " << bigE.size() << endl;
     // Inefficient, needs to improve.   
     int m = bigE.size();
     TNT::Array2D<float> E(n, m);
@@ -342,24 +382,44 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        }
 
     // Compute S
-    TNT::Array2D<float> S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
+    cout << "Calculating S..." << endl;
+    cout << "Dimensions of E transpose: " << E_transpose.dim1() << " x " << E_transpose.dim2() << endl;
+    cout << "Dimensions of Hessian: " << h.dim1() << " x " << h.dim2() << endl;
+    cout << "Dimensions of E: " << E.dim1() << " x " << E.dim2() << endl;
+    TNT::Array2D<float> S(m, m);
+    S = matmult(matmult(E_transpose, h), E);
+    //S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
 
     // Diagonalize S
+    cout << "Diagonalizing S..." << endl;
+    cout << "SIZE OF S: " << S.dim1() << " x "  << S.dim2() << endl;
+    cout << "PRINTING S: " << endl;
+    for (unsigned int i = 0; i < S.dim1(); i++) {
+       for (unsigned int j = 0; j < S.dim2(); j++)
+          cout << S[i][j] << " ";
+       cout << endl;
+    }
     TNT::Array1D<float> dS;
     TNT::Array2D<float> Q;
     findEigenvaluesJama(S, dS, Q);
     
     // Compute U, set of approximate eigenvectors.
-    TNT::Array2D<float> U = E*Q;
+    cout << "Computing U..." << endl;
+    TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
     
     // Record the eigenvectors.
+    cout << "Computing final eigenvectors... " << endl;
+    ofstream outfile("eigenvectors.txt", ios::out);
     int nV = U.dim2();
     eigenvectors.resize(nV, vector<Vec3>(numParticles));
     for (int i = 0; i < nV; i++) {
-        for (int j = 0; j < numParticles; j++)
+        for (int j = 0; j < numParticles; j++) {
             eigenvectors[i][j] = Vec3(U[3*j][i], U[3*j+1][i], U[3*j+2][i]);
+            outfile << U[3*j][i] << " " << U[3*j+1][i] << " " << U[3*j+2][i] << endl;
+        }
     }
+
 }
 
 void NormalModeAnalysis::computeEigenvectorsRestricting(ContextImpl& contextImpl, int numVectors) {
