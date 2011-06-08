@@ -104,31 +104,46 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     /*                                                                   */
     /*********************************************************************/
 
-    TNT::Array2D<float> hessian(n,n); // Hessian matrix
+
+    /*********************************************************************/
+   
+    TNT::Array2D<float> hessian(n,n); // Hessian matrix (note n = 3N!)
                                       // Initial residue data (where in OpenMM?)
+    
+    // For now, since OpenMM input files do not contain residue information
+    // I am assuming that they will always start with the N-terminus, just for testing.
+    // This is true for the villin.xml but may not be true in the future.
     int num_residues = 0;
     for (int i = 0; i < numParticles; i++) {
-       if (int(system.getParticleMass(i)) == 14) // N-terminus end (hack for now?)
+       if (int(system.getParticleMass(i)) == 14) // N-terminus end, Nitrogen atom
           {
              num_residues++;
              blocks.push_back(i);
           }
     }
-    
     cout << "Running block Hessian with " << num_residues << endl;
  
+    // Creating a whole new system called the blockSystem.
+    // This system will only contain bonds, angles, dihedrals, and impropers
+    // between atoms in the same block. 
+    // Also contains pairwise force terms which are zeroed out for atoms
+    // in different blocks.
+    // This necessitates some copying from the original system, but is required
+    // because OpenMM populates all data when it reads XML.
     System* blockSystem = new System();
 
-    // Copying: (1) PBC vecs, (2) positions and (3) masses.
-    // Need to remove some bonds, angles and dihedrals.
-
+    // Copy all atoms into the block system.
     for (int i = 0; i < numParticles; i++) {
        blockSystem->addParticle(system.getParticleMass(i));
     } 
     
-    // COM
+    // Copy the center of mass force.
     blockSystem->addForce(&system.getForce(0));    
 
+    // Create a new harmonic bond force.
+    // This only contains pairs of atoms which are in the same block.
+    // I have to iterate through each bond from the old force, then
+    // selectively add them to the new force based on this condition.
     HarmonicBondForce hf;
     cout << system.getNumForces() << endl;
     const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(1));
@@ -143,6 +158,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
     blockSystem->addForce(&hf);
 
+
+    // Same thing with the angle force....
     HarmonicAngleForce af;
     const HarmonicAngleForce* ahf = dynamic_cast<const HarmonicAngleForce*>(&system.getForce(2));
     for (int i = 0; i < ahf->getNumAngles(); i++) {
@@ -156,6 +173,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
     blockSystem->addForce(&af);
 
+
+    // And the dihedrals....
     PeriodicTorsionForce ptf;
     const PeriodicTorsionForce* optf = dynamic_cast<const PeriodicTorsionForce*>(&system.getForce(3));
     for (int i = 0; i < optf->getNumTorsions(); i++) {
@@ -169,6 +188,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
     blockSystem->addForce(&ptf);
 
+    // And the impropers....
     RBTorsionForce rbtf;
     const RBTorsionForce* orbtf = dynamic_cast<const RBTorsionForce*>(&system.getForce(4));
     for (int i = 0; i < orbtf->getNumTorsions(); i++) {
@@ -180,18 +200,26 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            rbtf.addTorsion(particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
         }
     }
-    
     blockSystem->addForce(&rbtf);
 
+
+    // This is a custom nonbonded pairwise force and
+    // includes terms for both LJ and Coulomb. 
+    // Note that the step term will go to zero if block1 does not equal block 2,
+    // and will be one otherwise.
     CustomNonbondedForce* customNonbonded = new CustomNonbondedForce("(step(block1-block2)*step(block2-block1))*(4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r); q=q1*q2; sigma=0.5*(sigma1+sigma2); eps=sqrt(eps1*eps2)");
     const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(5));
+    
+ 
+    // To make a custom nonbonded force work, you have to add parameters.
+    // The block number is new for this particular application, the other
+    // three are copied from the old system.
     customNonbonded->addPerParticleParameter("block");
     customNonbonded->addPerParticleParameter("q");
     customNonbonded->addPerParticleParameter("sigma");
     customNonbonded->addPerParticleParameter("eps");
     
     vector<double> params(4);
-
     for (int i = 0; i < nbf->getNumParticles(); i++) {
         double charge, sigma, epsilon;
         nbf->getParticleParameters(i, charge, sigma, epsilon);
@@ -202,6 +230,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         customNonbonded->addParticle(params);
     }
  
+    // Copy the exclusions.
     for (int i = 0; i < nbf->getNumExceptions(); i++) {
         int p1, p2;
         double cp, sig, eps;
@@ -209,18 +238,22 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         customNonbonded->addExclusion(p1, p2);
     }   
 
+    // Copy the algorithm then add the force.
     customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
     blockSystem->addForce(customNonbonded);   
 
 
+    // Copy the positions.
     Context blockContext(*blockSystem, context.getIntegrator());
     blockContext.setPositions(state.getPositions());
-    //blockContext.setVelocities(state.getVelocities());
     
     /*********************************************************************/
 
     // Construct the mass weighted Hessian.
-    
+    // This will also be 3Nx3N, but should turn out to be a block Hessian
+    // since appropriate forces have been zeroed out.
+    // Finite difference method works the same, you perturb positions twice
+    // and calculate forces each time, and you must scale by 1/2*dx*M^2.
     TNT::Array2D<float> h(n, n);
     cout << "Numparticles: " << numParticles << endl;
     for (int i = 0; i < numParticles; i++) {
@@ -231,13 +264,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
             positions[i][j] = pos[j]-delta;
             blockContext.setPositions(positions);
             vector<Vec3> forces1 = blockContext.getState(State::Forces).getForces();
-            //context.setPositions(positions);
-            //vector<Vec3> forces1 = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j]+delta;
             blockContext.setPositions(positions);
             vector<Vec3> forces2 = blockContext.getState(State::Forces).getForces();
-            //context.setPositions(positions);
-            //vector<Vec3> forces2 = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j];
             int col = i*3+j;
             int row = 0;
@@ -251,7 +280,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
 
     // Make sure it is exactly symmetric.
-
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < i; j++) {
             float avg = 0.5f*(h[i][j]+h[j][i]);
@@ -260,9 +288,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
 
+    // Print the Hessian to the screen.
+    // Note we may want to modify this later to print to a file.
     cout << "PRINTING HESSIAN: " << endl << endl;
-
-    
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             cout << h[i][j] << " ";
@@ -281,6 +309,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        cout << "Diagonalizing block: " << i << endl;   
  
        // 1. Determine the starting and ending index for the block
+       //    This means that the upper left corner of the block will be at (startatom, startatom)
+       //    And the lower right corner will be at (endatom, endatom)
        int startatom = 3*blocks[i];
        int endatom;
        if (i == blocks.size()-1)
@@ -289,6 +319,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           endatom = 3*blocks[i+1] - 1; 
 
        // 2. Get the block Hessian i
+       //    Right now I'm just doing a copy from the big Hessian
+       //    There's probably a more efficient way but for now I just want things to work..
        TNT::Array2D<float> h_tilde(endatom-startatom+1, endatom-startatom+1);
        int xpos = 0;
        for (int j = startatom; j <= endatom; j++) {
@@ -298,12 +330,14 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           xpos++;
        }
        
-       // 3. Diagonalize, and get eigenvectors
+       // 3. Diagonalize the block Hessian only, and get eigenvectors
        TNT::Array1D<float> di(endatom-startatom+1);
        TNT::Array2D<float> Qi(endatom-startatom+1, endatom-startatom+1);
        findEigenvaluesJama(h_tilde, di, Qi);
 
        // 4. Copy eigenvalues to big array
+       //    This is necessary because we have to sort them, and determine
+       //    the cutoff eigenvalue for everybody.
        for (int j = 0; j < di.dim(); j++)
           Di.push_back(di[j]);
 
@@ -315,10 +349,10 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     cout << "Size of Di: " << Di.size() << endl;
     cout << "Size of bigD: " << bigD.size() << endl;
     cout << "Size of bigQ: " << bigQ.size() << endl;
-    // Sort the eigenvectors by the absolute value of the eigenvalue.
 
     //***********************************************************
     // This section here is only to find the cuttoff eigenvalue.
+    // First sort the eigenvectors by the absolute value of the eigenvalue.
     vector<pair<float, int> > sortedEvalues(Di.size());
     for (int i = 0; i < Di.size(); i++)
        sortedEvalues[i] = make_pair(fabs(Di[i]), i);
@@ -343,22 +377,37 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         vector<pair<float, int> > sE(bigD[i].dim());
         int k = 0;
         
+        // Here we find k as the number of eigenvectors
+        // smaller than the cutoff eigenvalue.
+        // After we sort them, then k will be the index
+        // of the smallest eigenvalue bigger than the cutoff value.
         for (int j = 0; j < bigD[i].dim(); j++) {
            sE[j] = make_pair(fabs(bigD[i][j]), j);
            if (bigD[i][j] <= cutEigen) k++;
         }
-
         sort(sE.begin(), sE.end());
  
         // Put the eigenvectors in the corresponding order
-        // into E.
+        // into E.  Note that k is the index of the smallest
+        // eigenvalue ABOVE the cutoff, so we have to put in the values
+        // at indices 0 to k-1. 
         for (int a = 0; a < k; a++) {
+           // Again, these are the corners of the block Hessian:
+           // (startatom, startatom) and (endatom, endatom).
            int startatom = blocks[i]*3;
            int endatom;
            if (i == blocks.size()-1)
              endatom = 3*numParticles-1;
            else
              endatom = 3*blocks[i+1] - 1; 
+
+           // This is an entry for matrix E. 
+           // The eigenvectors will occupy row startatom through
+           // row endatom.
+           // Thus we must pad with zeroes before startatom and after
+           // endatom.
+           // Note that the way this is set up, bigE is actually E^T and not E,
+           // since we form the vectors and THEN push.
            TNT::Array1D<float> entryE(n);
            int pos = 0;
            for (int j = 0; j < startatom; j++) // Pad beginning
@@ -371,7 +420,14 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
     cout << "Size of bigE: " << bigE.size() << endl;
-    // Inefficient, needs to improve.   
+    
+
+    // Inefficient, needs to improve.
+    // Basically, just setting up E and E^T by
+    // copying values from bigE.
+    // Again, right now I'm only worried about
+    // correctness plus this time will be marginal compared to
+    // diagonalization.
     int m = bigE.size();
     TNT::Array2D<float> E(n, m);
     TNT::Array2D<float> E_transpose(m, n);
@@ -381,7 +437,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           E_transpose[i][j] = bigE[i][j];
        }
 
-    // Compute S
+    // Compute S, which is equal to E^T * H * E.
+    // Using the matmult function of Jama.
     cout << "Calculating S..." << endl;
     cout << "Dimensions of E transpose: " << E_transpose.dim1() << " x " << E_transpose.dim2() << endl;
     cout << "Dimensions of Hessian: " << h.dim1() << " x " << h.dim2() << endl;
@@ -390,8 +447,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     S = matmult(matmult(E_transpose, h), E);
     //S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
 
-    // Diagonalize S
-    cout << "Diagonalizing S..." << endl;
     cout << "SIZE OF S: " << S.dim1() << " x "  << S.dim2() << endl;
     cout << "PRINTING S: " << endl;
     for (unsigned int i = 0; i < S.dim1(); i++) {
@@ -399,16 +454,21 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           cout << S[i][j] << " ";
        cout << endl;
     }
+    
+    // Diagonalizing S by finding eigenvalues and eigenvectors...
+    cout << "Diagonalizing S..." << endl;
     TNT::Array1D<float> dS;
     TNT::Array2D<float> Q;
     findEigenvaluesJama(S, dS, Q);
     
     // Compute U, set of approximate eigenvectors.
+    // U = E*Q.
     cout << "Computing U..." << endl;
     TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
     
     // Record the eigenvectors.
+    // These will be placed in a file eigenvectors.txt
     cout << "Computing final eigenvectors... " << endl;
     ofstream outfile("eigenvectors.txt", ios::out);
     int nV = U.dim2();
