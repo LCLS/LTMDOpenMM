@@ -75,8 +75,8 @@ static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1
 
 unsigned int NormalModeAnalysis::blockNumber(int p) {
     unsigned int block = 0;
-    while (blocks[block] < p) block++;
-    return block;
+    while (block != blocks.size() && blocks[block] <= p) block++;
+    return block-1;
 }
 
 bool NormalModeAnalysis::inSameBlock(int p1, int p2, int p3=-1, int p4=-1) {
@@ -153,8 +153,11 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         double length, k;
         ohf->getBondParameters(i, particle1, particle2, length, k);
         if (inSameBlock(particle1, particle2)) {
+	   cout << particle1 << " and " << particle2 << " are in the same block." << endl;
            hf.addBond(particle1, particle2, length, k);
         }
+	else
+	   cout << particle1 << " and " << particle2 << " are not in the same block." << endl;
     }
     blockSystem->addForce(&hf);
 
@@ -288,14 +291,13 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
 
-    // Print the Hessian to the screen.
-    // Note we may want to modify this later to print to a file.
+    // Print the Hessian to a file.
+    ofstream hess("hessian.txt", ios::out);
     cout << "PRINTING HESSIAN: " << endl << endl;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            cout << h[i][j] << " ";
+            hess << "H(" << i << ", " << j << "): " << h[i][j] << endl;
         }
-        cout << endl;
     }
 
 
@@ -326,7 +328,10 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        for (int j = startatom; j <= endatom; j++) {
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
+	     {
+	     if (h[j][k] != 0) cout << "PUSHING NONZERO ITEM FOR BLOCK " << i << endl;
              h_tilde[xpos][ypos++] = h[j][k];
+	     }
           xpos++;
        }
        
