@@ -122,7 +122,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           }
     }
     cout << "Running block Hessian with " << num_residues << endl;
- 
+    cout << "Total number of blocks: " << blocks.size() << endl;
     // Creating a whole new system called the blockSystem.
     // This system will only contain bonds, angles, dihedrals, and impropers
     // between atoms in the same block. 
@@ -305,8 +305,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Note: The eigenvalues will be placed in one large array, because
     //       we must sort them to get k
     vector<float> Di;
-    vector<TNT::Array1D<float> > bigD(blocks.size());
-    vector<TNT::Array2D<float> > bigQ(blocks.size());
+    vector<TNT::Array1D<float> > bigD;
+    vector<TNT::Array2D<float> > bigQ;
     for (int i = 0; i < blocks.size(); i++) {
        cout << "Diagonalizing block: " << i << endl;   
  
@@ -329,7 +329,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
 	     {
-	     if (h[j][k] != 0) cout << "PUSHING NONZERO ITEM FOR BLOCK " << i << endl;
              h_tilde[xpos][ypos++] = h[j][k];
 	     }
           xpos++;
@@ -373,7 +372,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     //    Sort individual eigenvalues.
     //    Find some k such that k is the index of the largest eigenvalue less or equal to cutEigen
     //    Put those first k eigenvectors into E.
-    vector<TNT::Array1D<float> > bigE;
+    vector<vector<float> > bigE;
     
     
     for (int i = 0; i < bigQ.size(); i++) {
@@ -381,7 +380,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         cout << "BigD dim: " << bigD[i].dim() << endl;
         vector<pair<float, int> > sE(bigD[i].dim());
         int k = 0;
-        
+        cout << "Finding k" << endl;   
         // Here we find k as the number of eigenvectors
         // smaller than the cutoff eigenvalue.
         // After we sort them, then k will be the index
@@ -390,13 +389,16 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            sE[j] = make_pair(fabs(bigD[i][j]), j);
            if (bigD[i][j] <= cutEigen) k++;
         }
+	cout << "Sorting Eigenvalues" << endl;
         sort(sE.begin(), sE.end());
  
+        cout << "Putting k eigenvectors in.  k is: " << k << endl;
         // Put the eigenvectors in the corresponding order
         // into E.  Note that k is the index of the smallest
         // eigenvalue ABOVE the cutoff, so we have to put in the values
         // at indices 0 to k-1. 
         for (int a = 0; a < k; a++) {
+	   cout << "A: " << a << endl;
            // Again, these are the corners of the block Hessian:
            // (startatom, startatom) and (endatom, endatom).
            int startatom = blocks[i]*3;
@@ -413,15 +415,23 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            // endatom.
            // Note that the way this is set up, bigE is actually E^T and not E,
            // since we form the vectors and THEN push.
-           TNT::Array1D<float> entryE(n);
+	   cout << "Making entry e" << endl;
+	   cout << "Startatom: " << startatom << endl;
+	   cout << "Dim2: " << bigQ[i].dim2() << endl;
+	   cout << "Endatom: " << endatom << endl;
+	   cout << "Total: " << startatom+bigQ[i].dim2()+(n-endatom-1) << endl;
+           vector<float> entryE(n);
            int pos = 0;
            for (int j = 0; j < startatom; j++) // Pad beginning
               entryE[pos++] = 0;
            for (int j = 0; j < bigQ[i].dim2(); j++) // Eigenvector entries
-              entryE[pos++] = bigQ[i][sE[j].second][j];  
-           for (int j = endatom; j < n; j++)  // Pad end
+              entryE[pos++] = bigQ[i][sE[a].second][j];  
+           for (int j = endatom+1; j < n; j++)  // Pad end
               entryE[pos++] = 0;
+
+	   cout << "Putting into E" << endl;
            bigE.push_back(entryE);
+	   cout << "Done pushing into E" << endl;
         }
     }
     cout << "Size of bigE: " << bigE.size() << endl;
