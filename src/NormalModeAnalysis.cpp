@@ -263,13 +263,18 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         cout << i << endl;
         Vec3 pos = positions[i];
         for (int j = 0; j < 3; j++) {
-            double delta = getDelta(positions[i][j], isDoublePrecision);
+	    // Block Hessian AND Hessian for now
+	    double delta = getDelta(positions[i][j], isDoublePrecision);
             positions[i][j] = pos[j]-delta;
+	    context.setPositions(positions);
             blockContext.setPositions(positions);
             vector<Vec3> forces1 = blockContext.getState(State::Forces).getForces();
+            vector<Vec3> forces1full = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j]+delta;
             blockContext.setPositions(positions);
+            context.setPositions(positions);
             vector<Vec3> forces2 = blockContext.getState(State::Forces).getForces();
+            vector<Vec3> forces2full = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j];
             int col = i*3+j;
             int row = 0;
@@ -278,6 +283,10 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
                 h[row++][col] = (forces1[k][0]-forces2[k][0])*scale;
                 h[row++][col] = (forces1[k][1]-forces2[k][1])*scale;
                 h[row++][col] = (forces1[k][2]-forces2[k][2])*scale;
+		row = row - 3;
+                hessian[row++][col] = (forces1full[k][0]-forces2full[k][0])*scale;
+                hessian[row++][col] = (forces1full[k][1]-forces2full[k][1])*scale;
+                hessian[row++][col] = (forces1full[k][2]-forces2full[k][2])*scale;
             }
         }
     }
@@ -288,6 +297,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
             float avg = 0.5f*(h[i][j]+h[j][i]);
             h[i][j] = avg;
             h[j][i] = avg;
+            avg = 0.5f*(hessian[i][j]+hessian[j][i]);
+            hessian[i][j] = avg;
+            hessian[j][i] = avg;
         }
     }
 
@@ -397,7 +409,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         // into E.  Note that k is the index of the smallest
         // eigenvalue ABOVE the cutoff, so we have to put in the values
         // at indices 0 to k-1. 
-        for (int a = 0; a < k; a++) {
+	for (int a = 0; a < k; a++) {
 	   cout << "A: " << a << endl;
            // Again, these are the corners of the block Hessian:
            // (startatom, startatom) and (endatom, endatom).
@@ -459,14 +471,18 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     cout << "Dimensions of Hessian: " << h.dim1() << " x " << h.dim2() << endl;
     cout << "Dimensions of E: " << E.dim1() << " x " << E.dim2() << endl;
     TNT::Array2D<float> S(m, m);
-    S = matmult(matmult(E_transpose, h), E);
+    S = matmult(matmult(E_transpose, hessian), E);
     //S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
 
     cout << "SIZE OF S: " << S.dim1() << " x "  << S.dim2() << endl;
     cout << "PRINTING S: " << endl;
     for (unsigned int i = 0; i < S.dim1(); i++) {
-       for (unsigned int j = 0; j < S.dim2(); j++)
+       for (unsigned int j = 0; j < S.dim2(); j++) {
+            float avg = 0.5f*(S[i][j]+S[j][i]);
+            S[i][j] = avg;
+            S[j][i] = avg;
           cout << S[i][j] << " ";
+       }
        cout << endl;
     }
     
@@ -481,16 +497,23 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     cout << "Computing U..." << endl;
     TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
-    
+    // Sort by ABSOLUTE VALUE of eigenvalues.
+    sortedEvalues.clear();
+    sortedEvalues.resize(dS.dim());
+    for (int i = 0; i < dS.dim(); i++)
+       sortedEvalues[i] = make_pair(fabs(dS[i]), i);
+    sort(sortedEvalues.begin(), sortedEvalues.end()); 
+
+
     // Record the eigenvectors.
     // These will be placed in a file eigenvectors.txt
     cout << "Computing final eigenvectors... " << endl;
     ofstream outfile("eigenvectors.txt", ios::out);
-    int nV = U.dim2();
+    int nV = 20;
     eigenvectors.resize(nV, vector<Vec3>(numParticles));
     for (int i = 0; i < nV; i++) {
         for (int j = 0; j < numParticles; j++) {
-            eigenvectors[i][j] = Vec3(U[3*j][i], U[3*j+1][i], U[3*j+2][i]);
+            eigenvectors[i][j] = Vec3(U[3*j][sortedEvalues[i].second], U[3*j+1][sortedEvalues[i].second], U[3*j+2][sortedEvalues[i].second]);
             outfile << U[3*j][i] << " " << U[3*j+1][i] << " " << U[3*j+2][i] << endl;
         }
     }
