@@ -145,7 +145,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // I have to iterate through each bond from the old force, then
     // selectively add them to the new force based on this condition.
     HarmonicBondForce hf;
-    cout << system.getNumForces() << endl;
+    cout << "Number of forces: " << system.getNumForces() << endl;
     const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(1));
     for (int i = 0; i < ohf->getNumBonds(); i++) {
         // For our system, add bonds between atoms in the same block
@@ -243,6 +243,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
     // Copy the algorithm then add the force.
     customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
+    customNonbonded->setCutoffDistance((CustomNonbondedForce::NonbondedMethod)nbf->getCutoffDistance());
     blockSystem->addForce(customNonbonded);   
 
 
@@ -252,9 +253,10 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     
     /*********************************************************************/
 
-    // Construct the mass weighted Hessian.
-    // This will also be 3Nx3N, but should turn out to be a block Hessian
-    // since appropriate forces have been zeroed out.
+    // Construct the mass weighted Hessian, and the block Hessian.
+    // The latter should turn out to be a block Hessian
+    // since appropriate forces have been zeroed out in a separate context
+    // blockContext.
     // Finite difference method works the same, you perturb positions twice
     // and calculate forces each time, and you must scale by 1/2*dx*M^2.
     TNT::Array2D<float> h(n, n);
@@ -332,7 +334,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        else
           endatom = 3*blocks[i+1] - 1; 
 
-       // 2. Get the block Hessian i
+       // 2. Get the block Hessian Hii
        //    Right now I'm just doing a copy from the big Hessian
        //    There's probably a more efficient way but for now I just want things to work..
        TNT::Array2D<float> h_tilde(endatom-startatom+1, endatom-startatom+1);
@@ -460,13 +462,11 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Using the matmult function of Jama.
     cout << "Calculating S..." << endl;
     cout << "Dimensions of E transpose: " << E_transpose.dim1() << " x " << E_transpose.dim2() << endl;
-    cout << "Dimensions of Hessian: " << h.dim1() << " x " << h.dim2() << endl;
+    cout << "Dimensions of Hessian: " << hessian.dim1() << " x " << hessian.dim2() << endl;
     cout << "Dimensions of E: " << E.dim1() << " x " << E.dim2() << endl;
     TNT::Array2D<float> S(m, m);
     S = matmult(matmult(E_transpose, hessian), E);
-    //S = E_transpose*h*E;  //operator*(operator*(E_transpose, h), E);
 
-    cout << "SIZE OF S: " << S.dim1() << " x "  << S.dim2() << endl;
     cout << "PRINTING S: " << endl;
     for (unsigned int i = 0; i < S.dim1(); i++) {
        for (unsigned int j = 0; j < S.dim2(); j++) {
@@ -506,7 +506,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     for (int i = 0; i < nV; i++) {
         for (int j = 0; j < numParticles; j++) {
             eigenvectors[i][j] = Vec3(U[3*j][sortedEvalues[i].second], U[3*j+1][sortedEvalues[i].second], U[3*j+2][sortedEvalues[i].second]);
-            outfile << U[3*j][i] << " " << U[3*j+1][i] << " " << U[3*j+2][i] << endl;
+            outfile << U[3*j][sortedEvalues[i].second] << " " << U[3*j+1][sortedEvalues[i].second] << " " << U[3*j+2][sortedEvalues[i].second] << endl;
         }
     }
 
