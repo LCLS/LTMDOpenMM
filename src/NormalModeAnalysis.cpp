@@ -410,7 +410,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         // eigenvalue ABOVE the cutoff, so we have to put in the values
         // at indices 0 to k-1. 
 	for (int a = 0; a < k; a++) {
-	   cout << "A: " << a << endl;
            // Again, these are the corners of the block Hessian:
            // (startatom, startatom) and (endatom, endatom).
            int startatom = blocks[i]*3;
@@ -427,11 +426,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            // endatom.
            // Note that the way this is set up, bigE is actually E^T and not E,
            // since we form the vectors and THEN push.
-	   cout << "Making entry e" << endl;
-	   cout << "Startatom: " << startatom << endl;
-	   cout << "Dim2: " << bigQ[i].dim2() << endl;
-	   cout << "Endatom: " << endatom << endl;
-	   cout << "Total: " << startatom+bigQ[i].dim2()+(n-endatom-1) << endl;
            vector<float> entryE(n);
            int pos = 0;
            for (int j = 0; j < startatom; j++) // Pad beginning
@@ -441,9 +435,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            for (int j = endatom+1; j < n; j++)  // Pad end
               entryE[pos++] = 0;
 
-	   cout << "Putting into E" << endl;
            bigE.push_back(entryE);
-	   cout << "Done pushing into E" << endl;
         }
     }
     cout << "Size of bigE: " << bigE.size() << endl;
