@@ -138,7 +138,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     } 
     
     // Copy the center of mass force.
-    blockSystem->addForce(&system.getForce(0));    
+    //blockSystem->addForce(&system.getForce(0));    
 
     // Create a new harmonic bond force.
     // This only contains pairs of atoms which are in the same block.
@@ -306,11 +306,12 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
 
     // Print the Hessian to a file.
+    // Put both to a file.
     ofstream hess("hessian.txt", ios::out);
     cout << "PRINTING HESSIAN: " << endl << endl;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            hess << "H(" << i << ", " << j << "): " << h[i][j] << endl;
+            hess << "H(" << i << ", " << j << "): " << hessian[i][j] << endl;
         }
     }
 
@@ -343,7 +344,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
 	     {
-             h_tilde[xpos][ypos++] = h[j][k];
+             h_tilde[xpos][ypos++] = hessian[j][k];
 	     }
           xpos++;
        }
@@ -467,6 +468,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     TNT::Array2D<float> S(m, m);
     S = matmult(matmult(E_transpose, hessian), E);
 
+    // Change to file
     cout << "PRINTING S: " << endl;
     for (unsigned int i = 0; i < S.dim1(); i++) {
        for (unsigned int j = 0; j < S.dim2(); j++) {
@@ -481,13 +483,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Diagonalizing S by finding eigenvalues and eigenvectors...
     cout << "Diagonalizing S..." << endl;
     TNT::Array1D<float> dS;
-    TNT::Array2D<float> Q;
-    findEigenvaluesJama(S, dS, Q);
+    TNT::Array2D<float> q;
+    findEigenvaluesJama(S, dS, q);
     
-    // Compute U, set of approximate eigenvectors.
-    // U = E*Q.
-    cout << "Computing U..." << endl;
-    TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
     // Sort by ABSOLUTE VALUE of eigenvalues.
     sortedEvalues.clear();
@@ -495,20 +493,42 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     for (int i = 0; i < dS.dim(); i++)
        sortedEvalues[i] = make_pair(fabs(dS[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
+    
+    TNT::Array2D<float> Q_transpose(q.dim1(), q.dim2());
+    TNT::Array2D<float> Q(q.dim2(), q.dim1());
+    for (int i = 0; i < sortedEvalues.size(); i++)
+       for (int j = 0; j < q.dim2(); j++)
+          Q_transpose[i][j] = q[sortedEvalues[i].second][j];
+    maxEigenvalue = sortedEvalues[dS.dim()-1].first;
+    
+    for (int i = 0; i < q.dim2(); i++)
+       for (int j = 0; j < q.dim1(); j++)
+           Q[i][j] = Q_transpose[j][i];
 
+
+    // Compute U, set of approximate eigenvectors.
+    // BUG: Q should be sorted before multiplying by E.
+    // U = E*Q.
+    cout << "Computing U..." << endl;
+    TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
     // Record the eigenvectors.
     // These will be placed in a file eigenvectors.txt
     cout << "Computing final eigenvectors... " << endl;
     ofstream outfile("eigenvectors.txt", ios::out);
-    int nV = 20;
-    eigenvectors.resize(nV, vector<Vec3>(numParticles));
-    for (int i = 0; i < nV; i++) {
+    eigenvectors.resize(numVectors, vector<Vec3>(numParticles));
+    for (int i = 0; i < numVectors; i++) {
         for (int j = 0; j < numParticles; j++) {
-            eigenvectors[i][j] = Vec3(U[3*j][sortedEvalues[i].second], U[3*j+1][sortedEvalues[i].second], U[3*j+2][sortedEvalues[i].second]);
-            outfile << U[3*j][sortedEvalues[i].second] << " " << U[3*j+1][sortedEvalues[i].second] << " " << U[3*j+2][sortedEvalues[i].second] << endl;
+            eigenvectors[i][j] = Vec3(U[3*j][i], U[3*j+1][i], U[3*j+2][i]);
+            outfile << U[3*j][i] << " " << U[3*j+1][i] << " " << U[3*j+2][i] << endl;
         }
     }
+
+    // Record the eigenvalues.
+    // These will be placed in a file eigenvalues.txt
+    ofstream evalfile("eigenvalues.txt", ios::out);
+    for (int i = 0; i < sortedEvalues.size(); i++)
+       evalfile << i << " " << sortedEvalues[i].first << endl;
 
 }
 
