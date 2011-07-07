@@ -114,11 +114,23 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // I am assuming that they will always start with the N-terminus, just for testing.
     // This is true for the villin.xml but may not be true in the future.
     int num_residues = 0;
+    int res_per_block = 1;
+    int first_atom = 0;
+    int flag = 0;
     for (int i = 0; i < numParticles; i++) {
+
        if (int(system.getParticleMass(i)) == 14) // N-terminus end, Nitrogen atom
           {
-             num_residues++;
-             blocks.push_back(i);
+	     if (flag == 0) {
+	        cout << "NEW BLOCK AT " << i << endl;
+                num_residues++;
+                blocks.push_back(i);
+		flag++;
+	     }
+	     else
+	        flag++;
+	     if (flag == res_per_block)
+	       flag = 0;
           }
     }
     cout << "Running block Hessian with " << num_residues << endl;
@@ -153,11 +165,11 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         double length, k;
         ohf->getBondParameters(i, particle1, particle2, length, k);
         if (inSameBlock(particle1, particle2)) {
-	   cout << particle1 << " and " << particle2 << " are in the same block." << endl;
+	   //cout << particle1 << " and " << particle2 << " are in the same block." << endl;
            hf.addBond(particle1, particle2, length, k);
         }
-	else
-	   cout << particle1 << " and " << particle2 << " are not in the same block." << endl;
+	//else
+	//   cout << particle1 << " and " << particle2 << " are not in the same block." << endl;
     }
     blockSystem->addForce(&hf);
 
@@ -246,7 +258,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     customNonbonded->setCutoffDistance((CustomNonbondedForce::NonbondedMethod)nbf->getCutoffDistance());
     blockSystem->addForce(customNonbonded);   
 
-
     // Copy the positions.
     Context blockContext(*blockSystem, context.getIntegrator());
     blockContext.setPositions(state.getPositions());
@@ -280,8 +291,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
             positions[i][j] = pos[j];
             int col = i*3+j;
             int row = 0;
-            for (int k = 0; k < numParticles; k++) {
-                double scale = 1.0/(2*delta*sqrt(blockSystem->getParticleMass(i)*blockSystem->getParticleMass(k)));
+	    for (int k = 0; k < numParticles; k++) {
+                double scale = 1.0/(2*delta*sqrt(system.getParticleMass(i)*system.getParticleMass(k)));
                 h[row++][col] = (forces1[k][0]-forces2[k][0])*scale;
                 h[row++][col] = (forces1[k][1]-forces2[k][1])*scale;
                 h[row++][col] = (forces1[k][2]-forces2[k][2])*scale;
@@ -305,15 +316,23 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
 
+
+
     // Print the Hessian to a file.
     // Put both to a file.
     ofstream hess("hessian.txt", ios::out);
+    ofstream bhess("blockhessian.txt", ios::out);
     cout << "PRINTING HESSIAN: " << endl << endl;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            hess << "H(" << i << ", " << j << "): " << hessian[i][j] << endl;
+            //hess << "H(" << i << ", " << j << "): " << hessian[i][j] << endl;
+            //hess >> hessian[i][j];
+	    //bhess >> h[i][j];
+	    hess << hessian[i][j] << endl;
+            bhess << h[i][j] << endl;
         }
     }
+
 
 
     // Diagonalize each block Hessian, get Eigenvectors
@@ -322,9 +341,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     vector<float> Di;
     vector<TNT::Array1D<float> > bigD;
     vector<TNT::Array2D<float> > bigQ;
+    ofstream hii_file("h_tilde.txt", ios::out);
     for (int i = 0; i < blocks.size(); i++) {
        cout << "Diagonalizing block: " << i << endl;   
- 
        // 1. Determine the starting and ending index for the block
        //    This means that the upper left corner of the block will be at (startatom, startatom)
        //    And the lower right corner will be at (endatom, endatom)
@@ -335,6 +354,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        else
           endatom = 3*blocks[i+1] - 1; 
 
+       cout << "Startatom: " << startatom << " Endatom: " << endatom << endl;
        // 2. Get the block Hessian Hii
        //    Right now I'm just doing a copy from the big Hessian
        //    There's probably a more efficient way but for now I just want things to work..
@@ -344,10 +364,14 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
 	     {
-             h_tilde[xpos][ypos++] = hessian[j][k];
+	     hii_file << hessian[j][k] << " ";
+             h_tilde[xpos][ypos++] = h[j][k];
 	     }
           xpos++;
+	  hii_file << endl;
        }
+       hii_file << endl;
+       hii_file << endl;
        
        // 3. Diagonalize the block Hessian only, and get eigenvectors
        TNT::Array1D<float> di(endatom-startatom+1);
@@ -376,19 +400,23 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     for (int i = 0; i < Di.size(); i++)
        sortedEvalues[i] = make_pair(fabs(Di[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
+    ofstream firsteigen("eigenvals_hessian.txt", ios::out);
+    for (int i = 0; i < sortedEvalues.size(); i++)
+       firsteigen << sortedEvalues[i].first << endl;
     int bdof = 12;
     cout << "Number of eigenvalues is: " << sortedEvalues.size() << endl;
+    cout << "Printing the 1765th eigenvalue" << endl;
+    //float cutEigen = sortedEvalues[1745].first;
     float cutEigen = sortedEvalues[bdof*blocks.size()].first;  // This is the cutoff eigenvalue
     cout << "Cutoff eigenvalue is: " << cutEigen << endl;
     //***********************************************************
 
-    // Build E.
     // For each Qi:
     //    Sort individual eigenvalues.
     //    Find some k such that k is the index of the largest eigenvalue less or equal to cutEigen
     //    Put those first k eigenvectors into E.
     vector<vector<float> > bigE;
-    
+    ofstream efile("e.txt", ios::out);
     
     for (int i = 0; i < bigQ.size(); i++) {
         cout << "Putting eigenvector " << i << " into E" << endl;
@@ -434,11 +462,14 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
            for (int j = 0; j < startatom; j++) // Pad beginning
               entryE[pos++] = 0;
            for (int j = 0; j < bigQ[i].dim2(); j++) // Eigenvector entries
-              entryE[pos++] = bigQ[i][sE[a].second][j];  
+              entryE[pos++] = bigQ[i][j][sE[a].second];  
            for (int j = endatom+1; j < n; j++)  // Pad end
               entryE[pos++] = 0;
 
            bigE.push_back(entryE);
+	   for (int h = 0; h < entryE.size(); h++)
+	      efile << entryE[h] << " ";
+	   efile << endl;
         }
     }
     cout << "Size of bigE: " << bigE.size() << endl;
@@ -498,7 +529,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     TNT::Array2D<float> Q(q.dim2(), q.dim1());
     for (int i = 0; i < sortedEvalues.size(); i++)
        for (int j = 0; j < q.dim2(); j++)
-          Q_transpose[i][j] = q[sortedEvalues[i].second][j];
+          Q_transpose[i][j] = q[j][sortedEvalues[i].second];
     maxEigenvalue = sortedEvalues[dS.dim()-1].first;
     
     for (int i = 0; i < q.dim2(); i++)
@@ -507,7 +538,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
 
     // Compute U, set of approximate eigenvectors.
-    // BUG: Q should be sorted before multiplying by E.
     // U = E*Q.
     cout << "Computing U..." << endl;
     TNT::Array2D<float> U = matmult(E, Q); //E*Q;
