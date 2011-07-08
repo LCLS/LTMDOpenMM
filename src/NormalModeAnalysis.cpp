@@ -30,6 +30,7 @@
  * -------------------------------------------------------------------------- */
 
 #include "nmlopenmm/NormalModeAnalysis.h"
+#include "nmlopenmm/NMLIntegrator.h"
 #include "openmm/OpenMMException.h"
 #include "openmm/State.h"
 #include "openmm/Vec3.h"
@@ -42,6 +43,7 @@
 //#include <vecLib/clapack.h>
 #include <fstream>
 using namespace OpenMM;
+using namespace OpenMM_LTMD;
 using namespace std;
 
 static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
@@ -259,7 +261,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     blockSystem->addForce(customNonbonded);   
 
     // Copy the positions.
-    Context blockContext(*blockSystem, context.getIntegrator());
+NMLIntegrator integ(300, 100.0, 0.05);
+    integ.setMaxEigenvalue(5e5);
+    Context blockContext(*blockSystem, integ);
     blockContext.setPositions(state.getPositions());
     
     /*********************************************************************/
@@ -271,7 +275,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Finite difference method works the same, you perturb positions twice
     // and calculate forces each time, and you must scale by 1/2*dx*M^2.
     TNT::Array2D<float> h(n, n);
-    cout << "Numparticles: " << numParticles << endl;
+    /*cout << "Numparticles: " << numParticles << endl;
     for (int i = 0; i < numParticles; i++) {
         cout << i << endl;
         Vec3 pos = positions[i];
@@ -314,22 +318,22 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
             hessian[i][j] = avg;
             hessian[j][i] = avg;
         }
-    }
+    }*/
 
 
 
     // Print the Hessian to a file.
     // Put both to a file.
-    ofstream hess("hessian.txt", ios::out);
-    ofstream bhess("blockhessian.txt", ios::out);
+    ifstream hess("hessian.txt", ios::out);
+    ifstream bhess("blockhessian.txt", ios::out);
     cout << "PRINTING HESSIAN: " << endl << endl;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             //hess << "H(" << i << ", " << j << "): " << hessian[i][j] << endl;
-            //hess >> hessian[i][j];
-	    //bhess >> h[i][j];
-	    hess << hessian[i][j] << endl;
-            bhess << h[i][j] << endl;
+            hess >> hessian[i][j];
+	    bhess >> h[i][j];
+	    //hess << hessian[i][j] << endl;
+            //bhess << h[i][j] << endl;
         }
     }
 
