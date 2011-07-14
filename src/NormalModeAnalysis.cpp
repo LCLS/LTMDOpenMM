@@ -124,7 +124,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        if (int(system.getParticleMass(i)) == 14) // N-terminus end, Nitrogen atom
           {
 	     if (flag == 0) {
-	        cout << "NEW BLOCK AT " << i << endl;
                 num_residues++;
                 blocks.push_back(i);
 		flag++;
@@ -135,8 +134,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	       flag = 0;
           }
     }
-    cout << "Running block Hessian with " << num_residues << endl;
-    cout << "Total number of blocks: " << blocks.size() << endl;
+    
     // Creating a whole new system called the blockSystem.
     // This system will only contain bonds, angles, dihedrals, and impropers
     // between atoms in the same block. 
@@ -145,21 +143,19 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // This necessitates some copying from the original system, but is required
     // because OpenMM populates all data when it reads XML.
     System* blockSystem = new System();
-
     // Copy all atoms into the block system.
     for (int i = 0; i < numParticles; i++) {
        blockSystem->addParticle(system.getParticleMass(i));
     } 
     
     // Copy the center of mass force.
-    //blockSystem->addForce(&system.getForce(0));    
+    blockSystem->addForce(&system.getForce(0));    
 
     // Create a new harmonic bond force.
     // This only contains pairs of atoms which are in the same block.
     // I have to iterate through each bond from the old force, then
     // selectively add them to the new force based on this condition.
     HarmonicBondForce hf;
-    cout << "Number of forces: " << system.getNumForces() << endl;
     const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(1));
     for (int i = 0; i < ohf->getNumBonds(); i++) {
         // For our system, add bonds between atoms in the same block
@@ -167,14 +163,10 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         double length, k;
         ohf->getBondParameters(i, particle1, particle2, length, k);
         if (inSameBlock(particle1, particle2)) {
-	   //cout << particle1 << " and " << particle2 << " are in the same block." << endl;
            hf.addBond(particle1, particle2, length, k);
         }
-	//else
-	//   cout << particle1 << " and " << particle2 << " are not in the same block." << endl;
     }
     blockSystem->addForce(&hf);
-
 
     // Same thing with the angle force....
     HarmonicAngleForce af;
@@ -219,7 +211,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     }
     blockSystem->addForce(&rbtf);
 
-
     // This is a custom nonbonded pairwise force and
     // includes terms for both LJ and Coulomb. 
     // Note that the step term will go to zero if block1 does not equal block 2,
@@ -261,11 +252,18 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     blockSystem->addForce(customNonbonded);   
 
     // Copy the positions.
-NMLIntegrator integ(300, 100.0, 0.05);
+    NMLIntegrator integ(300, 100.0, 0.05);
     integ.setMaxEigenvalue(5e5);
-    Context blockContext(*blockSystem, integ);
-    blockContext.setPositions(state.getPositions());
-    
+    if (blockContext) delete blockContext;
+    blockContext = new Context(*blockSystem, integ, Platform::getPlatformByName("Cuda"));
+    bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
+    vector<Vec3> blockPositions;
+    for (int i = 0; i < numParticles; i++) {
+       Vec3 atom(state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2]);
+       blockPositions.push_back(atom);
+    }
+
+    blockContext->setPositions(blockPositions);
     /*********************************************************************/
 
     // Construct the mass weighted Hessian, and the block Hessian.
@@ -275,31 +273,35 @@ NMLIntegrator integ(300, 100.0, 0.05);
     // Finite difference method works the same, you perturb positions twice
     // and calculate forces each time, and you must scale by 1/2*dx*M^2.
     TNT::Array2D<float> h(n, n);
-    /*cout << "Numparticles: " << numParticles << endl;
     for (int i = 0; i < numParticles; i++) {
-        cout << i << endl;
         Vec3 pos = positions[i];
-        for (int j = 0; j < 3; j++) {
+        Vec3 blockpos = blockPositions[i];
+	for (int j = 0; j < 3; j++) {
 	    // Block Hessian AND Hessian for now
 	    double delta = getDelta(positions[i][j], isDoublePrecision);
-            positions[i][j] = pos[j]-delta;
+	    double blockDelta = getDelta(blockPositions[i][j], isBlockDoublePrecision);
+	    positions[i][j] = pos[j]-delta;
+	    blockPositions[i][j] = blockpos[j]-blockDelta;
 	    context.setPositions(positions);
-            blockContext.setPositions(positions);
-            vector<Vec3> forces1 = blockContext.getState(State::Forces).getForces();
+            blockContext->setPositions(blockPositions);
+            vector<Vec3> forces1 = blockContext->getState(State::Forces).getForces();
             vector<Vec3> forces1full = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j]+delta;
-            blockContext.setPositions(positions);
+	    blockPositions[i][j] = blockpos[j]+blockDelta;
+            blockContext->setPositions(blockPositions);
             context.setPositions(positions);
-            vector<Vec3> forces2 = blockContext.getState(State::Forces).getForces();
+            vector<Vec3> forces2 = blockContext->getState(State::Forces).getForces();
             vector<Vec3> forces2full = context.getState(State::Forces).getForces();
             positions[i][j] = pos[j];
+	    blockPositions[i][j] = blockpos[j];
             int col = i*3+j;
             int row = 0;
 	    for (int k = 0; k < numParticles; k++) {
                 double scale = 1.0/(2*delta*sqrt(system.getParticleMass(i)*system.getParticleMass(k)));
-                h[row++][col] = (forces1[k][0]-forces2[k][0])*scale;
-                h[row++][col] = (forces1[k][1]-forces2[k][1])*scale;
-                h[row++][col] = (forces1[k][2]-forces2[k][2])*scale;
+                double blockscale = 1.0/(2*blockDelta*sqrt(system.getParticleMass(i)*system.getParticleMass(k)));
+                h[row++][col] = (forces1[k][0]-forces2[k][0])*blockscale;
+                h[row++][col] = (forces1[k][1]-forces2[k][1])*blockscale;
+                h[row++][col] = (forces1[k][2]-forces2[k][2])*blockscale;
 		row = row - 3;
                 hessian[row++][col] = (forces1full[k][0]-forces2full[k][0])*scale;
                 hessian[row++][col] = (forces1full[k][1]-forces2full[k][1])*scale;
@@ -318,24 +320,8 @@ NMLIntegrator integ(300, 100.0, 0.05);
             hessian[i][j] = avg;
             hessian[j][i] = avg;
         }
-    }*/
-
-
-
-    // Print the Hessian to a file.
-    // Put both to a file.
-    ifstream hess("hessian.txt", ios::out);
-    ifstream bhess("blockhessian.txt", ios::out);
-    cout << "PRINTING HESSIAN: " << endl << endl;
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            //hess << "H(" << i << ", " << j << "): " << hessian[i][j] << endl;
-            hess >> hessian[i][j];
-	    bhess >> h[i][j];
-	    //hess << hessian[i][j] << endl;
-            //bhess << h[i][j] << endl;
-        }
     }
+
 
 
 
@@ -345,9 +331,7 @@ NMLIntegrator integ(300, 100.0, 0.05);
     vector<float> Di;
     vector<TNT::Array1D<float> > bigD;
     vector<TNT::Array2D<float> > bigQ;
-    ofstream hii_file("h_tilde.txt", ios::out);
     for (int i = 0; i < blocks.size(); i++) {
-       cout << "Diagonalizing block: " << i << endl;   
        // 1. Determine the starting and ending index for the block
        //    This means that the upper left corner of the block will be at (startatom, startatom)
        //    And the lower right corner will be at (endatom, endatom)
@@ -358,7 +342,6 @@ NMLIntegrator integ(300, 100.0, 0.05);
        else
           endatom = 3*blocks[i+1] - 1; 
 
-       cout << "Startatom: " << startatom << " Endatom: " << endatom << endl;
        // 2. Get the block Hessian Hii
        //    Right now I'm just doing a copy from the big Hessian
        //    There's probably a more efficient way but for now I just want things to work..
@@ -368,14 +351,10 @@ NMLIntegrator integ(300, 100.0, 0.05);
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
 	     {
-	     hii_file << hessian[j][k] << " ";
              h_tilde[xpos][ypos++] = h[j][k];
 	     }
           xpos++;
-	  hii_file << endl;
        }
-       hii_file << endl;
-       hii_file << endl;
        
        // 3. Diagonalize the block Hessian only, and get eigenvectors
        TNT::Array1D<float> di(endatom-startatom+1);
@@ -393,9 +372,6 @@ NMLIntegrator integ(300, 100.0, 0.05);
        bigQ.push_back(Qi);
     }
 
-    cout << "Size of Di: " << Di.size() << endl;
-    cout << "Size of bigD: " << bigD.size() << endl;
-    cout << "Size of bigQ: " << bigQ.size() << endl;
 
     //***********************************************************
     // This section here is only to find the cuttoff eigenvalue.
@@ -404,15 +380,8 @@ NMLIntegrator integ(300, 100.0, 0.05);
     for (int i = 0; i < Di.size(); i++)
        sortedEvalues[i] = make_pair(fabs(Di[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
-    ofstream firsteigen("eigenvals_hessian.txt", ios::out);
-    for (int i = 0; i < sortedEvalues.size(); i++)
-       firsteigen << sortedEvalues[i].first << endl;
     int bdof = 12;
-    cout << "Number of eigenvalues is: " << sortedEvalues.size() << endl;
-    cout << "Printing the 1765th eigenvalue" << endl;
-    //float cutEigen = sortedEvalues[1745].first;
     float cutEigen = sortedEvalues[bdof*blocks.size()].first;  // This is the cutoff eigenvalue
-    cout << "Cutoff eigenvalue is: " << cutEigen << endl;
     //***********************************************************
 
     // For each Qi:
@@ -420,14 +389,10 @@ NMLIntegrator integ(300, 100.0, 0.05);
     //    Find some k such that k is the index of the largest eigenvalue less or equal to cutEigen
     //    Put those first k eigenvectors into E.
     vector<vector<float> > bigE;
-    ofstream efile("e.txt", ios::out);
     
     for (int i = 0; i < bigQ.size(); i++) {
-        cout << "Putting eigenvector " << i << " into E" << endl;
-        cout << "BigD dim: " << bigD[i].dim() << endl;
         vector<pair<float, int> > sE(bigD[i].dim());
         int k = 0;
-        cout << "Finding k" << endl;   
         // Here we find k as the number of eigenvectors
         // smaller than the cutoff eigenvalue.
         // After we sort them, then k will be the index
@@ -436,10 +401,8 @@ NMLIntegrator integ(300, 100.0, 0.05);
            sE[j] = make_pair(fabs(bigD[i][j]), j);
            if (bigD[i][j] <= cutEigen) k++;
         }
-	cout << "Sorting Eigenvalues" << endl;
         sort(sE.begin(), sE.end());
  
-        cout << "Putting k eigenvectors in.  k is: " << k << endl;
         // Put the eigenvectors in the corresponding order
         // into E.  Note that k is the index of the smallest
         // eigenvalue ABOVE the cutoff, so we have to put in the values
@@ -471,12 +434,8 @@ NMLIntegrator integ(300, 100.0, 0.05);
               entryE[pos++] = 0;
 
            bigE.push_back(entryE);
-	   for (int h = 0; h < entryE.size(); h++)
-	      efile << entryE[h] << " ";
-	   efile << endl;
         }
     }
-    cout << "Size of bigE: " << bigE.size() << endl;
     
 
     // Inefficient, needs to improve.
@@ -496,27 +455,19 @@ NMLIntegrator integ(300, 100.0, 0.05);
 
     // Compute S, which is equal to E^T * H * E.
     // Using the matmult function of Jama.
-    cout << "Calculating S..." << endl;
-    cout << "Dimensions of E transpose: " << E_transpose.dim1() << " x " << E_transpose.dim2() << endl;
-    cout << "Dimensions of Hessian: " << hessian.dim1() << " x " << hessian.dim2() << endl;
-    cout << "Dimensions of E: " << E.dim1() << " x " << E.dim2() << endl;
     TNT::Array2D<float> S(m, m);
     S = matmult(matmult(E_transpose, hessian), E);
 
     // Change to file
-    cout << "PRINTING S: " << endl;
     for (unsigned int i = 0; i < S.dim1(); i++) {
        for (unsigned int j = 0; j < S.dim2(); j++) {
             float avg = 0.5f*(S[i][j]+S[j][i]);
             S[i][j] = avg;
             S[j][i] = avg;
-          cout << S[i][j] << " ";
        }
-       cout << endl;
     }
     
     // Diagonalizing S by finding eigenvalues and eigenvectors...
-    cout << "Diagonalizing S..." << endl;
     TNT::Array1D<float> dS;
     TNT::Array2D<float> q;
     findEigenvaluesJama(S, dS, q);
@@ -543,12 +494,10 @@ NMLIntegrator integ(300, 100.0, 0.05);
 
     // Compute U, set of approximate eigenvectors.
     // U = E*Q.
-    cout << "Computing U..." << endl;
     TNT::Array2D<float> U = matmult(E, Q); //E*Q;
 
     // Record the eigenvectors.
     // These will be placed in a file eigenvectors.txt
-    cout << "Computing final eigenvectors... " << endl;
     ofstream outfile("eigenvectors.txt", ios::out);
     eigenvectors.resize(numVectors, vector<Vec3>(numParticles));
     for (int i = 0; i < numVectors; i++) {
@@ -558,11 +507,6 @@ NMLIntegrator integ(300, 100.0, 0.05);
         }
     }
 
-    // Record the eigenvalues.
-    // These will be placed in a file eigenvalues.txt
-    ofstream evalfile("eigenvalues.txt", ios::out);
-    for (int i = 0; i < sortedEvalues.size(); i++)
-       evalfile << i << " " << sortedEvalues[i].first << endl;
 
 }
 
