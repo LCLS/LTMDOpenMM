@@ -42,8 +42,10 @@ namespace OpenMM {
 class OPENMM_EXPORT NormalModeAnalysis {
 public:
     NormalModeAnalysis() {
+       blockContext = NULL;
     }
     ~NormalModeAnalysis() {
+      if (blockContext) delete blockContext;
     }
     void computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors);
     void computeEigenvectorsRestricting(ContextImpl& contextImpl, int numVectors);
@@ -70,6 +72,7 @@ private:
     std::vector<std::vector<double> > projection;
     std::vector<std::vector<Vec3> > eigenvectors;
     double maxEigenvalue;
+    Context* blockContext;
     std::vector<int> blocks;
 };
 
