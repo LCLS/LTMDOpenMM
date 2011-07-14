@@ -51,7 +51,7 @@ void testMinimizationAndIntegration() {
     ifstream in("villin.xml");
     System* system = XmlSerializer::deserialize<System>(in);
     in.close();
-    in.open("villin_start.txt");
+    in.open("villin_minimize.txt");
     int numParticles = system->getNumParticles();
 
     // Load the starting positions.
@@ -69,7 +69,7 @@ void testMinimizationAndIntegration() {
     int numModes = 10;
     NMLIntegrator integ(300, 100.0, 0.05);
     integ.setMaxEigenvalue(5e5);
-    Context context(*system, integ, Platform::getPlatformByName("Cuda"));
+    Context context(*system, integ, Platform::getPlatformByName("Reference"));
     context.setPositions(positions);
     double energy1 = context.getState(State::Energy).getPotentialEnergy();
     integ.minimize(50);
