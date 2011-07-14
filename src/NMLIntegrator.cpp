@@ -136,7 +136,7 @@ void NMLIntegrator::minimize(int maxsteps) {
 
 void NMLIntegrator::computeProjectionVectors() {
     NormalModeAnalysis nma;
-    nma.computeEigenvectorsFull(*context, 10);
+    nma.computeEigenvectorsFull(*context, 20);
     const vector<vector<Vec3> > e1 = nma.getEigenvectors();
     setProjectionVectors(nma.getEigenvectors());
     maxEigenvalue = 5e5;//nma.getMaxEigenvalue();
