@@ -135,7 +135,7 @@ void testMinimizationAndIntegration() {
     ifstream in("villin.xml");
     System* system = XmlSerializer::deserialize<System>(in);
     in.close();
-    in.open("villin_start.txt");
+    in.open("villin_minimize.txt");
     int numParticles = system->getNumParticles();
 
     // Load the starting positions.
