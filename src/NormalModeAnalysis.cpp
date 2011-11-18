@@ -618,14 +618,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Using the matmult function of Jama.
     TNT::Array2D<float> S(m, m);
     
-    //for (unsigned int i = 0; i < n; i++)
-    //   for (unsigned int j = 0; j < m; j++) 
-    //       EPS[i][j] = EPS_transpose[j][i] = (1.0/sqrt(system.getParticleMass(i/3)))*E[i][j];
-    
-
     // Compute F(x0). 
     vector<Vec3> fx0 = context.getState(State::Forces).getForces();
-    // Compute eps.
     double eps;
 
     // Make a temp copy of positions.
@@ -646,27 +640,24 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
        // Calculate F(xi).
        vector<Vec3> fxi = context.getState(State::Forces).getForces();
-
        TNT::Array2D<float> Force_diff(n, 1);
        for (int i = 0; i < n; i++) {
            Force_diff[i][0] = fxi[i/3][i%3] - fx0[i/3][i%3];
-	   }
+       }
 
        TNT::Array2D<float> Si(m, 1);
-       //matMultLapack(EPS_transpose,Force_diff,Si);
        Si = matmult(EPS_transpose,Force_diff);
 
        // Copy to S.
        for (int i = 0; i < m; i++)
           S[i][k] = Si[i][0]*(1.0/eps);
 
-       for (unsigned int i = 0; i < numParticles; i++) {
-          for (unsigned int j = 0; j < 3; j++) {
+       for (unsigned int i = 0; i < numParticles; i++)
+          for (unsigned int j = 0; j < 3; j++)
              positions[i][j] = tmppos[i][j];
-	  }
-	  }
        context.setPositions(positions);
     }
+
 
     //*****************************************************************
     
@@ -1059,6 +1050,7 @@ void NormalModeAnalysis::computeEigenvectorsDihedral(ContextImpl& contextImpl, i
 }
 
 double NormalModeAnalysis::getDelta(double value, bool isDoublePrecision, LTMDParameters* ltmd) {
+    return ltmd->delta;
     double delta = sqrt(ltmd->delta)*max(fabs(value), 0.1);
     //double delta = sqrt(isDoublePrecision ? 1e-16 : 1e-7)*max(fabs(value), 0.1);
     volatile double temp = value+delta;
