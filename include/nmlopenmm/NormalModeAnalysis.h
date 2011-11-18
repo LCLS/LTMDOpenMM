@@ -36,6 +36,12 @@
 #include <map>
 #include <utility>
 #include <vector>
+#include "LTMDParameters.h"
+
+//extern "C" void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
+//void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
+//        double *w, double *work, int *lwork, int *info );
+
 
 namespace OpenMM {
 
@@ -47,7 +53,7 @@ public:
     ~NormalModeAnalysis() {
       if (blockContext) delete blockContext;
     }
-    void computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors);
+    void computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors, LTMDParameters* ltmd);
     void computeEigenvectorsRestricting(ContextImpl& contextImpl, int numVectors);
     void computeEigenvectorsDihedral(ContextImpl& contextImpl, int numVectors);
     const std::vector<std::vector<Vec3> >& getEigenvectors() const {
@@ -60,7 +66,7 @@ public:
     bool inSameBlock(int, int, int, int);
 private:
     class TreeNode;
-    static double getDelta(double value, bool isDoublePrecision);
+    static double getDelta(double value, bool isDoublePrecision, LTMDParameters* ltmd);
     void buildTree(ContextImpl& context);
     void processTreeNode(TreeNode& node, std::vector<bool>& processed, bool isRootNode);
     void recordParticleNodes(TreeNode& node);
