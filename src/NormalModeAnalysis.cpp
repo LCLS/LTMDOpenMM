@@ -42,13 +42,17 @@
 #include <algorithm>
 #include <vector>
 #include <fstream>
-#include "/afs/crc.nd.edu/user/t/tcickovs/clapack-3.2.1-CMAKE/INCLUDE/clapack.h"
+//#include "/afs/crc.nd.edu/user/t/tcickovs/clapack-3.2.1-CMAKE/INCLUDE/clapack.h"
 using namespace OpenMM;
 using namespace OpenMM_LTMD;
 using namespace std;
 
 extern "C" void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
+//void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
         double *w, double *work, int *lwork, int *info );
+
+extern "C" int f2c_dgemm (char* transa, char* transb, int* m, int* n, int* k, double* alpha,
+                        double* a, int* lda, double* b, int* ldb, double* beta, double* c, int* ldc);
 
 static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
     JAMA::Eigenvalue<float> decomp(matrix);
@@ -57,15 +61,15 @@ static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<
 }
 
 static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
-    integer n = matrix.dim1();
+    int n = matrix.dim1();
     //long int n = matrix.dim1();
     char jobz = 'V';
     char uplo = 'U';
-    long int lwork = 3*n-1;
-    vector<float> a(n*n);
-    vector<float> w(n);
-    vector<float> work(lwork);
-    long int info;
+    int lwork = 3*n-1;
+    vector<double> a(n*n);
+    vector<double> w(n);
+    vector<double> work(lwork);
+    int info;
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             a[i*n+j] = matrix[i][j];
@@ -77,6 +81,36 @@ static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             vectors[i][j] = a[i+j*n];
+}
+
+static void matMultLapack(const TNT::Array2D<float>& matrix1, TNT::Array2D<float>& matrix2, TNT::Array2D<float>& matrix3) {
+   int m = matrix1.dim1();
+   int k = matrix1.dim2();
+   int n = matrix2.dim2();
+   char transa = 'N';
+   char transb = 'N';
+   double alpha = 0.0;
+   double beta = 0.0;
+   int lda = m;
+   int ldb = k;
+   int ldc = m;
+   vector<double> a(m*k);
+   vector<double> b(k*n);
+   vector<double> c(m*n);
+   cout << "LDA: " << lda << " LDB: " << ldb << " LDC: " << ldc << endl;
+   for (int i = 0; i < m; i++)
+       for (int j = 0; j < k; j++)
+           a[i*k+j] = matrix1[i][j];
+
+   for (int i = 0; i < k; i++)
+       for (int j = 0; j < n; j++)
+           b[i*n+j] = matrix2[i][j];
+
+   f2c_dgemm(&transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc);
+
+   for (int i = 0; i < m; i++)
+      for (int j = 0; j < n; j++)
+          matrix3[i][j] = c[i*n+j];
 }
 
 
@@ -236,27 +270,30 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // includes terms for both LJ and Coulomb. 
     // Note that the step term will go to zero if block1 does not equal block 2,
     // and will be one otherwise.
-    CustomNonbondedForce* customNonbonded = new CustomNonbondedForce("(step(block1-block2)*step(block2-block1))*(4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r); q=q1*q2; sigma=0.5*(sigma1+sigma2); eps=sqrt(eps1*eps2)");
+    //CustomNonbondedForce* customNonbonded = new CustomNonbondedForce("(step(block1-block2)*step(block2-block1))*(4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r); q=q1*q2; sigma=0.5*(sigma1+sigma2); eps=sqrt(eps1*eps2)");
     const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(5));
-    
+    NonbondedForce* nonbonded = new NonbondedForce();
  
     // To make a custom nonbonded force work, you have to add parameters.
     // The block number is new for this particular application, the other
     // three are copied from the old system.
-    customNonbonded->addPerParticleParameter("block");
+    /*customNonbonded->addPerParticleParameter("block");
     customNonbonded->addPerParticleParameter("q");
     customNonbonded->addPerParticleParameter("sigma");
     customNonbonded->addPerParticleParameter("eps");
-    
-    vector<double> params(4);
+    */
+
+
+    //vector<double> params(4);
     for (int i = 0; i < nbf->getNumParticles(); i++) {
         double charge, sigma, epsilon;
         nbf->getParticleParameters(i, charge, sigma, epsilon);
-        params[0] = blockNumber(i);   // block #
+        /*params[0] = blockNumber(i);   // block #
         params[1] = charge;
         params[2] = sigma;
-        params[3] = epsilon;
-        customNonbonded->addParticle(params);
+        params[3] = epsilon;*/
+        //customNonbonded->addParticle(params);
+        nonbonded->addParticle(charge, sigma, epsilon);
     }
  
     // Copy the exclusions.
@@ -264,14 +301,34 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         int p1, p2;
         double cp, sig, eps;
         nbf->getExceptionParameters(i, p1, p2, cp, sig, eps);
-        customNonbonded->addExclusion(p1, p2);
+	if (inSameBlock(p1, p2))
+	{
+            nonbonded->addException(p1, p2, cp, sig, eps);
+	}
+        //customNonbonded->addExclusion(p1, p2);
     }   
 
+    // Exclude interactions between atoms not in the same blocks
+    for(int i = 0; i < nbf->getNumParticles(); i++)
+         {
+	 for(int j = i + 1; j < nbf->getNumParticles(); j++)
+	 {
+             if(!inSameBlock(i, j))
+	        nonbonded->addException(i, j, 0.0, 0.0, 0.0);
+         }
+        }
+    nonbonded->setNonbondedMethod(nbf->getNonbondedMethod());
+    nonbonded->setCutoffDistance(nbf->getCutoffDistance());
+    blockSystem->addForce(nonbonded);
+
+
+
+
     // Copy the algorithm then add the force.
-    customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
+    /*customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
     customNonbonded->setCutoffDistance((CustomNonbondedForce::NonbondedMethod)nbf->getCutoffDistance());
     blockSystem->addForce(customNonbonded);   
-
+*/
     // Copy the positions.
     NMLIntegrator integ(300, 100.0, 0.05);
     integ.setMaxEigenvalue(5e5);
@@ -455,7 +512,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        // 3. Diagonalize the block Hessian only, and get eigenvectors
        TNT::Array1D<float> di(endatom-startatom+1);
        TNT::Array2D<float> Qi(endatom-startatom+1, endatom-startatom+1);
-       findEigenvaluesLapack(h_tilde, di, Qi);
+       findEigenvaluesJama(h_tilde, di, Qi);
+       //findEigenvaluesLapack(h_tilde, di, Qi);
 
        // 4. Copy eigenvalues to big array
        //    This is necessary because we have to sort them, and determine
@@ -598,6 +656,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	   }
 
        TNT::Array2D<float> Si(m, 1);
+       //matMultLapack(EPS_transpose,Force_diff,Si);
        Si = matmult(EPS_transpose,Force_diff);
 
        // Copy to S.
@@ -630,7 +689,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Diagonalizing S by finding eigenvalues and eigenvectors...
     TNT::Array1D<float> dS;
     TNT::Array2D<float> q;
-    findEigenvaluesLapack(S, dS, q);
+    findEigenvaluesJama(S, dS, q);
+    //findEigenvaluesLapack(S, dS, q);
     
 
     // Sort by ABSOLUTE VALUE of eigenvalues.
