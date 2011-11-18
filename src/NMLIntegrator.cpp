@@ -29,6 +29,7 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include "nmlopenmm/LTMDParameters.h"
 #include "nmlopenmm/NMLIntegrator.h"
 #include "nmlopenmm/IntegrateNMLStepKernel.h"
 #include "nmlopenmm/NormalModeAnalysis.h"
@@ -136,7 +137,28 @@ void NMLIntegrator::minimize(int maxsteps) {
 
 void NMLIntegrator::computeProjectionVectors() {
     NormalModeAnalysis nma;
-    nma.computeEigenvectorsFull(*context, 20);
+    
+    // Setting LTMDParameters
+    int res[] = {21, 11, 12, 15, 12, 20, 16, 6, 10, 16,
+                 20, 7, 17, 14, 13, 3, 3, 5, 11, 10,
+		 20, 10, 9, 5, 19, 14, 19, 10, 14, 16,
+		 6, 12, 5, 12, 5, 8, 3, 6, 19, 16,
+		 6, 16, 6, 15, 16, 6, 7, 19};
+    LTMDParameters ltmd;
+    ltmd.delta = 1e-9;
+    ltmd.bdof = 12;
+    ltmd.res_per_block = 1;
+    for (int i = 0; i < 49; i++)
+       ltmd.residue_sizes.push_back(res[i]);
+
+    ltmd.forces.push_back(LTMDForce("CenterOfMass", 0));
+    ltmd.forces.push_back(LTMDForce("Bond", 1));
+    ltmd.forces.push_back(LTMDForce("Angle", 2));
+    ltmd.forces.push_back(LTMDForce("Dihedral", 3));
+    ltmd.forces.push_back(LTMDForce("Improper", 4));
+    ltmd.forces.push_back(LTMDForce("Nonbonded", 5));
+
+    nma.computeEigenvectorsFull(*context, 20, &ltmd);
     const vector<vector<Vec3> > e1 = nma.getEigenvectors();
     setProjectionVectors(nma.getEigenvectors());
     maxEigenvalue = 5e5;//nma.getMaxEigenvalue();

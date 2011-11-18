@@ -130,7 +130,8 @@ bool NormalModeAnalysis::inSameBlock(int p1, int p2, int p3=-1, int p4=-1) {
     return true;   // They're all the same!
 }
 
-void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors) {
+void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors,
+                                                 LTMDParameters* ltmd) {
     struct timeval tp_begin;
     struct timeval tp_hess;
     struct timeval tp_diag;
@@ -171,13 +172,28 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     int largest_block_size = -1; // Keep track of the largest block size, we'll
                                  // need it to parallelize.
     System* blockSystem = new System();
+    int pos = 0;
+    int rescount = 0;
+    blocks.push_back(0);  // Starting atom starts first block
     for (int i = 0; i < numParticles; i++) {
        blockSystem->addParticle(system.getParticleMass(i));
+       if (i-blocks[pos] == ltmd->residue_sizes[pos] && rescount < ltmd->res_per_block)
+       {
+           cout << "Atom: " << i << endl;
+           blocks.push_back(i);
+	   if (ltmd->residue_sizes[pos] > largest_block_size)
+	       largest_block_size = ltmd->residue_sizes[pos];
+           pos++;
+	   rescount++;
+	   if (rescount == ltmd->res_per_block)
+	      rescount = 0;
+       }
 
-       if (int(system.getParticleMass(i)) == 14) // N-terminus end, Nitrogen atom
+       /*if (int(system.getParticleMass(i)) == 14) // N-terminus end, Nitrogen atom
           {
 	     if (flag == 0) {
                 num_residues++;
+		cout << "Atom: " << i << endl;
                 blocks.push_back(i);
 		if (blocks.size() > 1) {
 		   int blocksize = blocks[blocks.size()-1] - blocks[blocks.size()-2];
@@ -190,7 +206,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	        flag++;
 	     if (flag == res_per_block)
 	       flag = 0;
-          }
+          }*/
     }
     
     // Creating a whole new system called the blockSystem.
@@ -203,132 +219,113 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Copy all atoms into the block system.
     
     // Copy the center of mass force.
-    blockSystem->addForce(&system.getForce(0));    
-    //blockSystem->addForce(&system.getForce(1));
-
-    // Create a new harmonic bond force.
-    // This only contains pairs of atoms which are in the same block.
-    // I have to iterate through each bond from the old force, then
-    // selectively add them to the new force based on this condition.
-    HarmonicBondForce hf;
-    const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(1));
-    for (int i = 0; i < ohf->getNumBonds(); i++) {
-        // For our system, add bonds between atoms in the same block
-        int particle1, particle2;
-        double length, k;
-        ohf->getBondParameters(i, particle1, particle2, length, k);
-        if (inSameBlock(particle1, particle2)) {
-           hf.addBond(particle1, particle2, length, k);
-        }
-    }
-    blockSystem->addForce(&hf);
-
-    // Same thing with the angle force....
-    HarmonicAngleForce af;
-    const HarmonicAngleForce* ahf = dynamic_cast<const HarmonicAngleForce*>(&system.getForce(2));
-    for (int i = 0; i < ahf->getNumAngles(); i++) {
-        // For our system, add bonds between atoms in the same block
-        int particle1, particle2, particle3;
-        double angle, k;
-        ahf->getAngleParameters(i, particle1, particle2, particle3, angle, k);
-        if (inSameBlock(particle1, particle2, particle3)) {
-           af.addAngle(particle1, particle2, particle3, angle, k);
-        }
-    }
-    blockSystem->addForce(&af);
-
-
-    // And the dihedrals....
-    PeriodicTorsionForce ptf;
-    const PeriodicTorsionForce* optf = dynamic_cast<const PeriodicTorsionForce*>(&system.getForce(3));
-    for (int i = 0; i < optf->getNumTorsions(); i++) {
-        // For our system, add bonds between atoms in the same block
-        int particle1, particle2, particle3, particle4, periodicity;
-        double phase, k;
-        optf->getTorsionParameters(i, particle1, particle2, particle3, particle4, periodicity, phase, k);
-        if (inSameBlock(particle1, particle2, particle3, particle4)) {
-           ptf.addTorsion(particle1, particle2, particle3, particle4, periodicity, phase, k);
-        }
-    }
-    blockSystem->addForce(&ptf);
-
-    // And the impropers....
-    RBTorsionForce rbtf;
-    const RBTorsionForce* orbtf = dynamic_cast<const RBTorsionForce*>(&system.getForce(4));
-    for (int i = 0; i < orbtf->getNumTorsions(); i++) {
-        // For our system, add bonds between atoms in the same block
-        int particle1, particle2, particle3, particle4;
-        double c0, c1, c2, c3, c4, c5;
-        orbtf->getTorsionParameters(i, particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
-        if (inSameBlock(particle1, particle2, particle3, particle4)) {
-           rbtf.addTorsion(particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
-        }
-    }
-    blockSystem->addForce(&rbtf);
-
-    // This is a custom nonbonded pairwise force and
-    // includes terms for both LJ and Coulomb. 
-    // Note that the step term will go to zero if block1 does not equal block 2,
-    // and will be one otherwise.
-    //CustomNonbondedForce* customNonbonded = new CustomNonbondedForce("(step(block1-block2)*step(block2-block1))*(4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r); q=q1*q2; sigma=0.5*(sigma1+sigma2); eps=sqrt(eps1*eps2)");
-    const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(5));
-    NonbondedForce* nonbonded = new NonbondedForce();
+    cout << "adding forces..." << endl;
+    for (int i = 0; i < ltmd->forces.size(); i++) {
+       string forcename = ltmd->forces[i].name;
+       cout << "Adding force " << forcename << " at index " << ltmd->forces[i].index << endl;
+       if (forcename == "CenterOfMass") 
+          blockSystem->addForce(&system.getForce(ltmd->forces[i].index));    
+       else if (forcename == "Bond") {
+	  // Create a new harmonic bond force.
+          // This only contains pairs of atoms which are in the same block.
+          // I have to iterate through each bond from the old force, then
+          // selectively add them to the new force based on this condition.
+          HarmonicBondForce* hf = new HarmonicBondForce();
+          const HarmonicBondForce* ohf = dynamic_cast<const HarmonicBondForce*>(&system.getForce(ltmd->forces[i].index));
+          for (int i = 0; i < ohf->getNumBonds(); i++) {
+             // For our system, add bonds between atoms in the same block
+             int particle1, particle2;
+             double length, k;
+             ohf->getBondParameters(i, particle1, particle2, length, k);
+             if (inSameBlock(particle1, particle2)) {
+                hf->addBond(particle1, particle2, length, k);
+             }
+          }
+          blockSystem->addForce(hf);
+       }
+       else if (forcename == "Angle") {
+          // Same thing with the angle force....
+          HarmonicAngleForce* af = new HarmonicAngleForce();
+          const HarmonicAngleForce* ahf = dynamic_cast<const HarmonicAngleForce*>(&system.getForce(ltmd->forces[i].index));
+          for (int i = 0; i < ahf->getNumAngles(); i++) {
+             // For our system, add bonds between atoms in the same block
+             int particle1, particle2, particle3;
+             double angle, k;
+             ahf->getAngleParameters(i, particle1, particle2, particle3, angle, k);
+             if (inSameBlock(particle1, particle2, particle3)) {
+                af->addAngle(particle1, particle2, particle3, angle, k);
+             }
+          }
+          blockSystem->addForce(af);
+       }
+       else if (forcename == "Dihedral") {
+          // And the dihedrals....
+          PeriodicTorsionForce* ptf = new PeriodicTorsionForce();
+          const PeriodicTorsionForce* optf = dynamic_cast<const PeriodicTorsionForce*>(&system.getForce(ltmd->forces[i].index));
+          for (int i = 0; i < optf->getNumTorsions(); i++) {
+             // For our system, add bonds between atoms in the same block
+             int particle1, particle2, particle3, particle4, periodicity;
+             double phase, k;
+             optf->getTorsionParameters(i, particle1, particle2, particle3, particle4, periodicity, phase, k);
+             if (inSameBlock(particle1, particle2, particle3, particle4)) {
+                ptf->addTorsion(particle1, particle2, particle3, particle4, periodicity, phase, k);
+             }
+          }
+          blockSystem->addForce(ptf);
+       }
+       else if (forcename == "Improper") {
+          // And the impropers....
+          RBTorsionForce* rbtf = new RBTorsionForce();
+          const RBTorsionForce* orbtf = dynamic_cast<const RBTorsionForce*>(&system.getForce(ltmd->forces[i].index));
+          for (int i = 0; i < orbtf->getNumTorsions(); i++) {
+             // For our system, add bonds between atoms in the same block
+             int particle1, particle2, particle3, particle4;
+             double c0, c1, c2, c3, c4, c5;
+             orbtf->getTorsionParameters(i, particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
+             if (inSameBlock(particle1, particle2, particle3, particle4)) {
+                rbtf->addTorsion(particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5);
+             }
+          }
+          blockSystem->addForce(rbtf);
+       }
+       else if (forcename == "Nonbonded") {
+          // This is a custom nonbonded pairwise force and
+          // includes terms for both LJ and Coulomb. 
+          // Note that the step term will go to zero if block1 does not equal block 2,
+          // and will be one otherwise.
+          const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(ltmd->forces[i].index));
+          NonbondedForce* nonbonded = new NonbondedForce();
  
-    // To make a custom nonbonded force work, you have to add parameters.
-    // The block number is new for this particular application, the other
-    // three are copied from the old system.
-    /*customNonbonded->addPerParticleParameter("block");
-    customNonbonded->addPerParticleParameter("q");
-    customNonbonded->addPerParticleParameter("sigma");
-    customNonbonded->addPerParticleParameter("eps");
-    */
-
-
-    //vector<double> params(4);
-    for (int i = 0; i < nbf->getNumParticles(); i++) {
-        double charge, sigma, epsilon;
-        nbf->getParticleParameters(i, charge, sigma, epsilon);
-        /*params[0] = blockNumber(i);   // block #
-        params[1] = charge;
-        params[2] = sigma;
-        params[3] = epsilon;*/
-        //customNonbonded->addParticle(params);
-        nonbonded->addParticle(charge, sigma, epsilon);
-    }
+          for (int i = 0; i < nbf->getNumParticles(); i++) {
+             double charge, sigma, epsilon;
+             nbf->getParticleParameters(i, charge, sigma, epsilon);
+             nonbonded->addParticle(charge, sigma, epsilon);
+          }
  
-    // Copy the exclusions.
-    for (int i = 0; i < nbf->getNumExceptions(); i++) {
-        int p1, p2;
-        double cp, sig, eps;
-        nbf->getExceptionParameters(i, p1, p2, cp, sig, eps);
-	if (inSameBlock(p1, p2))
-	{
-            nonbonded->addException(p1, p2, cp, sig, eps);
-	}
-        //customNonbonded->addExclusion(p1, p2);
-    }   
+          // Copy the exclusions.
+          for (int i = 0; i < nbf->getNumExceptions(); i++) {
+             int p1, p2;
+             double cp, sig, eps;
+             nbf->getExceptionParameters(i, p1, p2, cp, sig, eps);
+	     if (inSameBlock(p1, p2))
+                nonbonded->addException(p1, p2, cp, sig, eps);
+          }   
 
-    // Exclude interactions between atoms not in the same blocks
-    for(int i = 0; i < nbf->getNumParticles(); i++)
-         {
-	 for(int j = i + 1; j < nbf->getNumParticles(); j++)
-	 {
-             if(!inSameBlock(i, j))
-	        nonbonded->addException(i, j, 0.0, 0.0, 0.0);
-         }
-        }
-    nonbonded->setNonbondedMethod(nbf->getNonbondedMethod());
-    nonbonded->setCutoffDistance(nbf->getCutoffDistance());
-    blockSystem->addForce(nonbonded);
+          // Exclude interactions between atoms not in the same blocks
+          for(int i = 0; i < nbf->getNumParticles(); i++)
+	        for(int j = i + 1; j < nbf->getNumParticles(); j++)
+                   if(!inSameBlock(i, j))
+	              nonbonded->addException(i, j, 0.0, 0.0, 0.0);
+          nonbonded->setNonbondedMethod(nbf->getNonbondedMethod());
+          nonbonded->setCutoffDistance(nbf->getCutoffDistance());
+          blockSystem->addForce(nonbonded);
+       }
+       else {
+          cout << "Unknown Force: " << forcename << endl;
+       }
+    }
+    cout << "done." << endl;
 
-
-
-
-    // Copy the algorithm then add the force.
-    /*customNonbonded->setNonbondedMethod((CustomNonbondedForce::NonbondedMethod)nbf->getNonbondedMethod());
-    customNonbonded->setCutoffDistance((CustomNonbondedForce::NonbondedMethod)nbf->getCutoffDistance());
-    blockSystem->addForce(customNonbonded);   
-*/
     // Copy the positions.
     NMLIntegrator integ(300, 100.0, 0.05);
     integ.setMaxEigenvalue(5e5);
@@ -362,7 +359,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	     if (j == blocks.size()-1 && atom_to_perturb >= numParticles) continue;
              if (j != blocks.size()-1 && atom_to_perturb >= blocks[j+1]) continue;
              
-	     double blockDelta = getDelta(blockPositions[atom_to_perturb][dof_to_perturb % 3], isBlockDoublePrecision);
+	     double blockDelta = getDelta(blockPositions[atom_to_perturb][dof_to_perturb % 3], isBlockDoublePrecision, ltmd);
 	     deltas[j] = blockDelta;
              blockPositions[atom_to_perturb][dof_to_perturb % 3] = tmp[atom_to_perturb][dof_to_perturb % 3] - blockDelta;
 
@@ -537,8 +534,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     for (int i = 0; i < Di.size(); i++)
        sortedEvalues[i] = make_pair(fabs(Di[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
-    int bdof = 12;
-    float cutEigen = sortedEvalues[bdof*blocks.size()].first;  // This is the cutoff eigenvalue
+    //int bdof = 12;
+    float cutEigen = sortedEvalues[ltmd->bdof*blocks.size()].first;  // This is the cutoff eigenvalue
 
     // For each Qi:
     //    Sort individual eigenvalues.
@@ -641,7 +638,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        for (unsigned int i = 0; i < numParticles; i++) {
           for (unsigned int j = 0; j < 3; j++) {
              positions[i][j] += eps*EPS[pos][k];
-	     eps = getDelta(positions[i][j], isDoublePrecision);
+	     eps = getDelta(positions[i][j], isDoublePrecision, ltmd);
 	     pos++;
 	  }
        }
@@ -749,7 +746,7 @@ void NormalModeAnalysis::computeEigenvectorsRestricting(ContextImpl& contextImpl
     for (int i = 0; i < numParticles; i++) {
         Vec3 pos = positions[i];
         for (int j = 0; j < 3; j++) {
-            double delta = getDelta(positions[i][j], isDoublePrecision);
+            double delta = getDelta(positions[i][j], isDoublePrecision, NULL);
             positions[i][j] = pos[j]+delta;
             context.setPositions(positions);
             vector<Vec3> forces2 = context.getState(State::Forces).getForces();
@@ -1061,8 +1058,9 @@ void NormalModeAnalysis::computeEigenvectorsDihedral(ContextImpl& contextImpl, i
     }
 }
 
-double NormalModeAnalysis::getDelta(double value, bool isDoublePrecision) {
-    double delta = sqrt(isDoublePrecision ? 1e-16 : 1e-7)*max(fabs(value), 0.1);
+double NormalModeAnalysis::getDelta(double value, bool isDoublePrecision, LTMDParameters* ltmd) {
+    double delta = sqrt(ltmd->delta)*max(fabs(value), 0.1);
+    //double delta = sqrt(isDoublePrecision ? 1e-16 : 1e-7)*max(fabs(value), 0.1);
     volatile double temp = value+delta;
     delta = temp-value;
     return delta;
