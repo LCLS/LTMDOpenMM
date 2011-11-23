@@ -35,6 +35,8 @@
 #include "openmm/Integrator.h"
 #include "openmm/Kernel.h"
 #include "openmm/internal/windowsExport.h"
+#include "nmlopenmm/LTMDParameters.h"
+
 
 namespace OpenMM_LTMD {
 
@@ -51,7 +53,7 @@ public:
      * @param frictionCoeff  the friction coefficient which couples the system to the heat bath
      * @param stepSize       the step size with which to integrator the system (in picoseconds)
      */
-    NMLIntegrator(double temperature, double frictionCoeff, double stepSize);
+    NMLIntegrator(double temperature, double frictionCoeff, double stepSize, LTMDParameters* param);
     /**
      * Get the temperature of the heat bath (in Kelvin).
      */
@@ -163,6 +165,7 @@ private:
     int stepsSinceDiagonalize, rediagonalizeFrequency, randomNumberSeed;
     OpenMM::ContextImpl* context;
     OpenMM::Kernel kernel;
+    LTMDParameters* parameters;
 };
 
 } // namespace OpenMM_LTMD

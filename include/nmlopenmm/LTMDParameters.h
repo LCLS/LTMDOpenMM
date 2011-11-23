@@ -6,6 +6,8 @@
 #include <map>
 using namespace std;
 
+namespace OpenMM_LTMD {
+
 struct LTMDForce {
    LTMDForce(string n, int i) : name(n), index(i) {}
    string name;
@@ -18,7 +20,10 @@ struct LTMDParameters {
     int res_per_block;
     int bdof;
     vector<LTMDForce> forces;
+    int modes;
 };
+
+}
 
 
 #endif

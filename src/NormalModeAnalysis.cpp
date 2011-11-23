@@ -42,17 +42,19 @@
 #include <algorithm>
 #include <vector>
 #include <fstream>
+#include "OpenMM.h"
+
 //#include "/afs/crc.nd.edu/user/t/tcickovs/clapack-3.2.1-CMAKE/INCLUDE/clapack.h"
 using namespace OpenMM;
 using namespace OpenMM_LTMD;
 using namespace std;
 
-extern "C" void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
+//extern "C" void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
 //void ssyev_( char *jobz, char *uplo, int *n, double *a, int *lda,
-        double *w, double *work, int *lwork, int *info );
+//        double *w, double *work, int *lwork, int *info );
 
-extern "C" int f2c_dgemm (char* transa, char* transb, int* m, int* n, int* k, double* alpha,
-                        double* a, int* lda, double* b, int* ldb, double* beta, double* c, int* ldc);
+//extern "C" int f2c_dgemm (char* transa, char* transb, int* m, int* n, int* k, double* alpha,
+//                        double* a, int* lda, double* b, int* ldb, double* beta, double* c, int* //ldc);
 
 static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
     JAMA::Eigenvalue<float> decomp(matrix);
@@ -60,6 +62,13 @@ static void findEigenvaluesJama(const TNT::Array2D<float>& matrix, TNT::Array1D<
     decomp.getV(vectors);
 }
 
+static void findEigenvaluesJama(const TNT::Array2D<double>& matrix, TNT::Array1D<double>& values, TNT::Array2D<double>& vectors) {
+    JAMA::Eigenvalue<double> decomp(matrix);
+    decomp.getRealEigenvalues(values);
+    decomp.getV(vectors);
+}
+
+/*
 static void findEigenvaluesLapack(const TNT::Array2D<float>& matrix, TNT::Array1D<float>& values, TNT::Array2D<float>& vectors) {
     int n = matrix.dim1();
     //long int n = matrix.dim1();
@@ -112,7 +121,7 @@ static void matMultLapack(const TNT::Array2D<float>& matrix1, TNT::Array2D<float
       for (int j = 0; j < n; j++)
           matrix3[i][j] = c[i*n+j];
 }
-
+*/
 
 unsigned int NormalModeAnalysis::blockNumber(int p) {
     unsigned int block = 0;
@@ -130,7 +139,7 @@ bool NormalModeAnalysis::inSameBlock(int p1, int p2, int p3=-1, int p4=-1) {
     return true;   // They're all the same!
 }
 
-void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int numVectors,
+void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl,
                                                  LTMDParameters* ltmd) {
     struct timeval tp_begin;
     struct timeval tp_hess;
@@ -149,6 +158,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     System& system = context.getSystem();
     int numParticles = positions.size();
     int n = 3*numParticles;
+    int numVectors = ltmd->modes;
 
     /*********************************************************************/
     /*                                                                   */
@@ -208,6 +218,8 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	       flag = 0;
           }*/
     }
+
+    cout << "blocks " << blocks.size();
     
     // Creating a whole new system called the blockSystem.
     // This system will only contain bonds, angles, dihedrals, and impropers
@@ -293,32 +305,78 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
           // includes terms for both LJ and Coulomb. 
           // Note that the step term will go to zero if block1 does not equal block 2,
           // and will be one otherwise.
+	 CustomBondForce* cbf = new CustomBondForce("4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r");
           const NonbondedForce* nbf = dynamic_cast<const NonbondedForce*>(&system.getForce(ltmd->forces[i].index));
           NonbondedForce* nonbonded = new NonbondedForce();
  
-          for (int i = 0; i < nbf->getNumParticles(); i++) {
-             double charge, sigma, epsilon;
-             nbf->getParticleParameters(i, charge, sigma, epsilon);
-             nonbonded->addParticle(charge, sigma, epsilon);
-          }
- 
-          // Copy the exclusions.
-          for (int i = 0; i < nbf->getNumExceptions(); i++) {
+	  cbf->addPerBondParameter("q");
+	  cbf->addPerBondParameter("sigma");
+	  cbf->addPerBondParameter("eps");
+
+	  // store exceptions
+	  // exceptions[p1][p2] = params
+	  map<int, map<int, vector<double> > > exceptions;
+
+	  for (int i = 0; i < nbf->getNumExceptions(); i++) {
              int p1, p2;
-             double cp, sig, eps;
-             nbf->getExceptionParameters(i, p1, p2, cp, sig, eps);
+             double q, sig, eps;
+             nbf->getExceptionParameters(i, p1, p2, q, sig, eps);
 	     if (inSameBlock(p1, p2))
-                nonbonded->addException(p1, p2, cp, sig, eps);
+	       {
+		 vector<double> params;
+		 params.push_back(q);
+		 params.push_back(sig);
+		 params.push_back(eps);
+		 if(exceptions.count(p1) == 0)
+		   {
+		     map<int, vector<double> > pair_exception;
+		     pair_exception[p2] = params;
+		     exceptions[p1] = pair_exception;
+		   }
+		 else
+		   {
+		     exceptions[p1][p2] = params;
+		   }
+	       }
           }   
 
-          // Exclude interactions between atoms not in the same blocks
-          for(int i = 0; i < nbf->getNumParticles(); i++)
-	        for(int j = i + 1; j < nbf->getNumParticles(); j++)
-                   if(!inSameBlock(i, j))
-	              nonbonded->addException(i, j, 0.0, 0.0, 0.0);
-          nonbonded->setNonbondedMethod(nbf->getNonbondedMethod());
-          nonbonded->setCutoffDistance(nbf->getCutoffDistance());
-          blockSystem->addForce(nonbonded);
+	  // add particle params
+	  // TODO: iterate over block dimensions to reduce to O(b^2 N_b)
+	  for(int i = 0; i < nbf->getNumParticles() - 1; i++)
+	    {
+	      for(int j = i + 1; j < nbf->getNumParticles(); j++)
+		{
+		  if(!inSameBlock(i, j))
+		    continue;
+		  // we have an exception -- 1-4 modified interactions, etc.
+		  if(exceptions.count(i) == 1 && exceptions[i].count(j) == 1)
+		    {
+		      vector<double> params = exceptions[i][j];
+		      cbf->addBond(i, j, params);
+		    }
+		  // no exception, normal interaction
+		  else
+		    {
+		      vector<double> params;
+		      double q1, q2, eps1, eps2, sigma1, sigma2, q, eps, sigma;
+		      
+		      nbf->getParticleParameters(i, q1, sigma1, eps1);
+		      nbf->getParticleParameters(j, q2, sigma2, eps2);
+		      
+		      q = q1 * q2;
+		      sigma = 0.5 * (sigma1 + sigma2);
+		      eps = sqrt(eps1 * eps2);
+		      
+		      params.push_back(q);
+		      params.push_back(sigma);
+		      params.push_back(eps);
+		      
+		      cbf->addBond(i, j, params);
+		    }
+		}
+	    }
+
+          blockSystem->addForce(cbf);
        }
        else {
           cout << "Unknown Force: " << forcename << endl;
@@ -327,10 +385,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     cout << "done." << endl;
 
     // Copy the positions.
-    NMLIntegrator integ(300, 100.0, 0.05);
-    integ.setMaxEigenvalue(5e5);
+    VerletIntegrator integ(0.0);
     if (blockContext) delete blockContext;
-    blockContext = new Context(*blockSystem, integ, Platform::getPlatformByName("Cuda"));
+    blockContext = new Context(*blockSystem, integ, Platform::getPlatformByName("Reference"));
     bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
     vector<Vec3> blockPositions;
     for (int i = 0; i < numParticles; i++) {
@@ -342,10 +399,13 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     /*********************************************************************/
 
 
-    TNT::Array2D<float> h(n, n);
+    fstream perturb_forces;
+    perturb_forces.open("perturb_forces.txt", fstream::out);
+    perturb_forces.precision(10);
+
+    TNT::Array2D<double> h(n, n);
     largest_block_size *= 3; // degrees of freedom in the largest block
-    vector<Vec3> tmp(blockPositions);
-    vector<Vec3> tmp2(blockPositions);
+    vector<Vec3> initialBlockPositions(blockPositions);
     for (int i = 0; i < largest_block_size; i++)
        {
           vector<double> deltas(blocks.size());
@@ -361,7 +421,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
              
 	     double blockDelta = getDelta(blockPositions[atom_to_perturb][dof_to_perturb % 3], isBlockDoublePrecision, ltmd);
 	     deltas[j] = blockDelta;
-             blockPositions[atom_to_perturb][dof_to_perturb % 3] = tmp[atom_to_perturb][dof_to_perturb % 3] - blockDelta;
+             blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - blockDelta;
 
 	  }
 
@@ -380,15 +440,50 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
              if (j != blocks.size()-1 && atom_to_perturb >= blocks[j+1]) continue;
              
 	     double blockDelta = deltas[j];
-             blockPositions[atom_to_perturb][dof_to_perturb % 3] = tmp2[atom_to_perturb][dof_to_perturb % 3] + blockDelta;
+             blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + blockDelta;
 
 
 	  }
 
           blockContext->setPositions(blockPositions);
           vector<Vec3> forces2 = blockContext->getState(State::Forces).getForces();
-          blockContext->setPositions(tmp2);
 
+	  // write out forces
+          for (int j = 0; j < blocks.size(); j++) {
+             int dof_to_perturb = 3*blocks[j]+i;
+             int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+
+	     // Cases to not perturb, in this case just skip the block
+	     if (j == blocks.size()-1 && atom_to_perturb >= numParticles) continue;
+             if (j != blocks.size()-1 && atom_to_perturb >= blocks[j+1]) continue;
+
+	     int start_dof = 3*blocks[j];
+	     int end_dof;
+	     if (j == blocks.size()-1)
+	       end_dof = 3*numParticles;
+	     else
+	       end_dof = 3*blocks[j+1]; 
+
+	     for(int k = start_dof; k < end_dof; k++)
+	       {
+		 perturb_forces << k << " " << dof_to_perturb << " " << forces2[k / 3][k % 3] << endl;
+	       }
+
+	  }
+
+
+	  // revert block positions
+          for (int j = 0; j < blocks.size(); j++) {
+             int dof_to_perturb = 3*blocks[j]+i;
+             int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+
+	     // Cases to not perturb, in this case just skip the block
+	     if (j == blocks.size()-1 && atom_to_perturb >= numParticles) continue;
+             if (j != blocks.size()-1 && atom_to_perturb >= blocks[j+1]) continue;
+             
+             blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3];
+
+	  }
 
           for (int j = 0; j < blocks.size(); j++) {
              int dof_to_perturb = 3*blocks[j]+i;
@@ -398,20 +493,43 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 	     if (j == blocks.size()-1 && atom_to_perturb >= numParticles) continue;
              if (j != blocks.size()-1 && atom_to_perturb >= blocks[j+1]) continue;
              
-	     int col = (atom_to_perturb*3)+(dof_to_perturb % 3);
+	     int col = dof_to_perturb; //(atom_to_perturb*3)+(dof_to_perturb % 3);
 	     int row = 0;
 
+	     int start_dof = 3*blocks[j];
+	     int end_dof;
+	     if (j == blocks.size()-1)
+	       end_dof = 3*numParticles;
+	     else
+	       end_dof = 3*blocks[j+1]; 
+
              double blockDelta = deltas[j];
-	     for (int k = 0; k < numParticles; k++) {
-                double blockscale = 1.0/(2*blockDelta*sqrt(system.getParticleMass(atom_to_perturb)*system.getParticleMass(k)));
-                h[row++][col] = (forces1[k][0]-forces2[k][0])*blockscale;
-                h[row++][col] = (forces1[k][1]-forces2[k][1])*blockscale;
-                h[row++][col] = (forces1[k][2]-forces2[k][2])*blockscale;
+	     for (int k = start_dof; k < end_dof; k++) {
+                double blockscale = 1.0/(2*blockDelta*sqrt(system.getParticleMass(atom_to_perturb)*system.getParticleMass(k / 3)));
+                h[k][col] = (forces1[k / 3][k % 3]-forces2[k / 3][k % 3])*blockscale;
               }
 	  }
 
        }
+    perturb_forces.close();
 
+    gettimeofday(&tp_hess, NULL);
+    cout << "Time to compute hessian: " << (tp_hess.tv_sec - tp_begin.tv_sec) << endl;
+
+    fstream block_hessian;
+    block_hessian.open("block_hessian.txt", fstream::out);
+    block_hessian.precision(10);
+    for(int i = 0; i < 3 * numParticles; i++)
+      {
+	for(int j = 0; j < 3 * numParticles; j++)
+	  {
+	    if(h[i][j] != 0.0)
+	      {
+		block_hessian << i << " " << j << " " << h[i][j] << endl;
+	      }
+	  }
+      }
+    block_hessian.close();
 
     // Construct the mass weighted Hessian, and the block Hessian.
     // The latter should turn out to be a block Hessian
@@ -468,8 +586,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
         }
     }
 
-    gettimeofday(&tp_hess, NULL);
-    cout << "Time to compute hessian: " << (tp_hess.tv_sec - tp_begin.tv_sec) << endl;
 
 
     cout << "Diagonalizing..." << endl;
@@ -477,9 +593,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Diagonalize each block Hessian, get Eigenvectors
     // Note: The eigenvalues will be placed in one large array, because
     //       we must sort them to get k
-    vector<float> Di;
-    vector<TNT::Array1D<float> > bigD;
-    vector<TNT::Array2D<float> > bigQ;
+    vector<double> Di;
+    TNT::Array1D<double> block_eigval(n);
+    TNT::Array2D<double> block_eigvec(n, n);
     for (int i = 0; i < blocks.size(); i++) {
        cout << "Diagonalizing block: " << i << endl;
        // 1. Determine the starting and ending index for the block
@@ -495,32 +611,44 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        // 2. Get the block Hessian Hii
        //    Right now I'm just doing a copy from the big Hessian
        //    There's probably a more efficient way but for now I just want things to work..
-       TNT::Array2D<float> h_tilde(endatom-startatom+1, endatom-startatom+1);
+       TNT::Array2D<double> h_tilde(endatom-startatom+1, endatom-startatom+1);
        int xpos = 0;
        for (int j = startatom; j <= endatom; j++) {
           int ypos = 0;
           for (int k = startatom; k <= endatom; k++)
 	     {
-             h_tilde[xpos][ypos++] = h[j][k];
+             h_tilde[ypos++][xpos] = h[j][k];
 	     }
           xpos++;
        }
        
        // 3. Diagonalize the block Hessian only, and get eigenvectors
-       TNT::Array1D<float> di(endatom-startatom+1);
-       TNT::Array2D<float> Qi(endatom-startatom+1, endatom-startatom+1);
+       TNT::Array1D<double> di(endatom-startatom+1);
+       TNT::Array2D<double> Qi(endatom-startatom+1, endatom-startatom+1);
        findEigenvaluesJama(h_tilde, di, Qi);
        //findEigenvaluesLapack(h_tilde, di, Qi);
 
-       // 4. Copy eigenvalues to big array
+       vector<pair<double, int> > sortedEval(di.dim());
+       for(int j = 0; j < di.dim(); j++)
+	 {
+	   sortedEval[j] = make_pair(fabs(di[j]), j);
+	 }
+       sort(sortedEval.begin(), sortedEval.end());
+
+       // 4. Copy eigenpairs to big array
        //    This is necessary because we have to sort them, and determine
        //    the cutoff eigenvalue for everybody.
-       for (int j = 0; j < di.dim(); j++)
-          Di.push_back(di[j]);
+       for(int j = 0; j < di.dim(); j++)
+	 {
+	   int col = sortedEval[j].second;
+	   block_eigval[j + startatom] = di[col];
 
-       // 5. Push eigenvectors into matrix
-       bigD.push_back(di);
-       bigQ.push_back(Qi);
+	   for(int k = 0; k < di.dim(); k++)
+	     {
+	       block_eigvec[k + startatom][j + startatom] = Qi[k][col];
+	     }
+	 }
+
     }
 
     gettimeofday(&tp_diag, NULL);
@@ -530,66 +658,37 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     //***********************************************************
     // This section here is only to find the cuttoff eigenvalue.
     // First sort the eigenvectors by the absolute value of the eigenvalue.
-    vector<pair<float, int> > sortedEvalues(Di.size());
-    for (int i = 0; i < Di.size(); i++)
-       sortedEvalues[i] = make_pair(fabs(Di[i]), i);
-    sort(sortedEvalues.begin(), sortedEvalues.end()); 
-    //int bdof = 12;
-    float cutEigen = sortedEvalues[ltmd->bdof*blocks.size()].first;  // This is the cutoff eigenvalue
-
-    // For each Qi:
-    //    Sort individual eigenvalues.
-    //    Find some k such that k is the index of the largest eigenvalue less or equal to cutEigen
-    //    Put those first k eigenvectors into E.
-    vector<vector<float> > bigE;
     
-    for (int i = 0; i < bigQ.size(); i++) {
-	vector<pair<float, int> > sE(bigD[i].dim());
-        int k = 0;
-        // Here we find k as the number of eigenvectors
-        // smaller than the cutoff eigenvalue.
-        // After we sort them, then k will be the index
-        // of the smallest eigenvalue bigger than the cutoff value.
-        for (int j = 0; j < bigD[i].dim(); j++) {
-           sE[j] = make_pair(fabs(bigD[i][j]), j);
-           if (bigD[i][j] <= cutEigen) k++;
-        }
-        sort(sE.begin(), sE.end());
- 
+    vector<pair<double, int> > sortedEvalues(block_eigval.dim());
+    for (int i = 0; i < block_eigval.dim(); i++)
+       sortedEvalues[i] = make_pair(fabs(block_eigval[i]), i);
+    sort(sortedEvalues.begin(), sortedEvalues.end()); 
 
-        // Put the eigenvectors in the corresponding order
-        // into E.  Note that k is the index of the smallest
-        // eigenvalue ABOVE the cutoff, so we have to put in the values
-        // at indices 0 to k-1. 
-	for (int a = 0; a < k; a++) {
-           // Again, these are the corners of the block Hessian:
-           // (startatom, startatom) and (endatom, endatom).
-           int startatom = blocks[i]*3;
-           int endatom;
-           if (i == blocks.size()-1)
-             endatom = 3*numParticles-1;
-           else
-             endatom = 3*blocks[i+1] - 1; 
+    int m = ltmd->bdof*blocks.size();
+    float cutEigen = sortedEvalues[m].first;  // This is the cutoff eigenvalue
+    cout << "cutoff " << cutEigen << endl;
+    
+    vector<int> selectedEigs;
+    for(int i = 0; i < n; i++)
+      {
+	if(fabs(block_eigval[i]) < cutEigen)
+	  {
+	    selectedEigs.push_back(i);
+	  }
+      }
 
-           // This is an entry for matrix E. 
-           // The eigenvectors will occupy row startatom through
-           // row endatom.
-           // Thus we must pad with zeroes before startatom and after
-           // endatom.
-           // Note that the way this is set up, bigE is actually E^T and not E,
-           // since we form the vectors and THEN push.
-           vector<float> entryE(n);
-           int pos = 0;
-           for (int j = 0; j < startatom; j++) // Pad beginning
-              entryE[pos++] = 0;
-           for (int j = 0; j < bigQ[i].dim2(); j++) // Eigenvector entries
-              entryE[pos++] = bigQ[i][j][sE[a].second];  
-           for (int j = endatom+1; j < n; j++)  // Pad end
-              entryE[pos++] = 0;
-
-           bigE.push_back(entryE);
-        }
-    }
+    fstream eigs_output;
+    eigs_output.open("block_eigs.txt", fstream::out);
+    eigs_output.precision(10);
+    for(int i = 0; i < m; i++)
+      {
+	for(int j = 0; j < n; j++)
+	  {
+	    int eig_col = selectedEigs[i];
+	    eigs_output << j << " " << i << " " << block_eigvec[j][eig_col] << endl;
+	  }
+      }
+    eigs_output.close();
     
 
     // Inefficient, needs to improve.
@@ -598,29 +697,47 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     // Again, right now I'm only worried about
     // correctness plus this time will be marginal compared to
     // diagonalization.
-    int m = bigE.size();
     cout << "M: " << m << endl;
-    TNT::Array2D<float> E(n, m);
-    //TNT::Array2D<float> E_transpose(m, n);
-    TNT::Array2D<float> EPS(n, m);
-    TNT::Array2D<float> EPS_transpose(m, n);
+    TNT::Array2D<double> E(n, m);
+    TNT::Array2D<double> E_transpose(m, n);
+    //TNT::Array2D<float> EPS(n, m);
+    //TNT::Array2D<float> EPS_transpose(m, n);
     for (int i = 0; i < m; i++)
        for (int j = 0; j < n; j++) {
-          E[j][i] = bigE[i][j];
-          //E[j][i] = E_transpose[i][j] = bigE[i][j];
-	  EPS[j][i] = EPS_transpose[i][j] = (1.0/sqrt(system.getParticleMass(i/3)))*bigE[i][j];
+	 int eig_col = selectedEigs[i];
+          E_transpose[i][j] = block_eigvec[j][eig_col];
+          E[j][i] = block_eigvec[j][eig_col];
        }
     gettimeofday(&tp_e, NULL);
     cout << "Time to compute E: " << (tp_e.tv_sec - tp_diag.tv_sec) << endl;
 
+    fstream eigs_in;
+    eigs_in.open("protomol_selected_eigs.txt", fstream::in);
+    int r, c;
+    double v;
+    while(!eigs_in.eof())
+      {
+	eigs_in >> r;
+	eigs_in >> c;
+	eigs_in >> v;
+	//E_transpose[c][r] = v;
+	//E[r][c] = v;
+      }
+    eigs_in.close();
+
     //*****************************************************************
     // Compute S, which is equal to E^T * H * E.
     // Using the matmult function of Jama.
-    TNT::Array2D<float> S(m, m);
+    TNT::Array2D<double> S(m, m);
+    
+    //for (unsigned int i = 0; i < n; i++)
+    //   for (unsigned int j = 0; j < m; j++) 
+    //       EPS[i][j] = EPS_transpose[j][i] = (1.0/sqrt(system.getParticleMass(i/3)))*E[i][j];
     
     // Compute F(x0). 
     vector<Vec3> fx0 = context.getState(State::Forces).getForces();
-    double eps;
+    // Compute eps.
+    double eps = ltmd->delta;
 
     // Make a temp copy of positions.
     vector<Vec3> tmppos(positions);
@@ -631,8 +748,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        int pos = 0;
        for (unsigned int i = 0; i < numParticles; i++) {
           for (unsigned int j = 0; j < 3; j++) {
-             positions[i][j] += eps*EPS[pos][k];
-	     eps = getDelta(positions[i][j], isDoublePrecision, ltmd);
+	    //positions[i][j] += eps*EPS[pos][k];
+	    positions[i][j] += eps * E[3*i+j][k] / sqrt(system.getParticleMass(i));
+	     //eps = getDelta(positions[i][j], isDoublePrecision, ltmd);
 	     pos++;
 	  }
        }
@@ -640,27 +758,30 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
        // Calculate F(xi).
        vector<Vec3> fxi = context.getState(State::Forces).getForces();
-       TNT::Array2D<float> Force_diff(n, 1);
-       for (int i = 0; i < n; i++) {
-           Force_diff[i][0] = fxi[i/3][i%3] - fx0[i/3][i%3];
-       }
 
-       TNT::Array2D<float> Si(m, 1);
-       Si = matmult(EPS_transpose,Force_diff);
+       TNT::Array2D<double> Force_diff(n, 1);
+       for (int i = 0; i < n; i++) {
+	 Force_diff[i][0] = (fxi[i/3][i%3] - fx0[i/3][i%3]) / (sqrt(system.getParticleMass(i/3)) * eps);
+	   }
+
+       TNT::Array2D<double> Si(m, 1);
+       //matMultLapack(EPS_transpose,Force_diff,Si);
+       Si = matmult(E_transpose, Force_diff);
 
        // Copy to S.
        for (int i = 0; i < m; i++)
-          S[i][k] = Si[i][0]*(1.0/eps);
+	 S[i][k] = Si[i][0];
 
-       for (unsigned int i = 0; i < numParticles; i++)
-          for (unsigned int j = 0; j < 3; j++)
+       for (unsigned int i = 0; i < numParticles; i++) {
+          for (unsigned int j = 0; j < 3; j++) {
              positions[i][j] = tmppos[i][j];
-       context.setPositions(positions);
+	  }
+       }
+       //context.setPositions(positions);
     }
 
-
-    //*****************************************************************
-    
+    // *****************************************************************
+    context.setPositions(tmppos);
 
     //S = matmult(matmult(E_transpose, hessian), E);
 
@@ -672,14 +793,39 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
             S[j][i] = avg;
        }
     }
+
+    fstream s_out;
+    s_out.open("s.txt", fstream::out);
+    s_out.precision(10);
+    for(int i = 0; i < m; i++)
+    {
+        for(int j = 0; j < m; j++)
+        {
+            s_out << j << " " << i << " " << S[j][i] << endl;
+        }
+    }
+    s_out.close(); 
+
+
     gettimeofday(&tp_s, NULL);
     cout << "Time to compute S: " << (tp_s.tv_sec - tp_e.tv_sec) << endl;
     // Diagonalizing S by finding eigenvalues and eigenvectors...
-    TNT::Array1D<float> dS;
-    TNT::Array2D<float> q;
+    TNT::Array1D<double> dS;
+    TNT::Array2D<double> q;
     findEigenvaluesJama(S, dS, q);
     //findEigenvaluesLapack(S, dS, q);
     
+
+    fstream s_eig_out;
+    s_eig_out.open("s_eig_out.txt", fstream::out);
+    s_eig_out.precision(10);
+    for(int i = 0; i < S.dim1(); i++)
+      {
+	for(int j = 0; j < S.dim1(); j++)
+	  {
+	    s_eig_out << j << " " << i << " " << q[j][i] << endl;
+	  }
+      }
 
     // Sort by ABSOLUTE VALUE of eigenvalues.
     sortedEvalues.clear();
@@ -688,8 +834,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
        sortedEvalues[i] = make_pair(fabs(dS[i]), i);
     sort(sortedEvalues.begin(), sortedEvalues.end()); 
     
-    //TNT::Array2D<float> Q_transpose(q.dim1(), q.dim2());
-    TNT::Array2D<float> Q(q.dim2(), q.dim1());
+    TNT::Array2D<double> Q(q.dim2(), q.dim1());
     for (int i = 0; i < sortedEvalues.size(); i++)
        for (int j = 0; j < q.dim2(); j++) {
           Q[j][i] = q[j][sortedEvalues[i].second];	  
@@ -701,7 +846,7 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
 
     // Compute U, set of approximate eigenvectors.
     // U = E*Q.
-    TNT::Array2D<float> U = matmult(E, Q); //E*Q;
+    TNT::Array2D<double> U = matmult(E, Q); //E*Q;
     gettimeofday(&tp_u, NULL);
     cout << "Time to compute U: " << (tp_u.tv_sec - tp_q.tv_sec) << endl;
 
@@ -712,7 +857,9 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl, int n
     for (int i = 0; i < numVectors; i++) {
         for (int j = 0; j < numParticles; j++) {
             eigenvectors[i][j] = Vec3(U[3*j][i], U[3*j+1][i], U[3*j+2][i]);
-            outfile << U[3*j][i] << " " << U[3*j+1][i] << " " << U[3*j+2][i] << endl;
+            outfile << 3 * j << " " << i << " " << U[3*j][i] << endl;
+	    outfile << 3*j + 1 << " " << i << " " << U[3*j+1][i] << endl;
+	    outfile << 3*j+2 << " " << i << " " << U[3*j+2][i] << endl;
         }
     }
 
@@ -1050,12 +1197,11 @@ void NormalModeAnalysis::computeEigenvectorsDihedral(ContextImpl& contextImpl, i
 }
 
 double NormalModeAnalysis::getDelta(double value, bool isDoublePrecision, LTMDParameters* ltmd) {
-    return ltmd->delta;
     double delta = sqrt(ltmd->delta)*max(fabs(value), 0.1);
     //double delta = sqrt(isDoublePrecision ? 1e-16 : 1e-7)*max(fabs(value), 0.1);
     volatile double temp = value+delta;
     delta = temp-value;
-    return delta;
+    return ltmd->delta;
 }
 
 void NormalModeAnalysis::buildTree(ContextImpl& context) {

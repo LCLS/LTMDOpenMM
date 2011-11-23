@@ -51,7 +51,7 @@ set(nml_sources ${nml_sources} ${sources})
 
 add_library(${NML_PLUGIN} SHARED ${nml_sources} ${nml_headers})
 set_target_properties(${NML_PLUGIN} PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
-target_link_libraries( ${NML_PLUGIN} ${OpenMM_LIBRARIES} lapack)
+target_link_libraries( ${NML_PLUGIN} ${OpenMM_LIBRARIES})
 
 ###############
 ### TESTING ###

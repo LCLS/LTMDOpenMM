@@ -46,13 +46,14 @@ using namespace OpenMM_LTMD;
 using std::string;
 using std::vector;
 
-NMLIntegrator::NMLIntegrator(double temperature, double frictionCoeff, double stepSize) : stepsSinceDiagonalize(0), rediagonalizeFrequency(1000) {
+NMLIntegrator::NMLIntegrator(double temperature, double frictionCoeff, double stepSize, LTMDParameters* params) : stepsSinceDiagonalize(0), rediagonalizeFrequency(1000) {
     setTemperature(temperature);
     setFriction(frictionCoeff);
     setStepSize(stepSize);
     setConstraintTolerance(1e-4);
     setMinimumLimit(0.1);
     setRandomNumberSeed((int) time(NULL));
+    parameters = params;
 }
 
 void NMLIntegrator::initialize(ContextImpl& contextRef) {
@@ -137,8 +138,8 @@ void NMLIntegrator::minimize(int maxsteps) {
 
 void NMLIntegrator::computeProjectionVectors() {
     NormalModeAnalysis nma;
-    
-    // Setting LTMDParameters
+    /*
+    Setting LTMDParameters
     int res[] = {21, 11, 12, 15, 12, 20, 16, 6, 10, 16,
                  20, 7, 17, 14, 13, 3, 3, 5, 11, 10,
 		 20, 10, 9, 5, 19, 14, 19, 10, 14, 16,
@@ -157,8 +158,9 @@ void NMLIntegrator::computeProjectionVectors() {
     ltmd.forces.push_back(LTMDForce("Dihedral", 3));
     ltmd.forces.push_back(LTMDForce("Improper", 4));
     ltmd.forces.push_back(LTMDForce("Nonbonded", 5));
+    */
 
-    nma.computeEigenvectorsFull(*context, 20, &ltmd);
+    nma.computeEigenvectorsFull(*context, parameters);
     const vector<vector<Vec3> > e1 = nma.getEigenvectors();
     setProjectionVectors(nma.getEigenvectors());
     maxEigenvalue = 5e5;//nma.getMaxEigenvalue();
