@@ -711,19 +711,6 @@ void NormalModeAnalysis::computeEigenvectorsFull(ContextImpl& contextImpl,
     gettimeofday(&tp_e, NULL);
     cout << "Time to compute E: " << (tp_e.tv_sec - tp_diag.tv_sec) << endl;
 
-    fstream eigs_in;
-    eigs_in.open("protomol_selected_eigs.txt", fstream::in);
-    int r, c;
-    double v;
-    while(!eigs_in.eof())
-      {
-	eigs_in >> r;
-	eigs_in >> c;
-	eigs_in >> v;
-	//E_transpose[c][r] = v;
-	//E[r][c] = v;
-      }
-    eigs_in.close();
 
     //*****************************************************************
     // Compute S, which is equal to E^T * H * E.
