@@ -37,18 +37,13 @@
 using namespace OpenMM;
 
 static int registerKernelFactories() {
-	std::cout << "Initializing Normal Mode Langevin OpenMM plugin..." << std::endl;
-	for( int p = 0; p < Platform::getNumPlatforms(); ++p ) {
-		std::cout << "Platform " << p << " name = " << Platform::getPlatform( p ).getName() << std::endl;
-	}
-
-	std::cout << "NML looking for Reference plugin..." << std::endl;
+	std::cout << "LTMD looking for Reference plugin..." << std::endl;
 	try {
 		Platform &platform = Platform::getPlatformByName( "Reference" );
-		std::cout << "NML found Reference platform..." << std::endl;
+		std::cout << "LTMD found Reference platform..." << std::endl;
 		platform.registerKernelFactory( "IntegrateNMLStep", new LTMD::Reference::KernelFactory() );
 	} catch( const std::exception &exc ) {
-		std::cout << "NML Reference platform not found. " << exc.what() << std::endl;
+		std::cout << "LTMD Reference platform not found. " << exc.what() << std::endl;
 	}
 
 	return 0;
