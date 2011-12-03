@@ -1,21 +1,31 @@
+include_directories( include )
+include_directories( "../include" )
 
-# NML_TEST_PLUGIN_DIR should have been created in top-level CMakeLists.txt
-if(NOT NML_TEST_PLUGIN_DIR)
-    message("ERROR: plugin test folder does not exist")
+file( GLOB_RECURSE TEST_HEADERS "include/*.h" )
+file( GLOB_RECURSE TEST_SOURCES "src/*.cpp" )
+
+# OpenMM
+set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
+if( OPENMM_DIR )
+	link_directories( "${OPENMM_DIR}/lib/" )
+	include_directories( "${OPENMM_DIR}/include/" )
 endif()
 
-file(GLOB test_sources "Test*.cpp")
-foreach(test_source ${test_sources})
-    get_filename_component(test_name ${test_source} NAME_WE)
+find_library( OPENMM_SERIALIAZE_LIB "OpenMMSerialization" HINT ${OPENMM_DIR}/lib )
 
-    add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} ${OpenMM_LIBRARIES})
+# Build
+add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} )
+target_link_libraries( LTMDTest "OpenMMLTMD" "LTMDReference" "cppunit" ${OPENMM_SERIALIAZE_LIB} )
 
-    add_test(${test_name} "${EXECUTABLE_OUTPUT_PATH}/${test_name}")
-
-    # Environment variable works only with CMake 2.8 or higher
-    set_tests_properties(${test_name}  PROPERTIES 
-        ENVIRONMENT "OPENMM_PLUGIN_DIR=${NML_TEST_PLUGIN_DIR}")
-
-endforeach(test_source ${test_sources})
-
+# Copy files
+if( CMAKE_GENERATOR MATCHES "Xcode" )
+	add_custom_command(
+		TARGET LTMDTest
+		COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/data/ ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/data/
+	)
+else()
+	add_custom_command(
+		TARGET LTMDTest
+		COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/data/ ${CMAKE_CURRENT_BINARY_DIR}/data/
+	)
+endif()
