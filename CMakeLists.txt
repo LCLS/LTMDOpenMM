@@ -47,6 +47,35 @@ add_library( LTMDReference SHARED ${LTMD_REFERENCE_HEADERS} ${LTMD_REFERENCE_SOU
 set_target_properties( LTMDReference PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
 target_link_libraries( LTMDReference OpenMMLTMD )
 
+option( BUILD_GPU "Build GPU code" Off )
+if( BUILD_GPU )
+	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
+	if( BUILD_GPU_CUDA )
+		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h )
+		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
+
+		file( GLOB LTMD_CUDA_SOURCES src/LTMD/CUDA/*.cpp )
+		source_group( "src\\LTMD\\CUDA" FILES ${LTMD_CUDA_SOURCES} )
+
+		add_library( LTMDCUDA SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES})
+		set_target_properties( LTMDCUDA PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
+		target_link_libraries( LTMDCUDA OpenMMLTMD )
+	endif( BUILD_GPU_CUDA )
+	
+	option( BUILD_GPU_OPENCL "Build OpenCL GPU code" Off )
+	if( BUILD_GPU_OPENCL )
+		file( GLOB LTMD_OPENCL_HEADERS include/LTMD/OpenCL/*.h )
+		source_group( "include\\LTMD\\OpenCL" FILES ${LTMD_OPENCL_HEADERS} )
+
+		file( GLOB LTMD_OPENCL_SOURCES src/LTMD/OpenCL/*.cpp )
+		source_group( "src\\LTMD\\OpenCL" FILES ${LTMD_OPENCL_SOURCES} )
+
+		add_library( LTMDOpenCL SHARED ${LTMD_OPENCL_HEADERS} ${LTMD_OPENCL_SOURCES})
+		set_target_properties( LTMDOpenCL PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
+		target_link_libraries( LTMDOpenCL OpenMMLTMD )
+	endif( BUILD_GPU_OPENCL )
+endif( BUILD_GPU )
+
 # Testing
 option( BUILD_TESTING "Build test code" Off )
 if( BUILD_TESTING )
