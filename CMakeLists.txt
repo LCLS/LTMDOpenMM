@@ -20,6 +20,10 @@ if( OPENMM_SOURCE_DIR )
 	# Reference
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/reference/src/" )
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/reference/include/" )
+	
+	# CUDA
+	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/src/" )
+	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/include/" )
 endif()
 
 find_library( OPENMM_LIB "OpenMM" HINT ${OPENMM_DIR}/lib )

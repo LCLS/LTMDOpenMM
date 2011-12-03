@@ -29,22 +29,29 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "CudaKernelFactoryNML.h"
-#include "CudaKernelsNML.h"
+#include <iostream>
+
+#include "LTMD/CUDA/Kernels.h"
+#include "LTMD/CUDA/KernelFactory.h"
+
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/OpenMMException.h"
-#include <iostream>
 
 using namespace OpenMM;
 using namespace std;
 
-namespace OpenMM_LTMD {
-
-KernelImpl* CudaKernelFactoryNML::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
-    CudaPlatform::PlatformData& data = *static_cast<CudaPlatform::PlatformData*>(context.getPlatformData());
-    if (name == IntegrateNMLStepKernel::Name())
-        return new CudaIntegrateNMLStepKernel(name, platform, data);
-    throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
+namespace OpenMM {
+	namespace LTMD {
+		namespace CUDA {
+			KernelImpl* KernelFactory::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
+				CudaPlatform::PlatformData& data = *static_cast<CudaPlatform::PlatformData*>(context.getPlatformData());
+				
+				if (name != StepKernel::Name()) {
+					throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
+				}
+				
+				return new StepKernel(name, platform, data);
+			}
+		}
+	}
 }
-
-} /* namespace OpenMM_LTMD */

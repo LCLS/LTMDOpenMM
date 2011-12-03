@@ -1,5 +1,5 @@
-#ifndef OPENMM_CUDA_KERNELFACTORYNML_H_
-#define OPENMM_CUDA_KERNELFACTORYNML_H_
+#ifndef OPENMM_LTMD_CUDA_KERNELFACTORY_H_
+#define OPENMM_LTMD_CUDA_KERNELFACTORY_H_
 
 /* -------------------------------------------------------------------------- *
  *                                   OpenMM                                   *
@@ -34,17 +34,15 @@
 
 #include "openmm/KernelFactory.h"
 
-namespace OpenMM_LTMD {
+namespace OpenMM {
+	namespace LTMD {
+		namespace CUDA {
+			class KernelFactory : public OpenMM::KernelFactory {
+				public:
+					KernelImpl *createKernelImpl( std::string name, const Platform &platform, ContextImpl &context ) const;
+			};
+		}
+	}
+}
 
-/**
- * This KernelFactory creates all kernels for NormalModeLangevin.
- */
-
-class CudaKernelFactoryNML : public OpenMM::KernelFactory {
-public:
-    OpenMM::KernelImpl* createKernelImpl(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& context) const;
-};
-
-} // namespace OpenMM_LTMD
-
-#endif /*OPENMM_CUDA_KERNELFACTORYNML_H_*/
+#endif // OPENMM_LTMD_CUDA_KERNELFACTORY_H_

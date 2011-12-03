@@ -1,5 +1,5 @@
-#ifndef CUDA_KERNELS_NML_H_
-#define CUDA_KERNELS_NML_H_
+#ifndef OPENMM_LTMD_CUDA_KERNELS_H_
+#define OPENMM_LTMD_CUDA_KERNELS_H_
 
 /* -------------------------------------------------------------------------- *
  *                                   OpenMM                                   *
@@ -27,9 +27,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
  * -------------------------------------------------------------------------- */
 
-#include "CudaKernels.h"
-#include "nmlopenmm/IntegrateNMLStepKernel.h"
 #include "CudaPlatform.h"
+#include "kernels/gputypes.h"
+
+#include "LTMD/StepKernel.h"
+#include "LTMD/CUDA/Kernels.h"
 
 static const float KILO                     =    1e3;                      // Thousand
 static const float BOLTZMANN                =    1.380658e-23f;            // (J/K)
@@ -37,37 +39,37 @@ static const float AVOGADRO                 =    6.0221367e23f;            // ()
 static const float RGAS                     =    BOLTZMANN * AVOGADRO;     // (J/(mol K))
 static const float BOLTZ                    =    (RGAS / KILO);            // (kJ/(mol K))
 
-namespace OpenMM_LTMD {
-  /**
-   * This kernel is invoked by NML to take one time step.
-   */
-  class CudaIntegrateNMLStepKernel : public IntegrateNMLStepKernel {
-  public:
-    CudaIntegrateNMLStepKernel(std::string name, const OpenMM::Platform& platform, OpenMM::CudaPlatform::PlatformData& data);
-    ~CudaIntegrateNMLStepKernel();
-    /**
-     * Initialize the kernel, setting up the particle masses.
-     * 
-     * @param system     the System this kernel will be applied to
-     * @param integrator the LangevinIntegrator this kernel will be used for
-     */
-    void initialize(const OpenMM::System& system, const NMLIntegrator& integrator);
-    /**
-     * Execute the kernel.
-     * 
-     * @param context    the context in which to execute this kernel
-     * @param integrator the LangevinIntegrator this kernel is being used for
-     */
-    void execute(OpenMM::ContextImpl& context, const NMLIntegrator& integrator, const double currentPE, const int stepType);
-  private:
-    OpenMM::CudaPlatform::PlatformData& data;
-    CUDAStream<float4>* modes;
-    CUDAStream<float>* modeWeights;
-    CUDAStream<float>* minimizerScale;
-    double lastPE;
-    double prevTemp, prevFriction, prevStepSize;
-  };
-  
-} // namespace OpenMM_LTMD
+namespace OpenMM {
+	namespace LTMD {
+		namespace CUDA {
+		  class StepKernel : public LTMD::StepKernel {
+		  public:
+			StepKernel(std::string name, const OpenMM::Platform& platform, OpenMM::CudaPlatform::PlatformData& data);
+			~StepKernel();
+			/**
+			 * Initialize the kernel, setting up the particle masses.
+			 * 
+			 * @param system     the System this kernel will be applied to
+			 * @param integrator the LangevinIntegrator this kernel will be used for
+			 */
+			void initialize(const OpenMM::System& system, const Integrator& integrator);
+			/**
+			 * Execute the kernel.
+			 * 
+			 * @param context    the context in which to execute this kernel
+			 * @param integrator the LangevinIntegrator this kernel is being used for
+			 */
+			void execute(OpenMM::ContextImpl& context, const Integrator& integrator, const double currentPE, const int stepType);
+		  private:
+			OpenMM::CudaPlatform::PlatformData& data;
+			CUDAStream<float4>* modes;
+			CUDAStream<float>* modeWeights;
+			CUDAStream<float>* minimizerScale;
+			double lastPE;
+			double prevTemp, prevFriction, prevStepSize;
+		  };
+	  }
+  }
+}
 
-#endif /*CUDA_KERNELS_NML_H_*/
+#endif // OPENMM_LTMD_CUDA_KERNELS_H_

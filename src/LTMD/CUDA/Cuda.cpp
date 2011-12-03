@@ -31,31 +31,23 @@
 
 #include <iostream>
 #include "OpenMM.h"
-#include "CudaKernelFactoryNML.h"
 #include "openmm/internal/windowsExport.h"
 
+#include "LTMD/Cuda/KernelFactory.h"
+
 using namespace OpenMM;
-using namespace OpenMM_LTMD;
-using namespace std;
- 
-extern "C" void OPENMM_EXPORT registerPlatforms() {
-    cout << "calling NML Cuda registerPlatforms()..." << endl;
+
+static int registerKernelFactories() {
+	std::cout << "LTMD looking for CUDA plugin..." << std::endl;
+	try {
+		Platform &platform = Platform::getPlatformByName( "Reference" );
+		std::cout << "LTMD found Reference platform..." << std::endl;
+		platform.registerKernelFactory( "IntegrateNMLStep", new LTMD::CUDA::KernelFactory() );
+	} catch( const std::exception &exc ) {
+		std::cout << "LTMD Reference platform not found. " << exc.what() << std::endl;
+	}
+
+	return 0;
 }
 
-extern "C" void OPENMM_EXPORT registerKernelFactories() {
-    cout << "Initializing Normal Mode Langevin Cuda OpenMM plugin..." << endl;
-    for (int p = 0; p < Platform::getNumPlatforms(); ++p) {
-        cout << "Platform " << p << " name = " << Platform::getPlatform(p).getName() << endl;
-    }
-
-    // Only register cuda kernels if cuda platform is found
-    cout << "NML looking for Cuda plugin..." << endl;
-    try {
-        Platform& platform = Platform::getPlatformByName("Cuda");
-        cout << "NML found Cuda platform..." << endl;
-        platform.registerKernelFactory("IntegrateNMLStep", new CudaKernelFactoryNML());
-    } catch (const std::exception& exc) { // non fatal
-        cout << "NML Cuda platform not found. " << exc.what() << endl;
-    }
-}
-
+static int platformInitializer = registerKernelFactories();
