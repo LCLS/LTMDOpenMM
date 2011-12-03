@@ -40,7 +40,7 @@ using namespace OpenMM;
 static int registerKernelFactories() {
 	std::cout << "LTMD looking for CUDA plugin..." << std::endl;
 	try {
-		Platform &platform = Platform::getPlatformByName( "Reference" );
+		Platform &platform = Platform::getPlatformByName( "Cuda" );
 		std::cout << "LTMD found Reference platform..." << std::endl;
 		platform.registerKernelFactory( "IntegrateNMLStep", new LTMD::CUDA::KernelFactory() );
 	} catch( const std::exception &exc ) {
