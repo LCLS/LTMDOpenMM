@@ -11,11 +11,20 @@ if( OPENMM_DIR )
 	include_directories( "${OPENMM_DIR}/include/" )
 endif()
 
-find_library( OPENMM_SERIALIAZE_LIB "OpenMMSerialization" HINT ${OPENMM_DIR}/lib )
+find_library( OPENMM_SERIALIAZE_LIB "OpenMMSerialization" HINT "${OPENMM_DIR}/lib" )
+
+# CPPUnit
+set( CPPUNIT_DIR "" CACHE PATH "CPPUnit Install Directory" )
+if( CPPUNIT_DIR )
+	link_directories( "${CPPUNIT_DIR}/lib" )
+	include_directories( "${CPPUNIT_DIR}/include" )
+endif( CPPUNIT_DIR )
+
+find_library( CPPUNIT_LIB "cppunit" hint "${CPPUNIT_DIR}/lib" )
 
 # Build
 add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} )
-target_link_libraries( LTMDTest "OpenMMLTMD" "LTMDReference" "cppunit" ${OPENMM_SERIALIAZE_LIB} )
+target_link_libraries( LTMDTest "OpenMMLTMD" "LTMDReference" ${CPPUNIT_LIB} ${OPENMM_SERIALIAZE_LIB} )
 
 # Copy files
 if( CMAKE_GENERATOR MATCHES "Xcode" )

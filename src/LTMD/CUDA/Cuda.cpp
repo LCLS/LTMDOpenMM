@@ -33,7 +33,7 @@
 #include "OpenMM.h"
 #include "openmm/internal/windowsExport.h"
 
-#include "LTMD/Cuda/KernelFactory.h"
+#include "LTMD/CUDA/KernelFactory.h"
 
 using namespace OpenMM;
 

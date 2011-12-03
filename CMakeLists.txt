@@ -55,13 +55,18 @@ option( BUILD_GPU "Build GPU code" Off )
 if( BUILD_GPU )
 	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
 	if( BUILD_GPU_CUDA )
+		find_package( CUDA REQUIRED )
+
 		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h )
 		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
 
 		file( GLOB LTMD_CUDA_SOURCES src/LTMD/CUDA/*.cpp )
 		source_group( "src\\LTMD\\CUDA" FILES ${LTMD_CUDA_SOURCES} )
 
-		add_library( LTMDCUDA SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES})
+		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cu )
+		source_group( "Kernels\\LTMD" FILES ${LTMD_CUDA_KERNELS} )
+
+		CUDA_ADD_LIBRARY( LTMDCUDA SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES} ${LTMD_CUDA_KERNELS} )
 		set_target_properties( LTMDCUDA PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
 		target_link_libraries( LTMDCUDA OpenMMLTMD )
 	endif( BUILD_GPU_CUDA )

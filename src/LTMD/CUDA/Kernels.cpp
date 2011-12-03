@@ -27,6 +27,7 @@
 #include <cmath>
 
 #include "OpenMM.h"
+#include "CudaKernels.h"
 #include "openmm/internal/ContextImpl.h"
 
 #include "LTMD/Integrator.h"
@@ -55,7 +56,7 @@ namespace OpenMM {
 					delete minimizerScale;
 			}
 
-			void StepKernel::initialize(const System& system, const NMLIntegrator& integrator) {
+			void StepKernel::initialize(const System& system, const Integrator& integrator) {
 					OpenMM::cudaOpenMMInitializeIntegration(system, data, integrator);
 				_gpuContext* gpu = data.gpu;
 				gpu->seed = (unsigned long) integrator.getRandomNumberSeed();
@@ -64,7 +65,7 @@ namespace OpenMM {
 			}
 
 
-			void StepKernel::execute(ContextImpl& context, const NMLIntegrator& integrator, const double currentPE, const int stepType) {
+			void StepKernel::execute(ContextImpl& context, const Integrator& integrator, const double currentPE, const int stepType) {
 				_gpuContext* gpu = data.gpu;
 
 				//get standard data
@@ -95,7 +96,7 @@ namespace OpenMM {
 					}
 					if (modesChanged) {
 						int index = 0;
-						const vector<vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
+						const std::vector<std::vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
 						for (int i = 0; i < numModes; i++)
 							for (int j = 0; j < numAtoms; j++)
 								(*modes)[index++] = make_float4((float) modeVectors[i][j][0], (float) modeVectors[i][j][1], (float) modeVectors[i][j][2], 0.0f);
@@ -136,4 +137,6 @@ namespace OpenMM {
 				if (data.removeCM && data.stepCount%data.cmMotionFrequency == 0)
 					gpu->bCalculateCM = true;
 			}
+		}
+	}
 }
