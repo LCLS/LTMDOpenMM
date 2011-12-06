@@ -29,24 +29,24 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include <iostream>
+#include <cstdio>
 #include "OpenMM.h"
 #include "LTMD/Reference/KernelFactory.h"
 #include "openmm/internal/windowsExport.h"
 
 using namespace OpenMM;
 
-static int registerKernelFactories() {
-	std::cout << "LTMD looking for Reference plugin..." << std::endl;
-	try {
-		Platform &platform = Platform::getPlatformByName( "Reference" );
-		std::cout << "LTMD found Reference platform..." << std::endl;
-		platform.registerKernelFactory( "IntegrateNMLStep", new LTMD::Reference::KernelFactory() );
-	} catch( const std::exception &exc ) {
-		std::cout << "LTMD Reference platform not found. " << exc.what() << std::endl;
-	}
+extern "C" void registerPlatforms() {
 
-	return 0;
 }
 
-static int platformInitializer = registerKernelFactories();
+extern "C" void registerKernelFactories() {
+	printf( "LTMD looking for CUDA plugin..." );
+	try {
+		Platform &platform = Platform::getPlatformByName( "Reference" );
+		printf( "LTMD found CUDA platform..." );
+		platform.registerKernelFactory( "IntegrateNMLStep", new LTMD::Reference::KernelFactory() );
+	} catch( const std::exception &exc ) {
+		printf( "LTMD CUDA platform not found. %s", exc.what() );
+	}
+}
