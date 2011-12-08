@@ -33,6 +33,7 @@
 #include <string>
 #include <iostream>
 
+
 #include "openmm/System.h"
 #include "openmm/Context.h"
 #include "openmm/kernels.h"
@@ -40,21 +41,22 @@
 #include "openmm/internal/ContextImpl.h"
 
 #include "LTMD/Analysis.h"
-#include "LTMD/Parameters.h"
 #include "LTMD/Integrator.h"
 #include "LTMD/StepKernel.h"
 
 namespace OpenMM {
 	namespace LTMD {
 		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, Parameters *params )
-			: stepsSinceDiagonalize( 0 ), rediagonalizeFrequency( 1000 ) {
+			: stepsSinceDiagonalize( 0 ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
 			setStepSize( stepSize );
 			setConstraintTolerance( 1e-4 );
-			setMinimumLimit( 0.1 );
+			setMinimumLimit( params->minLimit );
 			setRandomNumberSeed( ( int ) time( NULL ) );
 			parameters = params;
+                        rediagonalizeFrequency = params->rediagFreq;
+
 		}
 
 		void Integrator::initialize( ContextImpl &contextRef ) {
@@ -62,8 +64,11 @@ namespace OpenMM {
 			if( context->getSystem().getNumConstraints() > 0 ) {
 				throw OpenMMException( "NMLIntegrator does not support systems with constraints" );
 			}
+			std::cout << "going to create kernel" << std::endl;
 			kernel = context->getPlatform().createKernel( StepKernel::Name(), contextRef );
+			std::cout << "got kernel" << std::endl;
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).initialize( contextRef.getSystem(), *this );
+	  std::cout << "casted kernel" << std::endl;
 		}
 
 		std::vector<std::string> Integrator::getKernelNames() {

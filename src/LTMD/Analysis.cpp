@@ -363,11 +363,11 @@ namespace OpenMM {
 			cout << "done." << endl;
 
 			// Copy the positions.
-			VerletIntegrator integ( 0.0 );
+			VerletIntegrator integ( 0.000001 );
 			if( blockContext ) {
 				delete blockContext;
 			}
-			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "Reference" ) );
+			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "OpenCL" ) );
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
 			for( int i = 0; i < numParticles; i++ ) {
@@ -378,10 +378,11 @@ namespace OpenMM {
 			blockContext->setPositions( blockPositions );
 			/*********************************************************************/
 
-
+			/*
 			fstream perturb_forces;
 			perturb_forces.open( "perturb_forces.txt", fstream::out );
 			perturb_forces.precision( 10 );
+			*/
 
 			TNT::Array2D<double> h( n, n, 0.0 );
 			largest_block_size *= 3; // degrees of freedom in the largest block
@@ -455,10 +456,11 @@ namespace OpenMM {
 					} else {
 						end_dof = 3 * blocks[j + 1];
 					}
-
+					/*
 					for( int k = start_dof; k < end_dof; k++ ) {
 						perturb_forces << k << " " << dof_to_perturb << " " << forces2[k / 3][k % 3] << endl;
 					}
+					*/
 
 				}
 
@@ -511,11 +513,11 @@ namespace OpenMM {
 				}
 
 			}
-			perturb_forces.close();
+			//perturb_forces.close();
 
 			gettimeofday( &tp_hess, NULL );
 			cout << "Time to compute hessian: " << ( tp_hess.tv_sec - tp_begin.tv_sec ) << endl;
-
+			/*
 			fstream block_hessian;
 			block_hessian.open( "block_hessian.txt", fstream::out );
 			block_hessian.precision( 10 );
@@ -527,6 +529,7 @@ namespace OpenMM {
 				}
 			}
 			block_hessian.close();
+			*/
 
 
 			// Make sure it is exactly symmetric.
@@ -548,9 +551,11 @@ namespace OpenMM {
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
 			int total_surviving_eigvec = 0;
+			/*
 			fstream all_eigs;
 			all_eigs.open( "all_eigs.txt", fstream::out );
 			all_eigs.precision( 10 );
+			*/
 			for( int i = 0; i < blocks.size(); i++ ) {
 				cout << "Diagonalizing block: " << i << endl;
 				// 1. Determine the starting and ending index for the block
@@ -636,7 +641,7 @@ namespace OpenMM {
 					Qi_gdof[j][5]   =  diff[1] * factor;
 					Qi_gdof[j + 1][5] = -diff[0] * factor;
 				}
-
+				/*
 				fstream gdof_out;
 				gdof_out.open( "gdof_vec.txt", fstream::out | fstream::app );
 				gdof_out.precision( 10 );
@@ -648,7 +653,7 @@ namespace OpenMM {
 					}
 				}
 				gdof_out.close();
-
+				*/
 				// normalize first rotational vector
 				double rotnorm = 0.0;
 				for( int j = 0; j < size; j++ ) {
@@ -686,7 +691,7 @@ namespace OpenMM {
 						Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
 					}
 				}
-
+				/*
 				fstream gdof_out_orth;
 				gdof_out_orth.open( "gdof_vec_orth.txt", fstream::out | fstream::app );
 				gdof_out_orth.precision( 10 );
@@ -698,7 +703,7 @@ namespace OpenMM {
 					}
 				}
 				gdof_out_orth.close();
-
+				*/
 
 				// orthogonalize original eigenvectors against gdof
 				// number of evec that survive orthogonalization
@@ -760,7 +765,7 @@ namespace OpenMM {
 					curr_evec++;
 				}
 
-
+				/*
 				fstream block_out;
 				stringstream ss;
 				ss << "block_" << i << ".txt";
@@ -775,7 +780,7 @@ namespace OpenMM {
 					}
 				}
 				block_out.close();
-
+				*/
 
 				cout << "curr evec " << curr_evec << endl;
 				cout << "size " << size << endl;
@@ -796,6 +801,7 @@ namespace OpenMM {
 				}
 			}
 
+			/*
 			fstream block_out;
 			stringstream ss;
 			ss << "all_block_vec" << ".txt";
@@ -808,7 +814,7 @@ namespace OpenMM {
 				}
 			}
 			block_out.close();
-
+			*/
 
 
 			gettimeofday( &tp_diag, NULL );
@@ -845,7 +851,7 @@ namespace OpenMM {
 
 			// we may select fewer eigs if there are duplicate eigenvalues
 			const int m = selectedEigsCols.size();
-
+			/*
 			fstream eigs_output;
 			eigs_output.open( "block_eigs.txt", fstream::out );
 			eigs_output.precision( 10 );
@@ -858,6 +864,7 @@ namespace OpenMM {
 				}
 			}
 			eigs_output.close();
+			*/
 
 			cout << "output selected" << endl;
 
@@ -955,7 +962,7 @@ namespace OpenMM {
 					S[j][i] = avg;
 				}
 			}
-
+			/*
 			fstream s_out;
 			s_out.open( "s.txt", fstream::out );
 			s_out.precision( 10 );
@@ -965,7 +972,7 @@ namespace OpenMM {
 				}
 			}
 			s_out.close();
-
+			*/
 
 			gettimeofday( &tp_s, NULL );
 			cout << "Time to compute S: " << ( tp_s.tv_sec - tp_e.tv_sec ) << endl;
@@ -1009,8 +1016,10 @@ namespace OpenMM {
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
 
+			gettimeofday( &tp_end, NULL );
 			// Record the eigenvectors.
 			// These will be placed in a file eigenvectors.txt
+			
 			ofstream outfile( "eigenvectors.txt", ios::out );
 			eigenvectors.resize( numVectors, vector<Vec3>( numParticles ) );
 			for( int i = 0; i < numVectors; i++ ) {
@@ -1023,7 +1032,7 @@ namespace OpenMM {
 			}
 
 
-			gettimeofday( &tp_end, NULL );
+
 			cout << "Overall diagonalization time in seconds: " << ( tp_end.tv_sec - tp_begin.tv_sec ) << endl;
 		}
 

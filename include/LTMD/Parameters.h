@@ -19,6 +19,8 @@ namespace OpenMM {
 			int bdof;
 			std::vector<Force> forces;
 			int modes;
+		        int rediagFreq;
+		        double minLimit;
 		};
 	}
 }
