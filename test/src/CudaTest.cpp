@@ -1,4 +1,4 @@
-#include "ReferenceTest.h"
+#include "CudaTest.h"
 
 #include "OpenMM.h"
 #include "openmm/serialization/XmlSerializer.h"
@@ -7,13 +7,13 @@
 
 #include "LTMD/Integrator.h"
 #include "LTMD/Parameters.h"
-#include "LTMD/Reference/Dynamics.h"
+#include "LTMD/Cuda/Dynamics.h"
 
 #include <string>
 #include <vector>
 #include <cppunit/extensions/HelperMacros.h>
 
-CPPUNIT_TEST_SUITE_REGISTRATION( LTMD::Reference::Test );
+CPPUNIT_TEST_SUITE_REGISTRATION( LTMD::Cuda::Test );
 
 namespace LTMD {
 	namespace Reference {
@@ -146,7 +146,7 @@ namespace LTMD {
 				}
 
 			// Perform a projection and see if the results are correct.
-			OpenMM::LTMD::Reference::Dynamics dynamics(numAtoms, 0.001, 1, 300, modes, numModes, 0, 1);
+			OpenMM::LTMD::Cuda::Dynamics dynamics(numAtoms, 0.001, 1, 300, modes, numModes, 0, 1);
 			dynamics.subspaceProjection(initial, projected, numAtoms, invMass, mass, false);
 			for (int i = 0; i < numAtoms; i++) {
 				assert_equal_tol(expected[i][0], projected[i][0], 1e-2);
@@ -209,7 +209,7 @@ namespace LTMD {
 
 			OpenMM::LTMD::Integrator integ(300, 100.0, 0.05, &ltmd);
 			integ.setMaxEigenvalue(5e3);
-			Context context(*system, integ, Platform::getPlatformByName("Reference"));
+			Context context(*system, integ, Platform::getPlatformByName("Cuda"));
 			context.setPositions(positions);
 			double energy1 = context.getState(State::Energy).getPotentialEnergy();
 			integ.minimize(50);
