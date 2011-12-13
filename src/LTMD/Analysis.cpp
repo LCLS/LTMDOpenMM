@@ -367,7 +367,7 @@ namespace OpenMM {
 			if( blockContext ) {
 				delete blockContext;
 			}
-			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "OpenCL" ) );
+			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "Reference" ) );
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
 			for( int i = 0; i < numParticles; i++ ) {
