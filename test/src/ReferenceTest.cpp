@@ -196,6 +196,7 @@ namespace LTMD {
 			ltmd.bdof = 12;
 			ltmd.res_per_block = 1;
 			ltmd.modes = 20;
+			ltmd.rediagFreq = 1000;
 			for (int i = 0; i < 49; i++)
 			   ltmd.residue_sizes.push_back(res[i]);
 
