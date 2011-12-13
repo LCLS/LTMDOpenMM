@@ -1,6 +1,7 @@
 project( LTMDOpenMM )
-
 cmake_minimum_required(VERSION 2.8)
+
+include_directories( "include" )
 
 # OpenMM
 set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
@@ -27,8 +28,6 @@ if( OPENMM_SOURCE_DIR )
 endif()
 
 find_library( OPENMM_LIB "OpenMM" HINT ${OPENMM_DIR}/lib )
-
-include_directories( "include" )
 
 # LTMD Library
 file( GLOB LTMD_HEADERS include/LTMD/*.h )
