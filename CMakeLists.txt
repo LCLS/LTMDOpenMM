@@ -99,8 +99,9 @@ endif( BUILD_TESTING )
 # Installation
 install(
 	DIRECTORY "include/"
-	DESTINATION "include/"
+	DESTINATION "include"
 	PATTERN "*.h"
+	PATTERN ".*" EXCLUDE
 	PATTERN "include/LTMD/CUDA" EXCLUDE
 	PATTERN "include/LTMD/OpenCL" EXCLUDE
 	PATTERN "include/LTMD/Reference" EXCLUDE
