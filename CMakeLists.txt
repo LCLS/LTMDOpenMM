@@ -18,6 +18,11 @@ if( BUILD_PROFILE )
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 endif( BUILD_PROFILE )
 
+# Intel
+if (${CMAKE_CXX_COMPILER} MATCHES "icc.*$") 
+	set( CUDA_NVCC_FLAGS "-ccbin=icc" )
+endif()
+
 # MKL
 option( BUILD_MKL "Build with Intel MKL code" Off )
 if( BUILD_MKL )
