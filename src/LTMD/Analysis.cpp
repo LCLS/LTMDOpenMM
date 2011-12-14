@@ -88,36 +88,6 @@ namespace OpenMM {
 		        for (int j = 0; j < n; j++)
 		            vectors[i][j] = a[i+j*n];
 		}
-
-		static void matMultLapack(const TNT::Array2D<float>& matrix1, TNT::Array2D<float>& matrix2, TNT::Array2D<float>& matrix3) {
-		   int m = matrix1.dim1();
-		   int k = matrix1.dim2();
-		   int n = matrix2.dim2();
-		   char transa = 'N';
-		   char transb = 'N';
-		   double alpha = 0.0;
-		   double beta = 0.0;
-		   int lda = m;
-		   int ldb = k;
-		   int ldc = m;
-		   vector<double> a(m*k);
-		   vector<double> b(k*n);
-		   vector<double> c(m*n);
-		   cout << "LDA: " << lda << " LDB: " << ldb << " LDC: " << ldc << endl;
-		   for (int i = 0; i < m; i++)
-		       for (int j = 0; j < k; j++)
-		           a[i*k+j] = matrix1[i][j];
-
-		   for (int i = 0; i < k; i++)
-		       for (int j = 0; j < n; j++)
-		           b[i*n+j] = matrix2[i][j];
-
-		   f2c_dgemm(&transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc);
-
-		   for (int i = 0; i < m; i++)
-		      for (int j = 0; j < n; j++)
-		          matrix3[i][j] = c[i*n+j];
-		}
 		*/
 
 		unsigned int Analysis::blockNumber( int p ) {
@@ -145,14 +115,7 @@ namespace OpenMM {
 		}
 
 		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd ) {
-			struct timeval tp_begin;
-			struct timeval tp_hess;
-			struct timeval tp_diag;
-			struct timeval tp_e;
-			struct timeval tp_s;
-			struct timeval tp_q;
-			struct timeval tp_u;
-			struct timeval tp_end;
+			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u, tp_end;
 
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
@@ -378,12 +341,6 @@ namespace OpenMM {
 			blockContext->setPositions( blockPositions );
 			/*********************************************************************/
 
-			/*
-			fstream perturb_forces;
-			perturb_forces.open( "perturb_forces.txt", fstream::out );
-			perturb_forces.precision( 10 );
-			*/
-
 			TNT::Array2D<double> h( n, n, 0.0 );
 			largest_block_size *= 3; // degrees of freedom in the largest block
 			vector<Vec3> initialBlockPositions( blockPositions );
@@ -406,13 +363,10 @@ namespace OpenMM {
 					double blockDelta = getDelta( blockPositions[atom_to_perturb][dof_to_perturb % 3], isBlockDoublePrecision, ltmd );
 					deltas[j] = blockDelta;
 					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - blockDelta;
-
 				}
 
 				blockContext->setPositions( blockPositions );
 				vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
-
-
 
 				// Now, do it again...
 				for( int j = 0; j < blocks.size(); j++ ) {
@@ -429,8 +383,6 @@ namespace OpenMM {
 
 					double blockDelta = deltas[j];
 					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + blockDelta;
-
-
 				}
 
 				blockContext->setPositions( blockPositions );
@@ -456,14 +408,7 @@ namespace OpenMM {
 					} else {
 						end_dof = 3 * blocks[j + 1];
 					}
-					/*
-					for( int k = start_dof; k < end_dof; k++ ) {
-						perturb_forces << k << " " << dof_to_perturb << " " << forces2[k / 3][k % 3] << endl;
-					}
-					*/
-
 				}
-
 
 				// revert block positions
 				for( int j = 0; j < blocks.size(); j++ ) {
@@ -517,21 +462,7 @@ namespace OpenMM {
 
 			gettimeofday( &tp_hess, NULL );
 			cout << "Time to compute hessian: " << ( tp_hess.tv_sec - tp_begin.tv_sec ) << endl;
-			/*
-			fstream block_hessian;
-			block_hessian.open( "block_hessian.txt", fstream::out );
-			block_hessian.precision( 10 );
-			for( int i = 0; i < 3 * numParticles; i++ ) {
-				for( int j = 0; j < 3 * numParticles; j++ ) {
-					if( h[i][j] != 0.0 ) {
-						block_hessian << i << " " << j << " " << h[i][j] << endl;
-					}
-				}
-			}
-			block_hessian.close();
-			*/
-
-
+			
 			// Make sure it is exactly symmetric.
 			for( int i = 0; i < n; i++ ) {
 				for( int j = 0; j < i; j++ ) {
@@ -540,22 +471,15 @@ namespace OpenMM {
 				}
 			}
 
-
-
-
 			// Diagonalize each block Hessian, get Eigenvectors
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
-			//vector<double> Di;
+			
 			const int cdof = 6;
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
-			int total_surviving_eigvec = 0;
-			/*
-			fstream all_eigs;
-			all_eigs.open( "all_eigs.txt", fstream::out );
-			all_eigs.precision( 10 );
-			*/
+			int total_surviving_eigvec = 0; 
+			
 			for( int i = 0; i < blocks.size(); i++ ) {
 				cout << "Diagonalizing block: " << i << endl;
 				// 1. Determine the starting and ending index for the block
@@ -641,19 +565,7 @@ namespace OpenMM {
 					Qi_gdof[j][5]   =  diff[1] * factor;
 					Qi_gdof[j + 1][5] = -diff[0] * factor;
 				}
-				/*
-				fstream gdof_out;
-				gdof_out.open( "gdof_vec.txt", fstream::out | fstream::app );
-				gdof_out.precision( 10 );
-				// iterate over rows
-				for( int j = 0; j < size; j ++ ) {
-					for( int k = 0; k < cdof; k++ ) {
-						int mycol = i * cdof + k;
-						gdof_out << startatom + j << " " << mycol << " " << Qi_gdof[j][k] << endl;
-					}
-				}
-				gdof_out.close();
-				*/
+				
 				// normalize first rotational vector
 				double rotnorm = 0.0;
 				for( int j = 0; j < size; j++ ) {
@@ -682,7 +594,6 @@ namespace OpenMM {
 					double rotnorm = 0.0;
 					for( int l = 0; l < size; l++ ) {
 						rotnorm += Qi_gdof[l][j] * Qi_gdof[l][j];
-						//rotnorm += Qi_gdof.at(l)->at(j) * Qi_gdof.at(l)->at(j);
 					}
 
 					rotnorm = 1.0 / sqrt( rotnorm );
@@ -691,20 +602,7 @@ namespace OpenMM {
 						Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
 					}
 				}
-				/*
-				fstream gdof_out_orth;
-				gdof_out_orth.open( "gdof_vec_orth.txt", fstream::out | fstream::app );
-				gdof_out_orth.precision( 10 );
-				// iterate over rows
-				for( int j = 0; j < size; j ++ ) {
-					for( int k = 0; k < cdof; k++ ) {
-						int mycol = i * cdof + k;
-						gdof_out_orth << startatom + j << " " << mycol << " " << Qi_gdof[j][k] << endl;
-					}
-				}
-				gdof_out_orth.close();
-				*/
-
+				
 				// orthogonalize original eigenvectors against gdof
 				// number of evec that survive orthogonalization
 				int curr_evec = cdof;
@@ -765,23 +663,6 @@ namespace OpenMM {
 					curr_evec++;
 				}
 
-				/*
-				fstream block_out;
-				stringstream ss;
-				ss << "block_" << i << ".txt";
-				block_out.open( ss.str().c_str(), fstream::out );
-				block_out.precision( 10 );
-				// iterate over rows
-				for( int j = 0; j < size; j ++ ) {
-					for( int k = 0; k < curr_evec; k++ ) {
-						if( Qi_gdof[j][k] != 0.0 ) {
-							block_out << j << " " << k << " " << Qi_gdof[j][k] << endl;
-						}
-					}
-				}
-				block_out.close();
-				*/
-
 				cout << "curr evec " << curr_evec << endl;
 				cout << "size " << size << endl;
 
@@ -801,25 +682,8 @@ namespace OpenMM {
 				}
 			}
 
-			/*
-			fstream block_out;
-			stringstream ss;
-			ss << "all_block_vec" << ".txt";
-			block_out.open( ss.str().c_str(), fstream::out );
-			block_out.precision( 10 );
-			// iterate over rows
-			for( int j = 0; j < n; j ++ ) {
-				for( int k = 0; k < total_surviving_eigvec; k++ ) {
-					block_out << j << " " << k << " " << block_eigvec[j][k] << endl;
-				}
-			}
-			block_out.close();
-			*/
-
-
 			gettimeofday( &tp_diag, NULL );
 			cout << "Time to diagonalize block hessian: " << ( tp_diag.tv_sec - tp_hess.tv_sec ) << endl;
-
 
 			//***********************************************************
 			// This section here is only to find the cuttoff eigenvalue.
@@ -851,21 +715,7 @@ namespace OpenMM {
 
 			// we may select fewer eigs if there are duplicate eigenvalues
 			const int m = selectedEigsCols.size();
-			/*
-			fstream eigs_output;
-			eigs_output.open( "block_eigs.txt", fstream::out );
-			eigs_output.precision( 10 );
-			cout << "opened the file" << endl;
-			for( int i = 0; i < selectedEigsCols.size(); i++ ) {
-				int eig_col = selectedEigsCols.at( i );
-
-				for( int j = 0; j < n; j++ ) {
-					eigs_output << j << " " << i << " " << block_eigvec[j][eig_col] << endl;
-				}
-			}
-			eigs_output.close();
-			*/
-
+			
 			cout << "output selected" << endl;
 
 			// Inefficient, needs to improve.
@@ -877,8 +727,6 @@ namespace OpenMM {
 			cout << "M: " << m << endl;
 			TNT::Array2D<double> E( n, m, 0.0 );
 			TNT::Array2D<double> E_transpose( m, n, 0.0 );
-			//TNT::Array2D<float> EPS(n, m);
-			//TNT::Array2D<float> EPS_transpose(m, n);
 			for( int i = 0; i < m; i++ ) {
 				int eig_col = selectedEigsCols[i];
 				for( int j = 0; j < n; j++ ) {
@@ -962,17 +810,6 @@ namespace OpenMM {
 					S[j][i] = avg;
 				}
 			}
-			/*
-			fstream s_out;
-			s_out.open( "s.txt", fstream::out );
-			s_out.precision( 10 );
-			for( int i = 0; i < m; i++ ) {
-				for( int j = 0; j < m; j++ ) {
-					s_out << j << " " << i << " " << S[j][i] << endl;
-				}
-			}
-			s_out.close();
-			*/
 
 			gettimeofday( &tp_s, NULL );
 			cout << "Time to compute S: " << ( tp_s.tv_sec - tp_e.tv_sec ) << endl;
@@ -1031,8 +868,6 @@ namespace OpenMM {
 				}
 			}
 
-
-
 			cout << "Overall diagonalization time in seconds: " << ( tp_end.tv_sec - tp_begin.tv_sec ) << endl;
 		}
 
@@ -1047,7 +882,6 @@ namespace OpenMM {
 			int n = 3 * numParticles;
 
 			// Construct the mass weighted Hessian.
-
 			TNT::Array2D<float> h( n, n );
 			for( int i = 0; i < numParticles; i++ ) {
 				Vec3 pos = positions[i];
@@ -1069,7 +903,6 @@ namespace OpenMM {
 			}
 
 			// Make sure it is exactly symmetric.
-
 			for( int i = 0; i < n; i++ ) {
 				for( int j = 0; j < i; j++ ) {
 					float avg = 0.5f * ( h[i][j] + h[j][i] );
@@ -1079,14 +912,13 @@ namespace OpenMM {
 			}
 
 			// Find a projection matrix to the smaller subspace.
-
 			const vector<vector<int> >& molecules = contextImpl.getMolecules();
 			buildTree( contextImpl );
 			int m = 6 * molecules.size() + bonds.size();
 			projection.resize( m, vector<double>( n, 0.0 ) );
 			for( int i = 0; i < ( int ) molecules.size(); i++ ) {
+			
 				// Find the center of the molecule.
-
 				const vector<int>& mol = molecules[i];
 				Vec3 center;
 				for( int j = 0; j < ( int ) mol.size(); j++ ) {
@@ -1095,10 +927,9 @@ namespace OpenMM {
 				center *= 1.0 / mol.size();
 
 				// Now loop over particles.
-
 				for( int j = 0; j < ( int ) mol.size(); j++ ) {
+				
 					// Fill in the projection matrix.
-
 					int particle = mol[j];
 					projection[6 * i][3 * particle] = 1.0;
 					projection[6 * i + 1][3 * particle + 1] = 1.0;
@@ -1112,6 +943,7 @@ namespace OpenMM {
 					projection[6 * i + 5][3 * particle + 1] = ( pos[0] - center[0] );
 				}
 			}
+			
 			for( int i = 0; i < ( int ) bonds.size(); i++ ) {
 				Vec3 base = positions[bonds[i].first];
 				Vec3 dir = positions[bonds[i].second] - base;
@@ -1127,6 +959,7 @@ namespace OpenMM {
 					projection[row][3 * particle + 2] = delta[2];
 				}
 			}
+			
 			for( int i = 0; i < m; i++ ) {
 				for( int j = 0; j < numParticles; j++ ) {
 					double scale = sqrt( system.getParticleMass( j ) );
@@ -1135,9 +968,10 @@ namespace OpenMM {
 					projection[i][3 * j + 2] *= scale;
 				}
 			}
+			
 			for( int i = 0; i < m; i++ ) {
+			
 				// Make this vector orthogonal to all previous ones.
-
 				for( int j = 0; j < i; j++ ) {
 					double dot = 0.0;
 					for( int k = 0; k < n; k++ ) {
@@ -1149,7 +983,6 @@ namespace OpenMM {
 				}
 
 				// Normalize it.
-
 				double sum = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					sum += projection[i][j] * projection[i][j];
@@ -1161,7 +994,6 @@ namespace OpenMM {
 			}
 
 			// Multiply by the projection matrix to get an m by m Hessian.
-
 			vector<vector<double> > h2( m, vector<double>( n ) );
 			for( int i = 0; i < m; i++ )
 				for( int j = 0; j < n; j++ ) {
@@ -1171,6 +1003,7 @@ namespace OpenMM {
 					}
 					h2[i][j] = sum;
 				}
+				
 			TNT::Array2D<float> s( m, m );
 			for( int i = 0; i < m; i++ )
 				for( int j = 0; j < m; j++ ) {
@@ -1183,7 +1016,6 @@ namespace OpenMM {
 
 
 			// Sort the eigenvectors by the absolute value of the eigenvalue.
-
 			JAMA::Eigenvalue<float> decomp( s );
 			TNT::Array1D<float> d;
 			decomp.getRealEigenvalues( d );
@@ -1195,7 +1027,6 @@ namespace OpenMM {
 			maxEigenvalue = sortedEigenvalues[m - 1].first;
 
 			// Record the eigenvectors.
-
 			TNT::Array2D<float> eigen;
 			decomp.getV( eigen );
 			eigenvectors.resize( numVectors, vector<Vec3>( numParticles ) );
@@ -1227,10 +1058,9 @@ namespace OpenMM {
 			projection.resize( m, vector<double>( n, 0.0 ) );
 
 			// First compute derivatives with respect to global translations and rotations.
-
 			for( int i = 0; i < ( int ) molecules.size(); i++ ) {
+			
 				// Find the center of the molecule.
-
 				const vector<int>& mol = molecules[i];
 				Vec3 center;
 				for( int j = 0; j < ( int ) mol.size(); j++ ) {
@@ -1239,10 +1069,9 @@ namespace OpenMM {
 				center *= 1.0 / mol.size();
 
 				// Now loop over particles.
-
 				for( int j = 0; j < ( int ) mol.size(); j++ ) {
+				
 					// Fill in the projection matrix.
-
 					int particle = mol[j];
 					projection[6 * i][3 * particle] = 1.0;
 					projection[6 * i + 1][3 * particle + 1] = 1.0;
@@ -1258,7 +1087,6 @@ namespace OpenMM {
 			}
 
 			// Compute derivatives with respect to dihedrals.
-
 			for( int i = 0; i < ( int ) bonds.size(); i++ ) {
 				Vec3 base = positions[bonds[i].first];
 				Vec3 dir = positions[bonds[i].second] - base;
@@ -1274,6 +1102,7 @@ namespace OpenMM {
 					projection[row][3 * particle + 2] = delta[2];
 				}
 			}
+			
 			for( int i = 0; i < m; i++ ) {
 				for( int j = 0; j < numParticles; j++ ) {
 					double scale = sqrt( system.getParticleMass( j ) );
@@ -1282,9 +1111,10 @@ namespace OpenMM {
 					projection[i][3 * j + 2] *= scale;
 				}
 			}
+			
 			for( int i = 0; i < m; i++ ) {
+			
 				// Make this vector orthogonal to all previous ones.
-
 				for( int j = 0; j < i; j++ ) {
 					double dot = 0.0;
 					for( int k = 0; k < n; k++ ) {
@@ -1296,7 +1126,6 @@ namespace OpenMM {
 				}
 
 				// Normalize it.
-
 				double sum = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					sum += projection[i][j] * projection[i][j];
@@ -1308,14 +1137,13 @@ namespace OpenMM {
 			}
 
 			// Construct an m by n "Hessian like" matrix.
-
 			vector<vector<double> > h( m, vector<double>( n ) );
 			vector<Vec3> positions2( numParticles );
 			for( int i = 0; i < m; i++ ) {
 				double delta = sqrt( 1e-7 );
 				for( int j = 0; j < numParticles; j++ )
 					for( int k = 0; k < 3; k++ ) {
-						positions2[j][k] = positions[j][k] + delta * projection[i][3 * j + k];    ///sqrt(system.getParticleMass(j));
+						positions2[j][k] = positions[j][k] + delta * projection[i][3 * j + k];
 					}
 				context.setPositions( positions2 );
 				vector<Vec3> forces2 = context.getState( State::Forces ).getForces();
@@ -1328,7 +1156,6 @@ namespace OpenMM {
 			}
 
 			// Multiply by the projection matrix to get an m by m Hessian.
-
 			TNT::Array2D<float> s( m, m );
 			for( int i = 0; i < m; i++ )
 				for( int j = 0; j < m; j++ ) {
@@ -1340,7 +1167,6 @@ namespace OpenMM {
 				}
 
 			// Make sure it is exactly symmetric.
-
 			for( int i = 0; i < m; i++ ) {
 				for( int j = 0; j < i; j++ ) {
 					float avg = 0.5f * ( s[i][j] + s[j][i] );
@@ -1350,7 +1176,6 @@ namespace OpenMM {
 			}
 
 			// Sort the eigenvectors by the absolute value of the eigenvalue.
-
 			JAMA::Eigenvalue<float> decomp( s );
 			TNT::Array1D<float> d;
 			decomp.getRealEigenvalues( d );
@@ -1362,7 +1187,6 @@ namespace OpenMM {
 			maxEigenvalue = sortedEigenvalues[m - 1].first;
 
 			// Record the eigenvectors.
-
 			TNT::Array2D<float> eigen;
 			decomp.getV( eigen );
 			eigenvectors.resize( numVectors, vector<Vec3>( numParticles ) );
@@ -1382,7 +1206,6 @@ namespace OpenMM {
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
 			double delta = sqrt( ltmd->delta ) * max( fabs( value ), 0.1 );
-			//double delta = sqrt(isDoublePrecision ? 1e-16 : 1e-7)*max(fabs(value), 0.1);
 			volatile double temp = value + delta;
 			delta = temp - value;
 			return ltmd->delta;
