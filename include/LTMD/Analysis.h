@@ -52,8 +52,6 @@ namespace OpenMM {
 					}
 				}
 				void computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd );
-				void computeEigenvectorsRestricting( ContextImpl &contextImpl, int numVectors );
-				void computeEigenvectorsDihedral( ContextImpl &contextImpl, int numVectors );
 				const std::vector<std::vector<Vec3> >& getEigenvectors() const {
 					return eigenvectors;
 				}
