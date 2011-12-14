@@ -203,12 +203,13 @@ namespace OpenMM {
 				gettimeofday( &start, 0 );
 			#endif 
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 3 );
+			double retVal = context->calcForcesAndEnergy( false, true );
 			#ifdef PROFILE_INTEGRATOR
 				gettimeofday( &end, 0 );
 				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 				std::cout << "LinearMinimize: " << elapsed << "ms" << std::endl;
 			#endif
-			return context->calcForcesAndEnergy( true, true );
+			return retVal;
 		}
 		
 		double Integrator::QuadraticMinimize( const double energy ) {
@@ -216,13 +217,15 @@ namespace OpenMM {
 				timeval start, end;
 				gettimeofday( &start, 0 );
 			#endif 
+			context->calcForcesAndEnergy( true, true );
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 4 );
+			double retVal = context->calcForcesAndEnergy( false, true );
 			#ifdef PROFILE_INTEGRATOR
 				gettimeofday( &end, 0 );
 				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 				std::cout << "QuadraticMinimize: " << elapsed << "ms" << std::endl;
 			#endif
-			return context->calcForcesAndEnergy( true, true );
+			return retVal;
 		}
 		
 		void Integrator::SaveStep() {

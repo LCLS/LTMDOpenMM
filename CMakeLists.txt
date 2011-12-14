@@ -10,13 +10,25 @@ if( BUILD_PROFILE )
 	if( BUILD_PROFILE )
 		add_definitions( "-DPROFILE_INTEGRATOR" )
 	endif( BUILD_PROFILE )
-	
+
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -pg")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 endif( BUILD_PROFILE )
+
+# MKL
+option( BUILD_MKL "Build with Intel MKL code" Off )
+if( BUILD_MKL )
+	add_definitions( "-DINTEL_MKL" )
+
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mkl=parallel")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mkl=parallel")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mkl=parallel")
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -mkl=parallel")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mkl=parallel")
+endif( BUILD_MKL )
 
 # OpenMM
 set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
@@ -36,7 +48,7 @@ if( OPENMM_SOURCE_DIR )
 	# Reference
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/reference/src/" )
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/reference/include/" )
-	
+
 	# CUDA
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/src/" )
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/include/" )
@@ -87,7 +99,7 @@ if( BUILD_GPU )
 
 		install( TARGETS LTMDCuda LIBRARY DESTINATION "${OPENMM_DIR}/lib/plugins" )
 	endif( BUILD_GPU_CUDA )
-	
+
 	option( BUILD_GPU_OPENCL "Build OpenCL GPU code" Off )
 	if( BUILD_GPU_OPENCL )
 		file( GLOB LTMD_OPENCL_HEADERS include/LTMD/OpenCL/*.h )
