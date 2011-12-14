@@ -9,12 +9,10 @@ namespace LTMD {
 			private:
 				CPPUNIT_TEST_SUITE( Test );
 					CPPUNIT_TEST( Initialisation );
-					CPPUNIT_TEST( Projection );
 					CPPUNIT_TEST( MinimizeIntegration );
 				CPPUNIT_TEST_SUITE_END();
 			public:
 				void Initialisation();
-				void Projection();
 				void MinimizeIntegration();
 		};
 	}

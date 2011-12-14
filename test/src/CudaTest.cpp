@@ -7,7 +7,6 @@
 
 #include "LTMD/Integrator.h"
 #include "LTMD/Parameters.h"
-#include "LTMD/Cuda/Dynamics.h"
 
 #include <string>
 #include <vector>
@@ -16,7 +15,7 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( LTMD::Cuda::Test );
 
 namespace LTMD {
-	namespace Reference {
+	namespace Cuda {
 		using namespace OpenMM;
 		
 		void assert_equal_tol( double should, double is, double tol) {
@@ -62,97 +61,6 @@ namespace LTMD {
 			kernelName.push_back("IntegrateNMLStep");
 			
 			CPPUNIT_ASSERT_NO_THROW( Platform::findPlatform(kernelName) );
-		}
-		
-		void Test::Projection() {
-			// Load Projection
-			std::ifstream fProjection("data/projection.txt");
-			CPPUNIT_ASSERT( fProjection.good() );
-			
-			unsigned int numFrames = 0;
-			fProjection >> numFrames;
-			unsigned int numAtoms = 0;
-			fProjection >> numAtoms;
-			
-			std::vector<RealOpenMM> mass(numAtoms);
-			std::vector<RealOpenMM> invMass(numAtoms);
-			std::vector<RealVec> initial(numAtoms);
-			std::vector<RealVec> expected(numAtoms);
-			std::vector<RealVec> projected(numAtoms);
-			std::string type;
-			for (int i = 0; i < numAtoms; i++) {
-				fProjection >> type;
-				
-				if (type[0] == 'H')
-					mass[i] = 1.007;
-				else if (type[0] == 'C')
-					mass[i] = 12.0;
-				else if (type[0] == 'N')
-					mass[i] = 14.003;
-				else if (type[0] == 'O')
-					mass[i] = 15.994;
-				else if (type[0] == 'S')
-					mass[i] = 31.972;
-				else
-					throw OpenMMException("Unknown atom type: "+type);
-				invMass[i] = 1.0/mass[i];
-				
-				fProjection >> initial[i][0];
-				fProjection >> initial[i][1];
-				fProjection >> initial[i][2];
-			}
-			std::string skip;
-			fProjection >> skip;
-			for (int i = 0; i < numAtoms; i++) {
-				fProjection >> type;
-				fProjection >> expected[i][0];
-				fProjection >> expected[i][1];
-				fProjection >> expected[i][2];
-			}
-			fProjection.close();
-
-			std::ifstream fOutput("data/output.txt");
-			CPPUNIT_ASSERT( fOutput.good() );
-			
-			fOutput >> skip;
-			for (int i = 0; i < numAtoms; i++) {
-				fOutput >> initial[i][0];
-				fOutput >> initial[i][1];
-				fOutput >> initial[i][2];
-			}
-			fOutput >> skip;
-			for (int i = 0; i < numAtoms; i++) {
-				fOutput >> expected[i][0];
-				fOutput >> expected[i][1];
-				fOutput >> expected[i][2];
-			}
-			fOutput.close();
-
-			// Load the normal modes.
-			std::ifstream fMode("data/ww-fip35evec.txt");
-			CPPUNIT_ASSERT( fMode.good() );
-			
-			int numModes = 15;
-			RealOpenMM* modes = new RealOpenMM[numModes*3*numAtoms];
-		
-			int index = 0;
-			for (int i = 0; i < numModes; i++)
-				for (int j = 0; j < numAtoms; j++) {
-					int atom;;
-					fMode >> atom;
-					fMode >> modes[index++];
-					fMode >> modes[index++];
-					fMode >> modes[index++];
-				}
-
-			// Perform a projection and see if the results are correct.
-			OpenMM::LTMD::Cuda::Dynamics dynamics(numAtoms, 0.001, 1, 300, modes, numModes, 0, 1);
-			dynamics.subspaceProjection(initial, projected, numAtoms, invMass, mass, false);
-			for (int i = 0; i < numAtoms; i++) {
-				assert_equal_tol(expected[i][0], projected[i][0], 1e-2);
-				assert_equal_tol(expected[i][1], projected[i][1], 1e-2);
-				assert_equal_tol(expected[i][2], projected[i][2], 1e-2);
-			}
 		}
 		
 		void Test::MinimizeIntegration() {
