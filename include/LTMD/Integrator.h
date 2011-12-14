@@ -40,10 +40,8 @@
 
 namespace OpenMM {
 	namespace LTMD {
-		/**
-		 * This is an Integrator which simulates a System using Langevin dynamics.
-		 */
-
+		const unsigned int MaximumMinimizationIterations = 50;
+		
 		class OPENMM_EXPORT Integrator : public OpenMM::Integrator {
 			public:
 				/**
@@ -53,7 +51,7 @@ namespace OpenMM {
 				 * @param frictionCoeff  the friction coefficient which couples the system to the heat bath
 				 * @param stepSize       the step size with which to integrator the system (in picoseconds)
 				 */
-				Integrator( double temperature, double frictionCoeff, double stepSize, Parameters *param );
+				Integrator( const double temperature, const double frictionCoeff, const double stepSize, Parameters *param );
 				/**
 				 * Get the temperature of the heat bath (in Kelvin).
 				 */
@@ -139,22 +137,26 @@ namespace OpenMM {
 				 *
 				 * @param steps   the number of time steps to take
 				 */
-				void step( int steps );
+				void step( int steps = 1 );
 
 				//Minimizer
-				void minimize( int maxsteps );
+				void minimize( const unsigned int maxsteps = MaximumMinimizationIterations );
 
 			protected:
-				/**
-				 * This will be called by the OpenMMContext when it is created.  It informs the Integrator
-				 * of what context it will be integrating, and gives it a chance to do any necessary initialization.
-				 * It will also get called again if the application calls reinitialize() on the OpenMMContext.
-				 */
 				void initialize( OpenMM::ContextImpl &context );
-				/**
-				 * Get the names of all Kernels used by this Integrator.
-				 */
 				std::vector<std::string> getKernelNames();
+			private:
+				void DoStep();
+				
+				// Kernel Functions
+				void IntegrateStep();
+				void TimeAndCounterStep();
+				
+				double LinearMinimize( const double energy );
+				double QuadraticMinimize( const double energy );
+				
+				void SaveStep();
+				void RevertStep();
 			private:
 				void computeProjectionVectors();
 				double maxEigenvalue;

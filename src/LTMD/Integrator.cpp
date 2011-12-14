@@ -33,6 +33,9 @@
 #include <string>
 #include <iostream>
 
+#ifdef PROFILE_INTEGRATOR 
+#include <sys/time.h>
+#endif
 
 #include "openmm/System.h"
 #include "openmm/Context.h"
@@ -53,22 +56,18 @@ namespace OpenMM {
 			setStepSize( stepSize );
 			setConstraintTolerance( 1e-4 );
 			setMinimumLimit( params->minLimit );
-			setRandomNumberSeed( ( int ) time( NULL ) );
+			setRandomNumberSeed( (int) time( 0 ) );
 			parameters = params;
-                        rediagonalizeFrequency = params->rediagFreq;
-
+			rediagonalizeFrequency = params->rediagFreq;
 		}
 
 		void Integrator::initialize( ContextImpl &contextRef ) {
 			context = &contextRef;
 			if( context->getSystem().getNumConstraints() > 0 ) {
-				throw OpenMMException( "NMLIntegrator does not support systems with constraints" );
+				throw OpenMMException( "LTMD Integrator does not support constraints" );
 			}
-			std::cout << "going to create kernel" << std::endl;
 			kernel = context->getPlatform().createKernel( StepKernel::Name(), contextRef );
-			std::cout << "got kernel" << std::endl;
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).initialize( contextRef.getSystem(), *this );
-	  std::cout << "casted kernel" << std::endl;
 		}
 
 		std::vector<std::string> Integrator::getKernelNames() {
@@ -78,86 +77,178 @@ namespace OpenMM {
 		}
 
 		void Integrator::step( int steps ) {
-			for( int i = 0; i < steps; ++i ) {
-				context->updateContextState();
+			for( unsigned int i = 0; i < steps; ++i ) DoStep();
 
-				if( eigenvectors.size() == 0 || stepsSinceDiagonalize % rediagonalizeFrequency == 0 ) {
-					computeProjectionVectors();
-				}
-				stepsSinceDiagonalize++;
-
-				context->calcForcesAndEnergy( true, false );
-
-				// Integrate one step
-				dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 1 );
-				//in case projection vectors changed, clear flag
-				eigVecChanged = false;
-
-				//minimize compliment space, set maximum minimizer loops to 50
-				minimize( 50 );
-
-				// Update the time and step counter.
-				dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 2 );
-			}
-
-			//update time
+			// Update Time
 			context->setTime( context->getTime() + getStepSize() * steps );
+		}
+		
+		void Integrator::DoStep() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif
+			context->updateContextState();
 
+			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % rediagonalizeFrequency == 0 ) {
+				computeProjectionVectors();
+			}
+			
+			stepsSinceDiagonalize++;
+
+			context->calcForcesAndEnergy( true, false );
+
+			IntegrateStep();
+			eigVecChanged = false;
+
+			minimize();
+
+			TimeAndCounterStep();
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "Step: " << elapsed << "ms" << std::endl;
+			#endif
 		}
 
-		void Integrator::minimize( int maxsteps ) {
+		void Integrator::minimize( const unsigned int maxsteps ) {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
 			const double eigStore = maxEigenvalue;
 
 			if( eigenvectors.size() == 0 ) computeProjectionVectors();
 
-			//minimum limit
-			const double minlim = getMinimumLimit();
-
-			// Record initial positions.
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 6 );
+			SaveStep();
 
 			double initialPE = context->calcForcesAndEnergy( true, true );
 			for( int i = 0; i < maxsteps; ++i ) {
-				dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, initialPE, 3 ); //stepType 3 is simple minimizer
 				eigVecChanged = false;
 
-				double currentPE = context->calcForcesAndEnergy( true, true );
-				if( currentPE > initialPE ) {
-					std::cout << "Quadratic Minimize on step " << i << std::endl;
-					dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, currentPE, 4 ); //stepType 4 is quadratic minimizer
-					currentPE = context->calcForcesAndEnergy( true, true );
-
-				}
-
+				double currentPE = LinearMinimize( initialPE );
+				if( currentPE > initialPE ) currentPE = QuadraticMinimize( currentPE );
+				
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
-				if( diff < minlim && diff >= 0.0 ) {
-					std::cout << "Minimisation finishes in " << i << " steps." << std::endl;
-					break;
-				}
+				if( diff < getMinimumLimit() && diff >= 0.0 ) break;
 
-				// Accept or reject the step
-				dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, currentPE, diff < 0.0 ? 5 : 6 );
-				if( diff < 0.0 ) {
+				if( diff > 0.0 ){
+					SaveStep();
+					initialPE = currentPE;
+				}else{
+					RevertStep();
 					context->calcForcesAndEnergy( true, false );
 
 					maxEigenvalue *= 2;
-					std::cout << "Minimize failed, maxEigenvalue now " << maxEigenvalue << "." << std::endl;
-				} else {
-					initialPE = currentPE;
 				}
 			}
 
 			maxEigenvalue = eigStore;
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "Minimize: " << elapsed << "ms" << std::endl;
+			#endif
 		}
 
 		void Integrator::computeProjectionVectors() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
 			Analysis nma;
 			nma.computeEigenvectorsFull( *context, parameters );
 			const std::vector<std::vector<Vec3> > e1 = nma.getEigenvectors();
 			setProjectionVectors( nma.getEigenvectors() );
 			maxEigenvalue = nma.getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "ComputeProjection: " << elapsed << "ms" << std::endl;
+			#endif
+		}
+		
+		// Kernel Functions
+		void Integrator::IntegrateStep() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel&>( kernel.getImpl() ).execute( *context, *this, 0.0, 1 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "IntegrateStep: " << elapsed << "ms" << std::endl;
+			#endif
+		}
+		
+		void Integrator::TimeAndCounterStep() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel&>( kernel.getImpl() ).execute( *context, *this, 0.0, 2 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "TimeAndCounterStep: " << elapsed << "ms" << std::endl;
+			#endif
+		}
+		
+		double Integrator::LinearMinimize( const double energy ){
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 3 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "LinearMinimize: " << elapsed << "ms" << std::endl;
+			#endif
+			return context->calcForcesAndEnergy( true, true );
+		}
+		
+		double Integrator::QuadraticMinimize( const double energy ) {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 4 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "QuadraticMinimize: " << elapsed << "ms" << std::endl;
+			#endif
+			return context->calcForcesAndEnergy( true, true );
+		}
+		
+		void Integrator::SaveStep() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 6 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "SaveStep: " << elapsed << "ms" << std::endl;
+			#endif
+		}
+		
+		void Integrator::RevertStep() {
+			#ifdef PROFILE_INTEGRATOR
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 5 );
+			#ifdef PROFILE_INTEGRATOR
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "RevertStep: " << elapsed << "ms" << std::endl;
+			#endif
 		}
 	}
 }
