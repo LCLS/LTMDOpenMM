@@ -3,6 +3,21 @@ cmake_minimum_required(VERSION 2.8)
 
 include_directories( "include" )
 
+# Profiling
+option( BUILD_PROFILE "Build Profiling code" Off )
+if( BUILD_PROFILE )
+	option( BUILD_PROFILE_INTEGRATOR "Build Integrator Profiling code" Off )
+	if( BUILD_PROFILE )
+		add_definitions( "-DPROFILE_INTEGRATOR" )
+	endif( BUILD_PROFILE )
+	
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -pg")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+endif( BUILD_PROFILE )
+
 # OpenMM
 set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
 if( OPENMM_DIR )
