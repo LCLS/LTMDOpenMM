@@ -61,29 +61,15 @@ namespace OpenMM {
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 			private:
-				class TreeNode;
 				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
 				void buildTree( ContextImpl &context );
-				void processTreeNode( TreeNode &node, std::vector<bool>& processed, bool isRootNode );
-				void recordParticleNodes( TreeNode &node );
-				void findChildren( const TreeNode &node, std::vector<int>& children ) const;
 				std::vector<std::pair<int, int> > bonds;
 				std::vector<std::vector<int> > particleBonds;
-				std::vector<TreeNode> treeRoots;
-				std::map<int, TreeNode *> particleNodes;
 				std::vector<std::vector<double> > projection;
 				std::vector<std::vector<Vec3> > eigenvectors;
 				double maxEigenvalue;
 				Context *blockContext;
 				std::vector<int> blocks;
-		};
-
-		class Analysis::TreeNode {
-			public:
-				int particle, totalChildren;
-				std::vector<TreeNode> children;
-				TreeNode( int particle ) : particle( particle ), totalChildren( 0 ) {
-				}
 		};
 	}
 }
