@@ -346,28 +346,6 @@ namespace OpenMM {
 				blockContext->setPositions( blockPositions );
 				vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
 
-				// write out forces
-				for( int j = 0; j < blocks.size(); j++ ) {
-					int dof_to_perturb = 3 * blocks[j] + i;
-					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
-
-					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= numParticles ) {
-						continue;
-					}
-					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
-						continue;
-					}
-
-					int start_dof = 3 * blocks[j];
-					int end_dof;
-					if( j == blocks.size() - 1 ) {
-						end_dof = 3 * numParticles;
-					} else {
-						end_dof = 3 * blocks[j + 1];
-					}
-				}
-
 				// revert block positions
 				for( int j = 0; j < blocks.size(); j++ ) {
 					int dof_to_perturb = 3 * blocks[j] + i;
@@ -692,9 +670,9 @@ namespace OpenMM {
 					E[j][i] = block_eigvec[j][eig_col];
 				}
 			}
+			
 			gettimeofday( &tp_e, NULL );
 			cout << "Time to compute E: " << ( tp_e.tv_sec - tp_diag.tv_sec ) << endl;
-
 
 			//*****************************************************************
 			// Compute S, which is equal to E^T * H * E.
@@ -705,10 +683,12 @@ namespace OpenMM {
 
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
+			
 			// Loop over i.
 			for( unsigned int k = 0; k < m; k++ ) {
 				// Perturb positions.
 				int pos = 0;
+				
 				// forward perturbations
 				for( unsigned int i = 0; i < numParticles; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
@@ -769,21 +749,11 @@ namespace OpenMM {
 
 			gettimeofday( &tp_s, NULL );
 			cout << "Time to compute S: " << ( tp_s.tv_sec - tp_e.tv_sec ) << endl;
+			
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
 			TNT::Array1D<double> dS( m, 0.0 );
 			TNT::Array2D<double> q( m, m, 0.0 );
 			FindEigenvalues( S, dS, q );
-			//findEigenvaluesLapack(S, dS, q);
-
-
-			fstream s_eig_out;
-			s_eig_out.open( "s_eig_out.txt", fstream::out );
-			s_eig_out.precision( 10 );
-			for( int i = 0; i < S.dim1(); i++ ) {
-				for( int j = 0; j < S.dim1(); j++ ) {
-					s_eig_out << j << " " << i << " " << q[j][i] << endl;
-				}
-			}
 
 			// Sort by ABSOLUTE VALUE of eigenvalues.
 			sortedEvalues.clear();
@@ -799,9 +769,10 @@ namespace OpenMM {
 					Q[j][i] = q[j][sortedEvalues[i].second];
 				}
 			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
+			
+			
 			gettimeofday( &tp_q, NULL );
 			cout << "Time to compute Q: " << ( tp_q.tv_sec - tp_s.tv_sec ) << endl;
-
 
 			// Compute U, set of approximate eigenvectors.
 			// U = E*Q.
@@ -812,20 +783,6 @@ namespace OpenMM {
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
 
 			gettimeofday( &tp_end, NULL );
-			// Record the eigenvectors.
-			// These will be placed in a file eigenvectors.txt
-			
-			ofstream outfile( "eigenvectors.txt", ios::out );
-			eigenvectors.resize( numVectors, vector<Vec3>( numParticles ) );
-			for( int i = 0; i < numVectors; i++ ) {
-				for( int j = 0; j < numParticles; j++ ) {
-					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i] );
-					outfile << 3 * j << " " << i << " " << U[3 * j][i] << endl;
-					outfile << 3 * j + 1 << " " << i << " " << U[3 * j + 1][i] << endl;
-					outfile << 3 * j + 2 << " " << i << " " << U[3 * j + 2][i] << endl;
-				}
-			}
-
 			cout << "Overall diagonalization time in seconds: " << ( tp_end.tv_sec - tp_begin.tv_sec ) << endl;
 		}
 
