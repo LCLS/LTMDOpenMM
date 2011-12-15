@@ -77,13 +77,11 @@ namespace OpenMM {
 
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
-			bool isDoublePrecision = context.getPlatform().supportsDoublePrecision();
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
 			System &system = context.getSystem();
 			int numParticles = positions.size();
 			int n = 3 * numParticles;
-			int numVectors = ltmd->modes;
 
 			/*********************************************************************/
 			/*                                                                   */
@@ -100,7 +98,6 @@ namespace OpenMM {
 			// For now, since OpenMM input files do not contain residue information
 			// I am assuming that they will always start with the N-terminus, just for testing.
 			// This is true for the villin.xml but may not be true in the future.
-			int largest_block_size = -1; // Keep track of the largest block size, we'll
 			// need it to parallelize.
 			if( !mInitialized ){
 				System *blockSystem = new System();
@@ -119,8 +116,8 @@ namespace OpenMM {
 
 				for( int i = 1; i < blocks.size(); i++ ) {
 					int block_size = blocks[i] - blocks[i - 1];
-					if( block_size > largest_block_size ) {
-						largest_block_size = block_size;
+					if( block_size > mLargestBlockSize ) {
+						mLargestBlockSize = block_size;
 					}
 				}
 
@@ -278,13 +275,13 @@ namespace OpenMM {
 				}
 				cout << "done." << endl;
 				
-				VerletIntegrator integ( 0.000001 );
+				VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
 				if( blockContext ) delete blockContext;
-				blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "OpenCL" ) );
+				blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
 				
 				mInitialized = true;
 			}
-
+ 
 			// Copy the positions.
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
@@ -297,9 +294,9 @@ namespace OpenMM {
 			/*********************************************************************/
 
 			TNT::Array2D<double> h( n, n, 0.0 );
-			largest_block_size *= 3; // degrees of freedom in the largest block
+			mLargestBlockSize *= 3; // degrees of freedom in the largest block
 			vector<Vec3> initialBlockPositions( blockPositions );
-			for( int i = 0; i < largest_block_size; i++ ) {
+			for( int i = 0; i < mLargestBlockSize; i++ ) {
 				vector<double> deltas( blocks.size() );
 				// Perturb the ith degree of freedom in EACH block
 				// Note: not all blocks will have i degrees, we have to check for this
