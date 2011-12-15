@@ -35,101 +35,19 @@
 #include <sys/time.h>
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/internal/ForceImpl.h"
-#include "jama_eig.h"
-#include "tnt_array2d_utils.h"
 #include <algorithm>
 #include <vector>
 #include <fstream>
 #include <sstream>
 
-#ifdef INTEL_MKL
-#include <mkl_blas.h>
-#include <mkl_lapack.h>
-#endif
-
 #include "OpenMM.h"
+#include "LTMD/Math.h"
 #include "LTMD/Analysis.h"
 #include "LTMD/Integrator.h"
 
 
 namespace OpenMM {
-	namespace LTMD {
-		static void findEigenvalues( const TNT::Array2D<double>& matrix, TNT::Array1D<double>& values, TNT::Array2D<double>& vectors ) {
-		#ifdef INTEL_MKL
-			int n = matrix.dim1();
-		    char jobz = 'V';
-		    char uplo = 'U';
-		    int lwork = 3*n-1;
-		    vector<double> a(n*n);
-		    vector<double> w(n);
-		    vector<double> work(lwork);
-		    int info;
-			
-		    for (int i = 0; i < n; i++){
-		        for (int j = 0; j < n; j++){
-		            a[i*n+j] = matrix[i][j];
-				}
-			}
-					
-		    dsyev(&jobz, &uplo, &n, &a[0], &n, &w[0], &work[0], &lwork, &info);
-			
-		    values = TNT::Array1D<double>(n);
-		    for (int i = 0; i < n; i++){
-		        values[i] = w[i];
-			}
-			
-		    vectors = TNT::Array2D<double>(n, n);
-		    for (int i = 0; i < n; i++){
-		        for (int j = 0; j < n; j++){
-		            vectors[i][j] = a[i+j*n];
-				}
-			}
-		#else
-			JAMA::Eigenvalue<double> decomp( matrix );
-			decomp.getRealEigenvalues( values );
-			decomp.getV( vectors );
-		#endif
-		}
-		
-		static void matMult(const TNT::Array2D<double>& matrix1, const TNT::Array2D<double>& matrix2, TNT::Array2D<double>& matrix3) { 
-		#ifdef INTEL_MKL
-			int m = matrix1.dim1();                                                                                                                                                                                                                                                   
-			int k = matrix1.dim2();                                                                                                                                                                                                                                                   
-			int n = matrix2.dim2();                                                                                                                                                                                                                                                   
-			char transa = 'N';                                                                                                                                                                                                                                                        
-			char transb = 'N';                                                                                                                                                                                                                                                        
-			double alpha = 0.0;                                                                                                                                                                                                                                                       
-			double beta = 0.0;                                                                                                                                                                                                                                                        
-			int lda = m;                                                                                                                                                                                                                                                              
-			int ldb = k;                                                                                                                                                                                                                                                              
-			int ldc = m;                                                                                                                                                                                                                                                              
-			vector<double> a(m*k);                                                                                                                                                                                                                                                    
-			vector<double> b(k*n);                                                                                                                                                                                                                                                    
-			vector<double> c(m*n);                                                                                                                                                                                                  
-			for (int i = 0; i < m; i++){                                                                                                                                                                                                                                        
-				for (int j = 0; j < k; j++) {
-					a[i*k+j] = matrix1[i][j];                                                                                                                                                                                                                                        
-				}
-			}
-																																																																				 
-			for (int i = 0; i < k; i++){                                                                                                                                                                                                                                              
-				for (int j = 0; j < n; j++){                                                                                                                                                                                                                                         
-				   b[i*n+j] = matrix2[i][j];
-				}
-			}
-																																																																				 
-			dgemm(&transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc);                                                                                                                                                                            
-																																																																				 
-			for (int i = 0; i < m; i++){                                                                                                                                                                                                                                               
-				for (int j = 0; j < n; j++){                                                                                                                                                                                                                                            
-				  matrix3[i][j] = c[i*n+j];
-				}
-			}
-		#else
-			matrix3 = matmult( matrix1, matrix2 );
-		#endif
-        }
-		
+	namespace LTMD {		
 		unsigned int Analysis::blockNumber( int p ) {
 			unsigned int block = 0;
 			while( block != blocks.size() && blocks[block] <= p ) {
@@ -548,7 +466,7 @@ namespace OpenMM {
 				// 3. Diagonalize the block Hessian only, and get eigenvectors
 				TNT::Array1D<double> di( size, 0.0 );
 				TNT::Array2D<double> Qi( size, size, 0.0 );
-				findEigenvalues( h_tilde, di, Qi );
+				FindEigenvalues( h_tilde, di, Qi );
 				//findEigenvaluesLapack(h_tilde, di, Qi);
 
 				// sort eigenvalues by absolute magnitude
@@ -821,7 +739,7 @@ namespace OpenMM {
 				}
 
 				TNT::Array2D<double> Si( m, 1, 0.0 );
-				matMult( E_transpose, Force_diff, Si );
+				MatrixMultiply( E_transpose, Force_diff, Si );
 
 				// Copy to S.
 				for( int i = 0; i < m; i++ ) {
@@ -854,7 +772,7 @@ namespace OpenMM {
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
 			TNT::Array1D<double> dS( m, 0.0 );
 			TNT::Array2D<double> q( m, m, 0.0 );
-			findEigenvalues( S, dS, q );
+			FindEigenvalues( S, dS, q );
 			//findEigenvaluesLapack(S, dS, q);
 
 
@@ -888,7 +806,7 @@ namespace OpenMM {
 			// Compute U, set of approximate eigenvectors.
 			// U = E*Q.
 			TNT::Array2D<double> U( E.dim1(), E.dim2(), 0.0 );
-			matMult( E, Q, U );
+			MatrixMultiply( E, Q, U );
 			
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
