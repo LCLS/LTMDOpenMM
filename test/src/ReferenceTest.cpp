@@ -192,7 +192,7 @@ namespace LTMD {
 				 6, 12, 5, 12, 5, 8, 3, 6, 19, 16,
 				 6, 16, 6, 15, 16, 6, 7, 19};
 			OpenMM::LTMD::Parameters ltmd;
-			ltmd.delta = 1e-9;
+			ltmd.delta = 1e-4;
 			ltmd.bdof = 12;
 			ltmd.res_per_block = 1;
 			ltmd.modes = 20;

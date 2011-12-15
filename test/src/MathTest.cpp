@@ -34,14 +34,6 @@ namespace LTMD {
 			expectedVectors[1][0] =  0.816; expectedVectors[1][1] = -0.000; expectedVectors[1][2] = -0.577;
 			expectedVectors[2][0] = -0.408; expectedVectors[2][1] = -0.707; expectedVectors[2][2] = -0.577;
 			
-			std::cout << "Result: " << std::endl;
-			for( unsigned int i = 0; i < vectors.dim1(); i++ ){
-				for( unsigned int j = 0; j < vectors.dim2(); j++ ){
-					std::cout << vectors[i][j] << " ";
-				}
-				std::cout << std::endl;
-			}
-			
 			for( unsigned int i = 0; i < vectors.dim1(); i++ ){
 				for( unsigned int j = 0; j < vectors.dim2(); j++ ){
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedVectors[i][j], vectors[i][j], 1e-3);
