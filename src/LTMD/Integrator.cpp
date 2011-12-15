@@ -158,7 +158,6 @@ namespace OpenMM {
 				gettimeofday( &start, 0 );
 			#endif
 			mAnalysis.computeEigenvectorsFull( *context, parameters );
-			const std::vector<std::vector<Vec3> > e1 = mAnalysis.getEigenvectors();
 			setProjectionVectors( mAnalysis.getEigenvectors() );
 			maxEigenvalue = mAnalysis.getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;
