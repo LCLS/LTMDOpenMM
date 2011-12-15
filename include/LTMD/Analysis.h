@@ -62,6 +62,8 @@ namespace OpenMM {
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 			private:
+				void Initialize( System& system, const Parameters& ltmd, const unsigned int Particles );
+			private:
 				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
 				
 				int mLargestBlockSize;

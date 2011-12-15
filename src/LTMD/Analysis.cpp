@@ -48,7 +48,9 @@
 #include "tnt_array2d_utils.h"
 
 namespace OpenMM {
-	namespace LTMD {		
+	namespace LTMD {	
+		const unsigned int ConservedDegreesOfFreedom = 6;
+		
 		unsigned int Analysis::blockNumber( int p ) {
 			unsigned int block = 0;
 			while( block != blocks.size() && blocks[block] <= p ) {
@@ -90,198 +92,14 @@ namespace OpenMM {
 			/*                                                                   */
 			/*********************************************************************/
 
-
-			/*********************************************************************/
-
-			//TNT::Array2D<float> hessian(n,n); // Hessian matrix (note n = 3N!)
 			// Initial residue data (where in OpenMM?)
 
 			// For now, since OpenMM input files do not contain residue information
 			// I am assuming that they will always start with the N-terminus, just for testing.
 			// This is true for the villin.xml but may not be true in the future.
 			// need it to parallelize.
-			if( !mInitialized ){
-				System *blockSystem = new System();
-				cout << "res per block " << ltmd->res_per_block << endl;
-				for( int i = 0; i < numParticles; i++ ) {
-					blockSystem->addParticle( system.getParticleMass( i ) );
-				}
 
-				int block_start = 0;
-				for( int i = 0; i < ltmd->residue_sizes.size(); i++ ) {
-					if( i % ltmd->res_per_block == 0 ) {
-						blocks.push_back( block_start );
-					}
-					block_start += ltmd->residue_sizes[i];
-				}
-
-				for( int i = 1; i < blocks.size(); i++ ) {
-					int block_size = blocks[i] - blocks[i - 1];
-					if( block_size > mLargestBlockSize ) {
-						mLargestBlockSize = block_size;
-					}
-				}
-
-				cout << "blocks " << blocks.size() << endl;
-				cout << blocks[blocks.size() - 1] << endl;
-
-				// Creating a whole new system called the blockSystem.
-				// This system will only contain bonds, angles, dihedrals, and impropers
-				// between atoms in the same block.
-				// Also contains pairwise force terms which are zeroed out for atoms
-				// in different blocks.
-				// This necessitates some copying from the original system, but is required
-				// because OpenMM populates all data when it reads XML.
-				// Copy all atoms into the block system.
-
-				// Copy the center of mass force.
-				cout << "adding forces..." << endl;
-				for( int i = 0; i < ltmd->forces.size(); i++ ) {
-					string forcename = ltmd->forces[i].name;
-					cout << "Adding force " << forcename << " at index " << ltmd->forces[i].index << endl;
-					if( forcename == "CenterOfMass" ) {
-						blockSystem->addForce( &system.getForce( ltmd->forces[i].index ) );
-					} else if( forcename == "Bond" ) {
-						// Create a new harmonic bond force.
-						// This only contains pairs of atoms which are in the same block.
-						// I have to iterate through each bond from the old force, then
-						// selectively add them to the new force based on this condition.
-						HarmonicBondForce *hf = new HarmonicBondForce();
-						const HarmonicBondForce *ohf = dynamic_cast<const HarmonicBondForce *>( &system.getForce( ltmd->forces[i].index ) );
-						for( int i = 0; i < ohf->getNumBonds(); i++ ) {
-							// For our system, add bonds between atoms in the same block
-							int particle1, particle2;
-							double length, k;
-							ohf->getBondParameters( i, particle1, particle2, length, k );
-							if( inSameBlock( particle1, particle2 ) ) {
-								hf->addBond( particle1, particle2, length, k );
-							}
-						}
-						blockSystem->addForce( hf );
-					} else if( forcename == "Angle" ) {
-						// Same thing with the angle force....
-						HarmonicAngleForce *af = new HarmonicAngleForce();
-						const HarmonicAngleForce *ahf = dynamic_cast<const HarmonicAngleForce *>( &system.getForce( ltmd->forces[i].index ) );
-						for( int i = 0; i < ahf->getNumAngles(); i++ ) {
-							// For our system, add bonds between atoms in the same block
-							int particle1, particle2, particle3;
-							double angle, k;
-							ahf->getAngleParameters( i, particle1, particle2, particle3, angle, k );
-							if( inSameBlock( particle1, particle2, particle3 ) ) {
-								af->addAngle( particle1, particle2, particle3, angle, k );
-							}
-						}
-						blockSystem->addForce( af );
-					} else if( forcename == "Dihedral" ) {
-						// And the dihedrals....
-						PeriodicTorsionForce *ptf = new PeriodicTorsionForce();
-						const PeriodicTorsionForce *optf = dynamic_cast<const PeriodicTorsionForce *>( &system.getForce( ltmd->forces[i].index ) );
-						for( int i = 0; i < optf->getNumTorsions(); i++ ) {
-							// For our system, add bonds between atoms in the same block
-							int particle1, particle2, particle3, particle4, periodicity;
-							double phase, k;
-							optf->getTorsionParameters( i, particle1, particle2, particle3, particle4, periodicity, phase, k );
-							if( inSameBlock( particle1, particle2, particle3, particle4 ) ) {
-								ptf->addTorsion( particle1, particle2, particle3, particle4, periodicity, phase, k );
-							}
-						}
-						blockSystem->addForce( ptf );
-					} else if( forcename == "Improper" ) {
-						// And the impropers....
-						RBTorsionForce *rbtf = new RBTorsionForce();
-						const RBTorsionForce *orbtf = dynamic_cast<const RBTorsionForce *>( &system.getForce( ltmd->forces[i].index ) );
-						for( int i = 0; i < orbtf->getNumTorsions(); i++ ) {
-							// For our system, add bonds between atoms in the same block
-							int particle1, particle2, particle3, particle4;
-							double c0, c1, c2, c3, c4, c5;
-							orbtf->getTorsionParameters( i, particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5 );
-							if( inSameBlock( particle1, particle2, particle3, particle4 ) ) {
-								rbtf->addTorsion( particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5 );
-							}
-						}
-						blockSystem->addForce( rbtf );
-					} else if( forcename == "Nonbonded" ) {
-						// This is a custom nonbonded pairwise force and
-						// includes terms for both LJ and Coulomb.
-						// Note that the step term will go to zero if block1 does not equal block 2,
-						// and will be one otherwise.
-						CustomBondForce *cbf = new CustomBondForce( "4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r" );
-						const NonbondedForce *nbf = dynamic_cast<const NonbondedForce *>( &system.getForce( ltmd->forces[i].index ) );
-						NonbondedForce *nonbonded = new NonbondedForce();
-
-						cbf->addPerBondParameter( "q" );
-						cbf->addPerBondParameter( "sigma" );
-						cbf->addPerBondParameter( "eps" );
-
-						// store exceptions
-						// exceptions[p1][p2] = params
-						map<int, map<int, vector<double> > > exceptions;
-
-						for( int i = 0; i < nbf->getNumExceptions(); i++ ) {
-							int p1, p2;
-							double q, sig, eps;
-							nbf->getExceptionParameters( i, p1, p2, q, sig, eps );
-							if( inSameBlock( p1, p2 ) ) {
-								vector<double> params;
-								params.push_back( q );
-								params.push_back( sig );
-								params.push_back( eps );
-								if( exceptions.count( p1 ) == 0 ) {
-									map<int, vector<double> > pair_exception;
-									pair_exception[p2] = params;
-									exceptions[p1] = pair_exception;
-								} else {
-									exceptions[p1][p2] = params;
-								}
-							}
-						}
-
-						// add particle params
-						// TODO: iterate over block dimensions to reduce to O(b^2 N_b)
-						for( int i = 0; i < nbf->getNumParticles() - 1; i++ ) {
-							for( int j = i + 1; j < nbf->getNumParticles(); j++ ) {
-								if( !inSameBlock( i, j ) ) {
-									continue;
-								}
-								// we have an exception -- 1-4 modified interactions, etc.
-								if( exceptions.count( i ) == 1 && exceptions[i].count( j ) == 1 ) {
-									vector<double> params = exceptions[i][j];
-									cbf->addBond( i, j, params );
-								}
-								// no exception, normal interaction
-								else {
-									vector<double> params;
-									double q1, q2, eps1, eps2, sigma1, sigma2, q, eps, sigma;
-
-									nbf->getParticleParameters( i, q1, sigma1, eps1 );
-									nbf->getParticleParameters( j, q2, sigma2, eps2 );
-
-									q = q1 * q2;
-									sigma = 0.5 * ( sigma1 + sigma2 );
-									eps = sqrt( eps1 * eps2 );
-
-									params.push_back( q );
-									params.push_back( sigma );
-									params.push_back( eps );
-
-									cbf->addBond( i, j, params );
-								}
-							}
-						}
-
-						blockSystem->addForce( cbf );
-					} else {
-						cout << "Unknown Force: " << forcename << endl;
-					}
-				}
-				cout << "done." << endl;
-				
-				VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
-				if( blockContext ) delete blockContext;
-				blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Reference" ) );
-				
-				mInitialized = true;
-			}
+			if( !mInitialized ) Initialize( system, *ltmd, numParticles );
  
 			// Copy the positions.
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
@@ -423,7 +241,6 @@ namespace OpenMM {
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
 			
-			const int cdof = 6;
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
 			int total_surviving_eigvec = 0; 
@@ -527,7 +344,7 @@ namespace OpenMM {
 				}
 
 				// orthogonalize rotational vectors 2 and 3
-				for( int j = 4; j < cdof; j++ ) { // <-- vector we're orthogonalizing
+				for( int j = 4; j < ConservedDegreesOfFreedom; j++ ) { // <-- vector we're orthogonalizing
 					for( int k = 3; k < j; k++ ) { // <-- vectors we're orthognalizing against
 						double dot_prod = 0.0;
 						for( int l = 0; l < size; l++ ) {
@@ -553,7 +370,7 @@ namespace OpenMM {
 				
 				// orthogonalize original eigenvectors against gdof
 				// number of evec that survive orthogonalization
-				int curr_evec = cdof;
+				int curr_evec = ConservedDegreesOfFreedom;
 				for( int j = 0; j < size; j++ ) { // <-- vector we're orthogonalizing
 					// to match ProtoMol we only include size instead of size + cdof vectors
 					// Note: for every vector that is skipped due to a low norm,
@@ -597,10 +414,7 @@ namespace OpenMM {
 					// continue on to next vector
 					// we don't update curr_evec so this vector
 					// will be overwritten
-					if( norm < 0.05 ) {
-						cout << "skipping vec" << endl;
-						continue;
-					}
+					if( norm < 0.05 ) continue;
 
 					// scale vector
 					norm = sqrt( norm );
@@ -832,6 +646,189 @@ namespace OpenMM {
 				eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i]);
 			      }
 			  }
+		}
+		
+		void Analysis::Initialize( System& system, const Parameters& ltmd, const unsigned int Particles ) {
+			System *blockSystem = new System();
+			cout << "res per block " << ltmd.res_per_block << endl;
+			for( int i = 0; i < Particles; i++ ) {
+				blockSystem->addParticle( system.getParticleMass( i ) );
+			}
+
+			int block_start = 0;
+			for( int i = 0; i < ltmd.residue_sizes.size(); i++ ) {
+				if( i % ltmd.res_per_block == 0 ) {
+					blocks.push_back( block_start );
+				}
+				block_start += ltmd.residue_sizes[i];
+			}
+
+			for( int i = 1; i < blocks.size(); i++ ) {
+				int block_size = blocks[i] - blocks[i - 1];
+				if( block_size > mLargestBlockSize ) {
+					mLargestBlockSize = block_size;
+				}
+			}
+
+			cout << "blocks " << blocks.size() << endl;
+			cout << blocks[blocks.size() - 1] << endl;
+
+			// Creating a whole new system called the blockSystem.
+			// This system will only contain bonds, angles, dihedrals, and impropers
+			// between atoms in the same block.
+			// Also contains pairwise force terms which are zeroed out for atoms
+			// in different blocks.
+			// This necessitates some copying from the original system, but is required
+			// because OpenMM populates all data when it reads XML.
+			// Copy all atoms into the block system.
+
+			// Copy the center of mass force.
+			cout << "adding forces..." << endl;
+			for( int i = 0; i < ltmd.forces.size(); i++ ) {
+				string forcename = ltmd.forces[i].name;
+				cout << "Adding force " << forcename << " at index " << ltmd.forces[i].index << endl;
+				if( forcename == "CenterOfMass" ) {
+					blockSystem->addForce( &system.getForce( ltmd.forces[i].index ) );
+				} else if( forcename == "Bond" ) {
+					// Create a new harmonic bond force.
+					// This only contains pairs of atoms which are in the same block.
+					// I have to iterate through each bond from the old force, then
+					// selectively add them to the new force based on this condition.
+					HarmonicBondForce *hf = new HarmonicBondForce();
+					const HarmonicBondForce *ohf = dynamic_cast<const HarmonicBondForce *>( &system.getForce( ltmd.forces[i].index ) );
+					for( int i = 0; i < ohf->getNumBonds(); i++ ) {
+						// For our system, add bonds between atoms in the same block
+						int particle1, particle2;
+						double length, k;
+						ohf->getBondParameters( i, particle1, particle2, length, k );
+						if( inSameBlock( particle1, particle2 ) ) {
+							hf->addBond( particle1, particle2, length, k );
+						}
+					}
+					blockSystem->addForce( hf );
+				} else if( forcename == "Angle" ) {
+					// Same thing with the angle force....
+					HarmonicAngleForce *af = new HarmonicAngleForce();
+					const HarmonicAngleForce *ahf = dynamic_cast<const HarmonicAngleForce *>( &system.getForce( ltmd.forces[i].index ) );
+					for( int i = 0; i < ahf->getNumAngles(); i++ ) {
+						// For our system, add bonds between atoms in the same block
+						int particle1, particle2, particle3;
+						double angle, k;
+						ahf->getAngleParameters( i, particle1, particle2, particle3, angle, k );
+						if( inSameBlock( particle1, particle2, particle3 ) ) {
+							af->addAngle( particle1, particle2, particle3, angle, k );
+						}
+					}
+					blockSystem->addForce( af );
+				} else if( forcename == "Dihedral" ) {
+					// And the dihedrals....
+					PeriodicTorsionForce *ptf = new PeriodicTorsionForce();
+					const PeriodicTorsionForce *optf = dynamic_cast<const PeriodicTorsionForce *>( &system.getForce( ltmd.forces[i].index ) );
+					for( int i = 0; i < optf->getNumTorsions(); i++ ) {
+						// For our system, add bonds between atoms in the same block
+						int particle1, particle2, particle3, particle4, periodicity;
+						double phase, k;
+						optf->getTorsionParameters( i, particle1, particle2, particle3, particle4, periodicity, phase, k );
+						if( inSameBlock( particle1, particle2, particle3, particle4 ) ) {
+							ptf->addTorsion( particle1, particle2, particle3, particle4, periodicity, phase, k );
+						}
+					}
+					blockSystem->addForce( ptf );
+				} else if( forcename == "Improper" ) {
+					// And the impropers....
+					RBTorsionForce *rbtf = new RBTorsionForce();
+					const RBTorsionForce *orbtf = dynamic_cast<const RBTorsionForce *>( &system.getForce( ltmd.forces[i].index ) );
+					for( int i = 0; i < orbtf->getNumTorsions(); i++ ) {
+						// For our system, add bonds between atoms in the same block
+						int particle1, particle2, particle3, particle4;
+						double c0, c1, c2, c3, c4, c5;
+						orbtf->getTorsionParameters( i, particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5 );
+						if( inSameBlock( particle1, particle2, particle3, particle4 ) ) {
+							rbtf->addTorsion( particle1, particle2, particle3, particle4, c0, c1, c2, c3, c4, c5 );
+						}
+					}
+					blockSystem->addForce( rbtf );
+				} else if( forcename == "Nonbonded" ) {
+					// This is a custom nonbonded pairwise force and
+					// includes terms for both LJ and Coulomb.
+					// Note that the step term will go to zero if block1 does not equal block 2,
+					// and will be one otherwise.
+					CustomBondForce *cbf = new CustomBondForce( "4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r" );
+					const NonbondedForce *nbf = dynamic_cast<const NonbondedForce *>( &system.getForce( ltmd.forces[i].index ) );
+					NonbondedForce *nonbonded = new NonbondedForce();
+
+					cbf->addPerBondParameter( "q" );
+					cbf->addPerBondParameter( "sigma" );
+					cbf->addPerBondParameter( "eps" );
+
+					// store exceptions
+					// exceptions[p1][p2] = params
+					map<int, map<int, vector<double> > > exceptions;
+
+					for( int i = 0; i < nbf->getNumExceptions(); i++ ) {
+						int p1, p2;
+						double q, sig, eps;
+						nbf->getExceptionParameters( i, p1, p2, q, sig, eps );
+						if( inSameBlock( p1, p2 ) ) {
+							vector<double> params;
+							params.push_back( q );
+							params.push_back( sig );
+							params.push_back( eps );
+							if( exceptions.count( p1 ) == 0 ) {
+								map<int, vector<double> > pair_exception;
+								pair_exception[p2] = params;
+								exceptions[p1] = pair_exception;
+							} else {
+								exceptions[p1][p2] = params;
+							}
+						}
+					}
+
+					// add particle params
+					// TODO: iterate over block dimensions to reduce to O(b^2 N_b)
+					for( int i = 0; i < nbf->getNumParticles() - 1; i++ ) {
+						for( int j = i + 1; j < nbf->getNumParticles(); j++ ) {
+							if( !inSameBlock( i, j ) ) {
+								continue;
+							}
+							// we have an exception -- 1-4 modified interactions, etc.
+							if( exceptions.count( i ) == 1 && exceptions[i].count( j ) == 1 ) {
+								vector<double> params = exceptions[i][j];
+								cbf->addBond( i, j, params );
+							}
+							// no exception, normal interaction
+							else {
+								vector<double> params;
+								double q1, q2, eps1, eps2, sigma1, sigma2, q, eps, sigma;
+
+								nbf->getParticleParameters( i, q1, sigma1, eps1 );
+								nbf->getParticleParameters( j, q2, sigma2, eps2 );
+
+								q = q1 * q2;
+								sigma = 0.5 * ( sigma1 + sigma2 );
+								eps = sqrt( eps1 * eps2 );
+
+								params.push_back( q );
+								params.push_back( sigma );
+								params.push_back( eps );
+
+								cbf->addBond( i, j, params );
+							}
+						}
+					}
+
+					blockSystem->addForce( cbf );
+				} else {
+					cout << "Unknown Force: " << forcename << endl;
+				}
+			}
+			cout << "done." << endl;
+			
+			VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
+			if( blockContext ) delete blockContext;
+			blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
+				
+			mInitialized = true;
 		}
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
