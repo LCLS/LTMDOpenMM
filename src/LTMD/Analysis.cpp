@@ -45,6 +45,7 @@
 #include "LTMD/Analysis.h"
 #include "LTMD/Integrator.h"
 
+#include "tnt_array2d_utils.h"
 
 namespace OpenMM {
 	namespace LTMD {		
@@ -277,7 +278,7 @@ namespace OpenMM {
 				
 				VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
 				if( blockContext ) delete blockContext;
-				blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
+				blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Reference" ) );
 				
 				mInitialized = true;
 			}
@@ -400,6 +401,23 @@ namespace OpenMM {
 					h[i][j] = avg;
 				}
 			}
+
+			fstream block_out;
+			block_out.open("block_hessian.txt", fstream::out);
+			block_out.precision(10);
+			for(int i = 0; i < n; i++)
+			  {
+			    for(int j = 0; j < n; j++)
+			      {
+				if(h[i][j] != 0.0)
+				  {
+				    block_out << i << " " << j << " " << h[i][j] << std::endl;
+				  }
+			       
+			      }
+			  }
+			block_out.close();
+
 
 			// Diagonalize each block Hessian, get Eigenvectors
 			// Note: The eigenvalues will be placed in one large array, because
@@ -614,7 +632,6 @@ namespace OpenMM {
 
 			gettimeofday( &tp_diag, NULL );
 			cout << "Time to diagonalize block hessian: " << ( tp_diag.tv_sec - tp_hess.tv_sec ) << endl;
-
 			//***********************************************************
 			// This section here is only to find the cuttoff eigenvalue.
 			// First sort the eigenvectors by the absolute value of the eigenvalue.
@@ -668,6 +685,19 @@ namespace OpenMM {
 			gettimeofday( &tp_e, NULL );
 			cout << "Time to compute E: " << ( tp_e.tv_sec - tp_diag.tv_sec ) << endl;
 
+			fstream selected_out;
+			selected_out.open("block_eigs.txt", fstream::out);
+			selected_out.precision(10);
+			for(int i = 0; i < m; i++)
+			  {
+			    for(int j = 0; j < n; j++)
+			      {
+				    selected_out << j << " " << i << " " << E[j][i] << std::endl;
+			      }
+			  }
+			selected_out.close();
+		
+
 			//*****************************************************************
 			// Compute S, which is equal to E^T * H * E.
 			TNT::Array2D<double> S( m, m, 0.0 );
@@ -712,8 +742,9 @@ namespace OpenMM {
 					Force_diff[i][0] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 				}
 
-				TNT::Array2D<double> Si( m, 1, 0.0 );
-				MatrixMultiply( E_transpose, Force_diff, Si );
+				//TNT::Array2D<double> Si( m, 1, 0.0 );
+				//MatrixMultiply( E_transpose, Force_diff, Si );
+				TNT::Array2D<double> Si = matmult(E_transpose, Force_diff);
 
 				// Copy to S.
 				for( int i = 0; i < m; i++ ) {
@@ -764,20 +795,43 @@ namespace OpenMM {
 				}
 			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
 			
-			
 			gettimeofday( &tp_q, NULL );
 			cout << "Time to compute Q: " << ( tp_q.tv_sec - tp_s.tv_sec ) << endl;
 
 			// Compute U, set of approximate eigenvectors.
 			// U = E*Q.
-			TNT::Array2D<double> U( E.dim1(), E.dim2(), 0.0 );
-			MatrixMultiply( E, Q, U );
+			//TNT::Array2D<double> U( E.dim1(), E.dim2(), 0.0 );
+			//MatrixMultiply( E, Q, U );
+			TNT::Array2D<double> U = matmult(E, Q);
 			
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
 
 			gettimeofday( &tp_end, NULL );
 			cout << "Overall diagonalization time in seconds: " << ( tp_end.tv_sec - tp_begin.tv_sec ) << endl;
+
+			const int modes = ltmd->modes;
+			fstream approx_out;
+			approx_out.open("eigenvectors.txt", fstream::out);
+			approx_out.precision(10);
+			for(int i = 0; i < modes; i++)
+			  {
+			    for(int j = 0; j < n; j++)
+			      {
+				approx_out << j << " " << i << " " << U[j][i] << std::endl;
+			      }
+			  }
+			approx_out.close();
+			cout << "Wrote out" << endl;
+
+			eigenvectors.resize(modes, vector<Vec3>(n / 3));
+			for(int i = 0; i < modes; i++)
+			  {
+			    for(int j = 0; j < n / 3; j++)
+			      {
+				eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i]);
+			      }
+			  }
 		}
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
