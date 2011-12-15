@@ -649,6 +649,11 @@ namespace OpenMM {
 		}
 		
 		void Analysis::Initialize( System& system, const Parameters& ltmd, const unsigned int Particles ) {
+			#ifdef PROFILE_ANALYSIS
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			
 			System *blockSystem = new System();
 			cout << "res per block " << ltmd.res_per_block << endl;
 			for( int i = 0; i < Particles; i++ ) {
@@ -829,6 +834,12 @@ namespace OpenMM {
 			blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
 				
 			mInitialized = true;
+			
+			#ifdef PROFILE_ANALYSIS
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "[Analysis] Initialize: " << elapsed << "ms" << std::endl;
+			#endif
 		}
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
