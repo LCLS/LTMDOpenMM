@@ -50,7 +50,7 @@
 namespace OpenMM {
 	namespace LTMD {
 		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, Parameters *params )
-			: stepsSinceDiagonalize( 0 ) {
+			: stepsSinceDiagonalize( 0 ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
 			setStepSize( stepSize );
@@ -59,6 +59,10 @@ namespace OpenMM {
 			setRandomNumberSeed( (int) time( 0 ) );
 			parameters = params;
 			rediagonalizeFrequency = params->rediagFreq;
+		}
+		
+		Integrator::~Integrator() {
+			delete mAnalysis;
 		}
 
 		void Integrator::initialize( ContextImpl &contextRef ) {
@@ -157,9 +161,9 @@ namespace OpenMM {
 				timeval start, end;
 				gettimeofday( &start, 0 );
 			#endif
-			mAnalysis.computeEigenvectorsFull( *context, parameters );
-			setProjectionVectors( mAnalysis.getEigenvectors() );
-			maxEigenvalue = mAnalysis.getMaxEigenvalue();
+			mAnalysis->computeEigenvectorsFull( *context, parameters );
+			setProjectionVectors( mAnalysis->getEigenvectors() );
+			maxEigenvalue = mAnalysis->getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;
 			#ifdef PROFILE_INTEGRATOR
 				gettimeofday( &end, 0 );

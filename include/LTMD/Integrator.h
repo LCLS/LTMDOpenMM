@@ -36,12 +36,11 @@
 #include "openmm/Kernel.h"
 #include "openmm/internal/windowsExport.h"
 
-#include "LTMD/Analysis.h"
 #include "LTMD/Parameters.h"
-
 
 namespace OpenMM {
 	namespace LTMD {
+		class Analysis;
 		const unsigned int MaximumMinimizationIterations = 50;
 		
 		class OPENMM_EXPORT Integrator : public OpenMM::Integrator {
@@ -54,6 +53,9 @@ namespace OpenMM {
 				 * @param stepSize       the step size with which to integrator the system (in picoseconds)
 				 */
 				Integrator( const double temperature, const double frictionCoeff, const double stepSize, Parameters *param );
+				
+				~Integrator();
+				
 				/**
 				 * Get the temperature of the heat bath (in Kelvin).
 				 */
@@ -170,7 +172,7 @@ namespace OpenMM {
 				OpenMM::ContextImpl *context;
 				OpenMM::Kernel kernel;
 				Parameters *parameters;
-				Analysis mAnalysis;
+				Analysis *mAnalysis;
 		};
 	}
 }
