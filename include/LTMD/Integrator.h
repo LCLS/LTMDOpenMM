@@ -35,6 +35,8 @@
 #include "openmm/Integrator.h"
 #include "openmm/Kernel.h"
 #include "openmm/internal/windowsExport.h"
+
+#include "LTMD/Analysis.h"
 #include "LTMD/Parameters.h"
 
 
@@ -168,6 +170,7 @@ namespace OpenMM {
 				OpenMM::ContextImpl *context;
 				OpenMM::Kernel kernel;
 				Parameters *parameters;
+				Analysis mAnalysis;
 		};
 	}
 }
