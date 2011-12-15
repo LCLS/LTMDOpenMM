@@ -23,6 +23,12 @@ if( BUILD_PROFILE )
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 endif( BUILD_PROFILE )
 
+# Profiling
+option( BUILD_VALIDATION "Build Validation Code" Off )
+if( BUILD_VALIDATION )
+	add_definitions( "-DVALIDATION" )
+endif( BUILD_VALIDATION )
+
 # Intel
 if (${CMAKE_CXX_COMPILER} MATCHES "icc.*$") 
 	set( CUDA_NVCC_FLAGS "-ccbin=icc" )

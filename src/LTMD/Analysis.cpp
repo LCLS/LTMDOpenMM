@@ -51,6 +51,10 @@ namespace OpenMM {
 	namespace LTMD {	
 		const unsigned int ConservedDegreesOfFreedom = 6;
 		
+		// Function Declarations
+		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes, const unsigned int n );
+		
+		// Function Implementations
 		unsigned int Analysis::blockNumber( int p ) {
 			unsigned int block = 0;
 			while( block != blocks.size() && blocks[block] <= p ) {
@@ -76,7 +80,12 @@ namespace OpenMM {
 		}
 
 		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd ) {
-			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u, tp_end;
+			#ifdef PROFILE_ANALYSIS
+				timeval start, end;
+				gettimeofday( &start, 0 );
+			#endif 
+			
+			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u;
 
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
@@ -620,32 +629,35 @@ namespace OpenMM {
 			
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
-
-			gettimeofday( &tp_end, NULL );
-			cout << "Overall diagonalization time in seconds: " << ( tp_end.tv_sec - tp_begin.tv_sec ) << endl;
-
-			const int modes = ltmd->modes;
-			fstream approx_out;
-			approx_out.open("eigenvectors.txt", fstream::out);
-			approx_out.precision(10);
-			for(int i = 0; i < modes; i++)
-			  {
-			    for(int j = 0; j < n; j++)
-			      {
-				approx_out << j << " " << i << " " << U[j][i] << std::endl;
-			      }
-			  }
-			approx_out.close();
-			cout << "Wrote out" << endl;
-
-			eigenvectors.resize(modes, vector<Vec3>(n / 3));
-			for(int i = 0; i < modes; i++)
-			  {
-			    for(int j = 0; j < n / 3; j++)
-			      {
-				eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i]);
-			      }
-			  }
+			
+			const unsigned int modes = ltmd->modes;
+			
+			WriteModes( U, modes, n );
+			
+			eigenvectors.resize(modes, vector<Vec3>( numParticles ));
+			for( unsigned int i = 0; i < modes; i++) {
+			    for( unsigned int j = 0; j < numParticles; j++) {
+					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i]);
+				}
+			}
+			  
+			#ifdef PROFILE_ANALYSIS
+				gettimeofday( &end, 0 );
+				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+				std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
+			#endif
+		}
+		
+		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes, const unsigned int n ){
+			#ifdef VALIDATION
+				std::ofstream approx_out( "eigenvectors.txt");
+				approx_out.precision(10);
+				for( unsigned int i = 0; i < modes; i++) {
+					for( unsigned int j = 0; j < n; j++) {
+						approx_out << j << " " << i << " " << U[j][i] << std::endl;
+					}
+				}
+			#endif
 		}
 		
 		void Analysis::Initialize( System& system, const Parameters& ltmd, const unsigned int Particles ) {
