@@ -156,12 +156,11 @@ namespace OpenMM {
 			#ifdef PROFILE_INTEGRATOR
 				timeval start, end;
 				gettimeofday( &start, 0 );
-			#endif 
-			Analysis nma;
-			nma.computeEigenvectorsFull( *context, parameters );
-			const std::vector<std::vector<Vec3> > e1 = nma.getEigenvectors();
-			setProjectionVectors( nma.getEigenvectors() );
-			maxEigenvalue = nma.getMaxEigenvalue();
+			#endif
+			mAnalysis.computeEigenvectorsFull( *context, parameters );
+			const std::vector<std::vector<Vec3> > e1 = mAnalysis.getEigenvectors();
+			setProjectionVectors( mAnalysis.getEigenvectors() );
+			maxEigenvalue = mAnalysis.getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;
 			#ifdef PROFILE_INTEGRATOR
 				gettimeofday( &end, 0 );

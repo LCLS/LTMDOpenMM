@@ -44,6 +44,7 @@ namespace OpenMM {
 		class OPENMM_EXPORT Analysis {
 			public:
 				Analysis() {
+					mInitialized = false;
 					blockContext = NULL;
 				}
 				~Analysis() {
@@ -62,7 +63,8 @@ namespace OpenMM {
 				bool inSameBlock( int, int, int, int );
 			private:
 				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
-				void buildTree( ContextImpl &context );
+				
+				bool mInitialized;
 				std::vector<std::pair<int, int> > bonds;
 				std::vector<std::vector<int> > particleBonds;
 				std::vector<std::vector<double> > projection;
