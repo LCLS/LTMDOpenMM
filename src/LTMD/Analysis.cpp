@@ -345,7 +345,7 @@ namespace OpenMM {
 								nbf->getParticleParameters( i, q1, sigma1, eps1 );
 								nbf->getParticleParameters( j, q2, sigma2, eps2 );
 
-								q = q1 * q2;
+r1946_intel_nmlopenmm								q = q1 * q2;
 								sigma = 0.5 * ( sigma1 + sigma2 );
 								eps = sqrt( eps1 * eps2 );
 
@@ -370,7 +370,7 @@ namespace OpenMM {
 			if( blockContext ) {
 				delete blockContext;
 			}
-			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "Reference" ) );
+			blockContext = new Context( *blockSystem, integ, Platform::getPlatformByName( "OpenCL" ) );
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
 			for( int i = 0; i < numParticles; i++ ) {
