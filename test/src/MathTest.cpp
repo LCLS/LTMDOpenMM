@@ -30,14 +30,25 @@ namespace LTMD {
 			
 			TNT::Array2D<double> expectedVectors( 3, 3, 0.0 );
 			
-			expectedVectors[0][0] = -0.408; expectedVectors[0][1] =  0.707; expectedVectors[0][2] = -0.577;
+			expectedVectors[0][0] = -0.408; expectedVectors[0][1] = -0.707; expectedVectors[0][2] = -0.577;
 			expectedVectors[1][0] =  0.816; expectedVectors[1][1] = -0.000; expectedVectors[1][2] = -0.577;
-			expectedVectors[2][0] = -0.408; expectedVectors[2][1] = -0.707; expectedVectors[2][2] = -0.577;
+			expectedVectors[2][0] = -0.408; expectedVectors[2][1] = 0.707; expectedVectors[2][2] = -0.577;
+			
+			std::vector<double> overlap( 3 );
 			
 			for( unsigned int i = 0; i < vectors.dim1(); i++ ){
-				for( unsigned int j = 0; j < vectors.dim2(); j++ ){
-					CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedVectors[i][j], vectors[i][j], 1e-3);
+				double sum = 0.0;
+				for( unsigned int j = 0; j < vectors.dim1(); j++ ){
+					for( unsigned int k = 0; k < vectors.dim2(); k++ ){
+						 double dot = vectors[k][i] * expectedVectors[k][j];
+						 sum += ( dot * dot );
+					}
 				}
+				overlap[i] = sum;
+			}
+	
+			for( unsigned int i = 0; i < values.dim(); i++ ){
+				CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0, overlap[i], 1e-3);
 			}
 		}
 		
