@@ -8,8 +8,8 @@ namespace LTMD {
 		class Test : public CppUnit::TestFixture  {
 			private:
 				CPPUNIT_TEST_SUITE( Test );
-					CPPUNIT_TEST( Initialisation );
-					CPPUNIT_TEST( MinimizeIntegration );
+				CPPUNIT_TEST( Initialisation );
+				CPPUNIT_TEST( MinimizeIntegration );
 				CPPUNIT_TEST_SUITE_END();
 			public:
 				void Initialisation();

@@ -33,40 +33,43 @@
 #include "LTMD/Integrator.h"
 #include "LTMD/CUDA/Kernels.h"
 
-extern void kGenerateRandoms(gpuContext gpu);
-void kNMLUpdate(gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights);
-void kNMLRejectMinimizationStep(gpuContext gpu, CUDAStream<float>& minimizerScale);
-void kNMLAcceptMinimizationStep(gpuContext gpu, CUDAStream<float>& minimizerScale);
-void kNMLLinearMinimize(gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float>& minimizerScale);
-void kNMLQuadraticMinimize(gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer);
+extern void kGenerateRandoms( gpuContext gpu );
+void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );
+void kNMLRejectMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale );
+void kNMLAcceptMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale );
+void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float>& minimizerScale );
+void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer );
 
 namespace OpenMM {
 	namespace LTMD {
 		namespace CUDA {
-			StepKernel::StepKernel(std::string name, const Platform& platform, CudaPlatform::PlatformData& data) : LTMD::StepKernel(name, platform),
-					data(data), modes(NULL), modeWeights(NULL), minimizerScale(NULL) {
+			StepKernel::StepKernel( std::string name, const Platform &platform, CudaPlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
+				data( data ), modes( NULL ), modeWeights( NULL ), minimizerScale( NULL ) {
 			}
 
 			StepKernel::~StepKernel() {
-				if (modes != NULL)
+				if( modes != NULL ) {
 					delete modes;
-				if (modeWeights != NULL)
+				}
+				if( modeWeights != NULL ) {
 					delete modeWeights;
-				if (minimizerScale != NULL)
+				}
+				if( minimizerScale != NULL ) {
 					delete minimizerScale;
+				}
 			}
 
-			void StepKernel::initialize(const System& system, const Integrator& integrator) {
-					OpenMM::cudaOpenMMInitializeIntegration(system, data, integrator);
-				_gpuContext* gpu = data.gpu;
-				gpu->seed = (unsigned long) integrator.getRandomNumberSeed();
-				gpuInitializeRandoms(gpu);
-				minimizerScale = new CUDAStream<float>(1, 1, "MinimizerScale");
+			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
+				OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator );
+				_gpuContext *gpu = data.gpu;
+				gpu->seed = ( unsigned long ) integrator.getRandomNumberSeed();
+				gpuInitializeRandoms( gpu );
+				minimizerScale = new CUDAStream<float>( 1, 1, "MinimizerScale" );
 			}
 
 
-			void StepKernel::execute(ContextImpl& context, const Integrator& integrator, const double currentPE, const int stepType) {
-				_gpuContext* gpu = data.gpu;
+			void StepKernel::execute( ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType ) {
+				_gpuContext *gpu = data.gpu;
 
 				//get standard data
 				int numAtoms = context.getSystem().getNumParticles();
@@ -77,43 +80,44 @@ namespace OpenMM {
 				bool modesChanged = integrator.getProjVecChanged();
 
 				//projection vectors changed or never allocated
-				if (modesChanged || modes == NULL){
+				if( modesChanged || modes == NULL ) {
 					//valid vectors?
-					if(numModes == 0){
-						throw OpenMMException("Projection vector size is zero.");
+					if( numModes == 0 ) {
+						throw OpenMMException( "Projection vector size is zero." );
 					}
 
-					if (modes != NULL && modes->_length != numModes*numAtoms) {
+					if( modes != NULL && modes->_length != numModes * numAtoms ) {
 						delete modes;
 						delete modeWeights;
 						modes = NULL;
 						modeWeights = NULL;
 					}
-					if (modes == NULL) {
-						modes = new CUDAStream<float4>(numModes*numAtoms, 1, "NormalModes");
-						modeWeights = new CUDAStream<float>(numModes > gpu->sim.blocks ? numModes : gpu->sim.blocks, 1, "NormalModeWeights");
+					if( modes == NULL ) {
+						modes = new CUDAStream<float4>( numModes * numAtoms, 1, "NormalModes" );
+						modeWeights = new CUDAStream<float>( numModes > gpu->sim.blocks ? numModes : gpu->sim.blocks, 1, "NormalModeWeights" );
 						modesChanged = true;
 					}
-					if (modesChanged) {
+					if( modesChanged ) {
 						int index = 0;
 						const std::vector<std::vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
-						for (int i = 0; i < numModes; i++)
-							for (int j = 0; j < numAtoms; j++)
-								(*modes)[index++] = make_float4((float) modeVectors[i][j][0], (float) modeVectors[i][j][1], (float) modeVectors[i][j][2], 0.0f);
+						for( int i = 0; i < numModes; i++ )
+							for( int j = 0; j < numAtoms; j++ ) {
+								( *modes )[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
+							}
 						modes->Upload();
 					}
-					gpu->sim.deltaT = (float) dt;
-					gpu->sim.oneOverDeltaT = (float) (1.0/dt);
+					gpu->sim.deltaT = ( float ) dt;
+					gpu->sim.oneOverDeltaT = ( float )( 1.0 / dt );
 					double friction = integrator.getFriction();
-					gpu->sim.tau = (float) (friction == 0.0 ? 0.0 : 1.0/friction);
-					gpu->sim.T = (float) integrator.getTemperature();
-					gpu->sim.kT = (float) (BOLTZ*integrator.getTemperature());
-					kGenerateRandoms(gpu);
+					gpu->sim.tau = ( float )( friction == 0.0 ? 0.0 : 1.0 / friction );
+					gpu->sim.T = ( float ) integrator.getTemperature();
+					gpu->sim.kT = ( float )( BOLTZ * integrator.getTemperature() );
+					kGenerateRandoms( gpu );
 				}
 
-				switch(stepType) {
+				switch( stepType ) {
 					case 1:
-						kNMLUpdate(gpu, numModes, *modes, *modeWeights);
+						kNMLUpdate( gpu, numModes, *modes, *modeWeights );
 						break;
 					case 2:
 						data.time += dt;
@@ -121,21 +125,22 @@ namespace OpenMM {
 						break;
 					case 3:
 						lastPE = currentPE;
-						kNMLLinearMinimize(gpu, numModes, integrator.getMaxEigenvalue(), *modes, *modeWeights, *minimizerScale);
+						kNMLLinearMinimize( gpu, numModes, integrator.getMaxEigenvalue(), *modes, *modeWeights, *minimizerScale );
 						break;
 					case 4:
-						kNMLQuadraticMinimize(gpu, integrator.getMaxEigenvalue(), currentPE, lastPE, *modeWeights);
+						kNMLQuadraticMinimize( gpu, integrator.getMaxEigenvalue(), currentPE, lastPE, *modeWeights );
 						break;
 					case 5:
-						kNMLRejectMinimizationStep(gpu, *minimizerScale);
+						kNMLRejectMinimizationStep( gpu, *minimizerScale );
 						break;
 					case 6:
-						kNMLAcceptMinimizationStep(gpu, *minimizerScale);
+						kNMLAcceptMinimizationStep( gpu, *minimizerScale );
 						break;
 				}
 
-				if (data.removeCM && data.stepCount%data.cmMotionFrequency == 0)
+				if( data.removeCM && data.stepCount % data.cmMotionFrequency == 0 ) {
 					gpu->bCalculateCM = true;
+				}
 			}
 		}
 	}

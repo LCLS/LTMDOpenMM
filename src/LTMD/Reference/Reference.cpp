@@ -47,7 +47,7 @@ extern "C" void registerKernelFactories() {
 		Platform &platform = Platform::getPlatformByName( "Reference" );
 		printf( "LTMD found reference platform... \n" );
 		platform.registerKernelFactory( LTMD::StepKernel::Name(), new LTMD::Reference::KernelFactory() );
-		printf("Registered LTMD reference plugin... \n");
+		printf( "Registered LTMD reference plugin... \n" );
 	} catch( const std::exception &exc ) {
 		printf( "LTMD Reference platform not found. %s", exc.what() );
 	}

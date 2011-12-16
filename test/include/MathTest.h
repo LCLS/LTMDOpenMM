@@ -8,8 +8,8 @@ namespace LTMD {
 		class Test : public CppUnit::TestFixture  {
 			private:
 				CPPUNIT_TEST_SUITE( Test );
-					CPPUNIT_TEST( Eigenvalues );
-					CPPUNIT_TEST( MatrixMultiplyTest );
+				CPPUNIT_TEST( Eigenvalues );
+				CPPUNIT_TEST( MatrixMultiplyTest );
 				CPPUNIT_TEST_SUITE_END();
 			public:
 				void Eigenvalues();

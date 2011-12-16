@@ -52,28 +52,28 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 void FindEigenvalues( const TNT::Array2D<double>& matrix, TNT::Array1D<double>& values, TNT::Array2D<double>& vectors ) {
 #ifdef INTEL_MKL
 	const int dim = matrix.dim1();
-	
+
 	const char cmach = 'S';
-    const double abstol = dlamch( &cmach ); 
-	
+	const double abstol = dlamch( &cmach );
+
 	std::vector<int> isuppz( 2 * dim ), iwork( 10 * dim );
 	std::vector<double> wrkSp( 26 * dim );
-	const char jobz = 'V', range = 'A', uplo = 'U'; 
-    const int n = dim, lda = dim;
-    const double vl = 1.0, vu = 1.0;
-    const int il = 1, iu = 1;
-    const int ldz = dim, lwork = 26 * dim, liwork = 10 * dim;
-    int info = 0, m = 0;
-	
+	const char jobz = 'V', range = 'A', uplo = 'U';
+	const int n = dim, lda = dim;
+	const double vl = 1.0, vu = 1.0;
+	const int il = 1, iu = 1;
+	const int ldz = dim, lwork = 26 * dim, liwork = 10 * dim;
+	int info = 0, m = 0;
+
 	std::vector<double> iMatrix( dim * dim ), oValue( dim ), oVector( dim * dim );
 	for( int i = 0; i < dim; i++ ) {
 		for( int j = 0; j < dim; j++ ) {
 			iMatrix[i * dim + j] = matrix[i][j];
 		}
 	}
-	
-	dsyevr( &jobz, &range, &uplo, &n, &iMatrix[0], &lda, &vl, &vu, &il, &iu, &abstol, &m, &oValue[0], &oVector[0], &ldz, &isuppz[0], &wrkSp[0], &lwork, &iwork[0], &liwork, &info);
-	
+
+	dsyevr( &jobz, &range, &uplo, &n, &iMatrix[0], &lda, &vl, &vu, &il, &iu, &abstol, &m, &oValue[0], &oVector[0], &ldz, &isuppz[0], &wrkSp[0], &lwork, &iwork[0], &liwork, &info );
+
 	for( int i = 0; i < dim; i++ ) {
 		values[i] = oValue[i];
 		for( int j = 0; j < dim; j++ ) {

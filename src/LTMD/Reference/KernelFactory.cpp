@@ -44,7 +44,7 @@ namespace OpenMM {
 				ReferencePlatform::PlatformData &data = *static_cast<ReferencePlatform::PlatformData *>( context.getPlatformData() );
 				std::cout << "trying to create step kernel" << std::endl;
 				if( name == StepKernel::Name() ) {
-				  return new Reference::StepKernel( name, platform, data );
+					return new Reference::StepKernel( name, platform, data );
 				}
 				std::cout << "step kernel not created" << std::endl;
 				throw OpenMMException( ( std::string( "Tried to create kernel with illegal kernel name '" ) + name + "'" ).c_str() );

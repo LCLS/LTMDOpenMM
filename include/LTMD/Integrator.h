@@ -42,7 +42,7 @@ namespace OpenMM {
 	namespace LTMD {
 		class Analysis;
 		const unsigned int MaximumMinimizationIterations = 50;
-		
+
 		class OPENMM_EXPORT Integrator : public OpenMM::Integrator {
 			public:
 				/**
@@ -53,9 +53,9 @@ namespace OpenMM {
 				 * @param stepSize       the step size with which to integrator the system (in picoseconds)
 				 */
 				Integrator( const double temperature, const double frictionCoeff, const double stepSize, Parameters *param );
-				
+
 				~Integrator();
-				
+
 				/**
 				 * Get the temperature of the heat bath (in Kelvin).
 				 */
@@ -151,14 +151,14 @@ namespace OpenMM {
 				std::vector<std::string> getKernelNames();
 			private:
 				void DoStep();
-				
+
 				// Kernel Functions
 				void IntegrateStep();
 				void TimeAndCounterStep();
-				
+
 				double LinearMinimize( const double energy );
 				double QuadraticMinimize( const double energy );
-				
+
 				void SaveStep();
 				void RevertStep();
 			private:

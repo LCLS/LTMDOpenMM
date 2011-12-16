@@ -48,12 +48,14 @@
 #include "tnt_array2d_utils.h"
 
 namespace OpenMM {
-	namespace LTMD {	
+	namespace LTMD {
 		const unsigned int ConservedDegreesOfFreedom = 6;
-		
+
 		// Function Declarations
-		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes, const unsigned int n );
-		
+		void WriteHessian( const TNT::Array2D<double>& H );
+		void WriteBlockEigs( const TNT::Array2D<double>& H );
+		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes );
+
 		// Function Implementations
 		unsigned int Analysis::blockNumber( int p ) {
 			unsigned int block = 0;
@@ -80,11 +82,11 @@ namespace OpenMM {
 		}
 
 		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd ) {
-			#ifdef PROFILE_ANALYSIS
-				timeval start, end;
-				gettimeofday( &start, 0 );
-			#endif 
-			
+#ifdef PROFILE_ANALYSIS
+			timeval start, end;
+			gettimeofday( &start, 0 );
+#endif
+
 			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u;
 
 			gettimeofday( &tp_begin, NULL );
@@ -108,8 +110,10 @@ namespace OpenMM {
 			// This is true for the villin.xml but may not be true in the future.
 			// need it to parallelize.
 
-			if( !mInitialized ) Initialize( system, *ltmd, numParticles );
- 
+			if( !mInitialized ) {
+				Initialize( system, *ltmd, numParticles );
+			}
+
 			// Copy the positions.
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
@@ -214,13 +218,11 @@ namespace OpenMM {
 						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 					}
 				}
-
 			}
-			//perturb_forces.close();
 
 			gettimeofday( &tp_hess, NULL );
 			cout << "Time to compute hessian: " << ( tp_hess.tv_sec - tp_begin.tv_sec ) << endl;
-			
+
 			// Make sure it is exactly symmetric.
 			for( int i = 0; i < n; i++ ) {
 				for( int j = 0; j < i; j++ ) {
@@ -229,31 +231,16 @@ namespace OpenMM {
 				}
 			}
 
-			fstream block_out;
-			block_out.open("block_hessian.txt", fstream::out);
-			block_out.precision(10);
-			for(int i = 0; i < n; i++)
-			  {
-			    for(int j = 0; j < n; j++)
-			      {
-				if(h[i][j] != 0.0)
-				  {
-				    block_out << i << " " << j << " " << h[i][j] << std::endl;
-				  }
-			       
-			      }
-			  }
-			block_out.close();
-
+			WriteHessian( h );
 
 			// Diagonalize each block Hessian, get Eigenvectors
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
-			
+
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
-			int total_surviving_eigvec = 0; 
-			
+			int total_surviving_eigvec = 0;
+
 			for( int i = 0; i < blocks.size(); i++ ) {
 				cout << "Diagonalizing block: " << i << endl;
 				// 1. Determine the starting and ending index for the block
@@ -339,7 +326,7 @@ namespace OpenMM {
 					Qi_gdof[j][5]   =  diff[1] * factor;
 					Qi_gdof[j + 1][5] = -diff[0] * factor;
 				}
-				
+
 				// normalize first rotational vector
 				double rotnorm = 0.0;
 				for( int j = 0; j < size; j++ ) {
@@ -376,7 +363,7 @@ namespace OpenMM {
 						Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
 					}
 				}
-				
+
 				// orthogonalize original eigenvectors against gdof
 				// number of evec that survive orthogonalization
 				int curr_evec = ConservedDegreesOfFreedom;
@@ -423,7 +410,9 @@ namespace OpenMM {
 					// continue on to next vector
 					// we don't update curr_evec so this vector
 					// will be overwritten
-					if( norm < 0.05 ) continue;
+					if( norm < 0.05 ) {
+						continue;
+					}
 
 					// scale vector
 					norm = sqrt( norm );
@@ -485,7 +474,7 @@ namespace OpenMM {
 
 			// we may select fewer eigs if there are duplicate eigenvalues
 			const int m = selectedEigsCols.size();
-			
+
 			cout << "output selected" << endl;
 
 			// Inefficient, needs to improve.
@@ -504,22 +493,11 @@ namespace OpenMM {
 					E[j][i] = block_eigvec[j][eig_col];
 				}
 			}
-			
+
 			gettimeofday( &tp_e, NULL );
 			cout << "Time to compute E: " << ( tp_e.tv_sec - tp_diag.tv_sec ) << endl;
 
-			fstream selected_out;
-			selected_out.open("block_eigs.txt", fstream::out);
-			selected_out.precision(10);
-			for(int i = 0; i < m; i++)
-			  {
-			    for(int j = 0; j < n; j++)
-			      {
-				    selected_out << j << " " << i << " " << E[j][i] << std::endl;
-			      }
-			  }
-			selected_out.close();
-		
+			WriteBlockEigs( E );
 
 			//*****************************************************************
 			// Compute S, which is equal to E^T * H * E.
@@ -530,12 +508,12 @@ namespace OpenMM {
 
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
-			
+
 			// Loop over i.
 			for( unsigned int k = 0; k < m; k++ ) {
 				// Perturb positions.
 				int pos = 0;
-				
+
 				// forward perturbations
 				for( unsigned int i = 0; i < numParticles; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
@@ -565,9 +543,7 @@ namespace OpenMM {
 					Force_diff[i][0] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 				}
 
-				//TNT::Array2D<double> Si( m, 1, 0.0 );
-				//MatrixMultiply( E_transpose, Force_diff, Si );
-				TNT::Array2D<double> Si = matmult(E_transpose, Force_diff);
+				TNT::Array2D<double> Si = matmult( E_transpose, Force_diff );
 
 				// Copy to S.
 				for( int i = 0; i < m; i++ ) {
@@ -597,7 +573,7 @@ namespace OpenMM {
 
 			gettimeofday( &tp_s, NULL );
 			cout << "Time to compute S: " << ( tp_s.tv_sec - tp_e.tv_sec ) << endl;
-			
+
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
 			TNT::Array1D<double> dS( m, 0.0 );
 			TNT::Array2D<double> q( m, m, 0.0 );
@@ -617,55 +593,78 @@ namespace OpenMM {
 					Q[j][i] = q[j][sortedEvalues[i].second];
 				}
 			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
-			
+
 			gettimeofday( &tp_q, NULL );
 			cout << "Time to compute Q: " << ( tp_q.tv_sec - tp_s.tv_sec ) << endl;
 
 			// Compute U, set of approximate eigenvectors.
 			// U = E*Q.
-			//TNT::Array2D<double> U( E.dim1(), E.dim2(), 0.0 );
-			//MatrixMultiply( E, Q, U );
-			TNT::Array2D<double> U = matmult(E, Q);
-			
+			TNT::Array2D<double> U = matmult( E, Q );
+
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
-			
+
 			const unsigned int modes = ltmd->modes;
-			
-			WriteModes( U, modes, n );
-			
-			eigenvectors.resize(modes, vector<Vec3>( numParticles ));
-			for( unsigned int i = 0; i < modes; i++) {
-			    for( unsigned int j = 0; j < numParticles; j++) {
-					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i]);
+
+			WriteModes( U, modes );
+
+			eigenvectors.resize( modes, vector<Vec3>( numParticles ) );
+			for( unsigned int i = 0; i < modes; i++ ) {
+				for( unsigned int j = 0; j < numParticles; j++ ) {
+					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i] );
 				}
 			}
-			  
-			#ifdef PROFILE_ANALYSIS
-				gettimeofday( &end, 0 );
-				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-				std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
-			#endif
+
+#ifdef PROFILE_ANALYSIS
+			gettimeofday( &end, 0 );
+			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
+			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
+#endif
 		}
 		
-		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes, const unsigned int n ){
-			#ifdef VALIDATION
-				std::ofstream approx_out( "eigenvectors.txt");
-				approx_out.precision(10);
-				for( unsigned int i = 0; i < modes; i++) {
-					for( unsigned int j = 0; j < n; j++) {
-						approx_out << j << " " << i << " " << U[j][i] << std::endl;
-					}
+		void WriteHessian( const TNT::Array2D<double>& H ) {
+#ifdef VALIDATION
+			std::ofstream file( "block_hessian.txt" );
+			file.precision( 10 );
+			for( unsigned int i = 0; i < H.dim2(); i++ ) {
+				for( unsigned int j = 0; j < H.dim1(); j++ ) {
+					file << j << " " << i << " " << H[j][i] << std::endl;
 				}
-			#endif
+			}
+#endif
 		}
 		
-		void Analysis::Initialize( System& system, const Parameters& ltmd, const unsigned int Particles ) {
-			#ifdef PROFILE_ANALYSIS
-				timeval start, end;
-				gettimeofday( &start, 0 );
-			#endif 
-			
+		
+		void WriteBlockEigs( const TNT::Array2D<double>& matrix ) {
+#ifdef VALIDATION
+			std::ofstream file( "block_eigs.txt" );
+			file.precision( 10 );
+			for( unsigned int i = 0; i < matrix.dim2(); i++ ) {
+				for( unsigned int j = 0; j < matrix.dim1(); j++ ) {
+					file << j << " " << i << " " << matrix[j][i] << std::endl;
+				}
+			}
+#endif
+		}
+
+		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes ) {
+#ifdef VALIDATION
+			std::ofstream file( "eigenvectors.txt" );
+			file.precision( 10 );
+			for( unsigned int i = 0; i < modes; i++ ) {
+				for( unsigned int j = 0; j < U.dim1(); j++ ) {
+					file << j << " " << i << " " << U[j][i] << std::endl;
+				}
+			}
+#endif
+		}
+
+		void Analysis::Initialize( System &system, const Parameters &ltmd, const unsigned int Particles ) {
+#ifdef PROFILE_ANALYSIS
+			timeval start, end;
+			gettimeofday( &start, 0 );
+#endif
+
 			System *blockSystem = new System();
 			cout << "res per block " << ltmd.res_per_block << endl;
 			for( int i = 0; i < Particles; i++ ) {
@@ -840,18 +839,20 @@ namespace OpenMM {
 				}
 			}
 			cout << "done." << endl;
-			
+
 			VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
-			if( blockContext ) delete blockContext;
+			if( blockContext ) {
+				delete blockContext;
+			}
 			blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
-				
+
 			mInitialized = true;
-			
-			#ifdef PROFILE_ANALYSIS
-				gettimeofday( &end, 0 );
-				double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-				std::cout << "[Analysis] Initialize: " << elapsed << "ms" << std::endl;
-			#endif
+
+#ifdef PROFILE_ANALYSIS
+			gettimeofday( &end, 0 );
+			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
+			std::cout << "[Analysis] Initialize: " << elapsed << "ms" << std::endl;
+#endif
 		}
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {

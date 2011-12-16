@@ -121,7 +121,7 @@ namespace OpenMM {
 
 				return _tau;
 			}
-			
+
 			void Dynamics::SetMaxEigenValue( double value ) {
 				_maxEig = value;
 			}

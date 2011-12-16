@@ -48,7 +48,7 @@ extern "C" void registerKernelFactories() {
 		Platform &platform = Platform::getPlatformByName( "Cuda" );
 		printf( "LTMD found CUDA platform...\n" );
 		platform.registerKernelFactory( LTMD::StepKernel::Name(), new LTMD::CUDA::KernelFactory() );
-		printf("LTMD registered CUDA plugin ... \n");
+		printf( "LTMD registered CUDA plugin ... \n" );
 	} catch( const std::exception &exc ) {
 		printf( "LTMD CUDA platform not found. %s\n", exc.what() );
 	}
