@@ -126,7 +126,6 @@ namespace OpenMM {
 			/*********************************************************************/
 
 			TNT::Array2D<double> h( n, n, 0.0 );
-			mLargestBlockSize *= 3; // degrees of freedom in the largest block
 			vector<Vec3> initialBlockPositions( blockPositions );
 			for( int i = 0; i < mLargestBlockSize; i++ ) {
 				vector<double> deltas( blocks.size() );
@@ -543,7 +542,8 @@ namespace OpenMM {
 					Force_diff[i][0] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 				}
 
-				TNT::Array2D<double> Si = matmult( E_transpose, Force_diff );
+				TNT::Array2D<double> Si( m, 1, 0.0 );
+				MatrixMultiply( E_transpose, Force_diff, Si );
 
 				// Copy to S.
 				for( int i = 0; i < m; i++ ) {
@@ -599,8 +599,9 @@ namespace OpenMM {
 
 			// Compute U, set of approximate eigenvectors.
 			// U = E*Q.
-			TNT::Array2D<double> U = matmult( E, Q );
-
+			TNT::Array2D<double> U( E.dim1(), Q.dim2(), 0.0 );
+			MatrixMultiply( E, Q, U );
+			
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
 
@@ -686,6 +687,7 @@ namespace OpenMM {
 				}
 			}
 
+			mLargestBlockSize *= 3; // degrees of freedom in the largest block
 			cout << "blocks " << blocks.size() << endl;
 			cout << blocks[blocks.size() - 1] << endl;
 
