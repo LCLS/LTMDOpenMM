@@ -48,9 +48,6 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 	std::vector<double> c( matrixA.dim1() * matrixB.dim2() );
 	
 	dgemm( &transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc );
-	std::cout << "completed call to dgemm" << std::endl;
-
-	std::cout << m << " " << n << std::endl;
 
 	for( int i = 0; i < matrixB.dim2(); i++ )
 	  {

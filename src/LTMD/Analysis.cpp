@@ -294,7 +294,7 @@ namespace OpenMM {
 			//*****************************************************************
 			// Compute S, which is equal to E^T * H * E.
 			TNT::Array2D<double> S( m, m, 0.0 );
-
+			TNT::Array2D<double> HE(n , m, 0.0);
 			// Compute eps.
 			const double eps = ltmd->delta;
 
@@ -329,18 +329,9 @@ namespace OpenMM {
 				// Calculate forces
 				vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
 
-				TNT::Array2D<double> Force_diff( n, 1, 0.0 );
 				for( int i = 0; i < n; i++ ) {
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
-					Force_diff[i][0] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
-				}
-
-				TNT::Array2D<double> Si( m, 1, 0.0 );
-				MatrixMultiply( E_transpose, Force_diff, Si );
-
-				// Copy to S.
-				for( int i = 0; i < m; i++ ) {
-					S[i][k] = Si[i][0];
+					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 				}
 
 				// restore positions
@@ -354,6 +345,9 @@ namespace OpenMM {
 			// *****************************************************************
 			// restore unperturbed positions
 			context.setPositions( positions );
+
+			MatrixMultiply( E_transpose, HE, S );
+
 
 			// make S symmetric
 			for( unsigned int i = 0; i < S.dim1(); i++ ) {
