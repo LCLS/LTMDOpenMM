@@ -37,13 +37,14 @@
 #include <vector>
 
 #include "OpenMM.h"
+#include "jama_eig.h"
 #include "LTMD/Parameters.h"
 
 namespace OpenMM {
 	namespace LTMD {
 		class OPENMM_EXPORT Analysis {
 			public:
-				Analysis() : mLargestBlockSize( -1 ), mParticleCount( 0 ) {
+				Analysis() : mParticleCount( 0 ), mLargestBlockSize( -1 ) {
 					mInitialized = false;
 					blockContext = NULL;
 				}
@@ -63,10 +64,15 @@ namespace OpenMM {
 				bool inSameBlock( int, int, int, int );
 			private:
 				void Initialize( Context &context, const Parameters &ltmd );
+				void DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
+					const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
 				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
 
-				int mLargestBlockSize, mParticleCount;
+				unsigned int mParticleCount;
+				std::vector<double> mParticleMass;
+				
+				int mLargestBlockSize;
 				bool mInitialized;
 				std::vector<std::pair<int, int> > bonds;
 				std::vector<std::vector<int> > particleBonds;

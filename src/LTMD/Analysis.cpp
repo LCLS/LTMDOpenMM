@@ -93,9 +93,7 @@ namespace OpenMM {
 			Context &context = contextImpl.getOwner();
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
-			System &system = context.getSystem();
-			int n = 3 * mParticleCount;
-
+			
 			/*********************************************************************/
 			/*                                                                   */
 			/* Block Hessian Code (Cickovski/Sweet)                              */
@@ -112,11 +110,13 @@ namespace OpenMM {
 			if( !mInitialized ) {
 				Initialize( context, *ltmd );
 			}
+			
+			int n = 3 * mParticleCount;
 
 			// Copy the positions.
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
-			for( int i = 0; i < mParticleCount; i++ ) {
+			for( unsigned int i = 0; i < mParticleCount; i++ ) {
 				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
 				blockPositions.push_back( atom );
 			}
@@ -126,13 +126,13 @@ namespace OpenMM {
 
 			TNT::Array2D<double> h( n, n, 0.0 );
 			vector<Vec3> initialBlockPositions( blockPositions );
-			for( int i = 0; i < mLargestBlockSize; i++ ) {
+			for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
 				vector<double> deltas( blocks.size() );
 				// Perturb the ith degree of freedom in EACH block
 				// Note: not all blocks will have i degrees, we have to check for this
-				for( int j = 0; j < blocks.size(); j++ ) {
-					int dof_to_perturb = 3 * blocks[j] + i;
-					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+				for( unsigned int j = 0; j < blocks.size(); j++ ) {
+					unsigned int dof_to_perturb = 3 * blocks[j] + i;
+					unsigned int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
 
 					// Cases to not perturb, in this case just skip the block
 					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
@@ -212,7 +212,7 @@ namespace OpenMM {
 
 					double blockDelta = deltas[j];
 					for( int k = start_dof; k < end_dof; k++ ) {
-						double blockscale = 1.0 / ( 2 * blockDelta * sqrt( system.getParticleMass( atom_to_perturb ) * system.getParticleMass( k / 3 ) ) );
+						double blockscale = 1.0 / ( 2 * blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
 						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 					}
 				}
@@ -237,203 +237,10 @@ namespace OpenMM {
 
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
-			int total_surviving_eigvec = 0;
-
+			
+			#pragma omp parallel for
 			for( int i = 0; i < blocks.size(); i++ ) {
-				cout << "Diagonalizing block: " << i << endl;
-				// 1. Determine the starting and ending index for the block
-				//    This means that the upper left corner of the block will be at (startatom, startatom)
-				//    And the lower right corner will be at (endatom, endatom)
-				int startatom = 3 * blocks[i];
-				int endatom;
-				if( i == blocks.size() - 1 ) {
-					endatom = 3 * mParticleCount - 1;
-				} else {
-					endatom = 3 * blocks[i + 1] - 1;
-				}
-
-				const int size = endatom - startatom + 1;
-
-				// 2. Get the block Hessian Hii
-				//    Right now I'm just doing a copy from the big Hessian
-				//    There's probably a more efficient way but for now I just want things to work..
-				TNT::Array2D<double> h_tilde( size, size, 0.0 );
-				for( int j = startatom; j <= endatom; j++ ) {
-					for( int k = startatom; k <= endatom; k++ ) {
-						h_tilde[k - startatom][j - startatom] = h[k][j];
-					}
-				}
-
-				// 3. Diagonalize the block Hessian only, and get eigenvectors
-				TNT::Array1D<double> di( size, 0.0 );
-				TNT::Array2D<double> Qi( size, size, 0.0 );
-				FindEigenvalues( h_tilde, di, Qi );
-
-				// sort eigenvalues by absolute magnitude
-				vector<pair<double, int> > sortedEvalPairs( size );
-				for( int j = 0; j < size; j++ ) {
-					sortedEvalPairs.at( j ) = make_pair( fabs( di[j] ), j );
-				}
-				sort( sortedEvalPairs.begin(), sortedEvalPairs.end() );
-
-				// find geometric dof
-				TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
-
-				Vec3 pos_center( 0.0, 0.0, 0.0 );
-				double totalmass = 0.0;
-
-				for( int j = startatom; j <= endatom; j += 3 ) {
-					double mass = system.getParticleMass( j / 3 );
-					pos_center += positions[j / 3] * mass;
-					totalmass += mass;
-				}
-
-				double norm = sqrt( totalmass );
-
-				// actual center
-				pos_center *= 1.0 / totalmass;
-
-				// create geometric dof vectors
-				// iterating over rows and filling in values for 6 vectors as we go
-				for( int j = 0; j < size; j += 3 ) {
-					double atom_index = ( startatom + j ) / 3;
-					double mass = system.getParticleMass( atom_index );
-					double factor = sqrt( mass ) / norm;
-
-					// translational
-					Qi_gdof[j][0]   = factor;
-					Qi_gdof[j + 1][1] = factor;
-					Qi_gdof[j + 2][2] = factor;
-
-					// rotational
-					// cross product of rotation axis and vector to center of molecule
-					// x-axis (b1=1) ja3-ka2
-					// y-axis (b2=1) ka1-ia3
-					// z-axis (b3=1) ia2-ja1
-					Vec3 diff = positions[atom_index] - pos_center;
-					// x
-					Qi_gdof[j + 1][3] =  diff[2] * factor;
-					Qi_gdof[j + 2][3] = -diff[1] * factor;
-
-					// y
-					Qi_gdof[j][4]   = -diff[2] * factor;
-					Qi_gdof[j + 2][4] =  diff[0] * factor;
-
-					// z
-					Qi_gdof[j][5]   =  diff[1] * factor;
-					Qi_gdof[j + 1][5] = -diff[0] * factor;
-				}
-
-				// normalize first rotational vector
-				double rotnorm = 0.0;
-				for( int j = 0; j < size; j++ ) {
-					rotnorm += Qi_gdof[j][3] * Qi_gdof[j][3];
-				}
-
-				rotnorm = 1.0 / sqrt( rotnorm );
-
-				for( int j = 0; j < size; j++ ) {
-					Qi_gdof[j][3] = Qi_gdof[j][3] * rotnorm;
-				}
-
-				// orthogonalize rotational vectors 2 and 3
-				for( int j = 4; j < ConservedDegreesOfFreedom; j++ ) { // <-- vector we're orthogonalizing
-					for( int k = 3; k < j; k++ ) { // <-- vectors we're orthognalizing against
-						double dot_prod = 0.0;
-						for( int l = 0; l < size; l++ ) {
-							dot_prod += Qi_gdof[l][k] * Qi_gdof[l][j];
-						}
-						for( int l = 0; l < size; l++ ) {
-							Qi_gdof[l][j] = Qi_gdof[l][j] - Qi_gdof[l][k] * dot_prod;
-						}
-					}
-
-					// normalize residual vector
-					double rotnorm = 0.0;
-					for( int l = 0; l < size; l++ ) {
-						rotnorm += Qi_gdof[l][j] * Qi_gdof[l][j];
-					}
-
-					rotnorm = 1.0 / sqrt( rotnorm );
-
-					for( int l = 0; l < size; l++ ) {
-						Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
-					}
-				}
-
-				// orthogonalize original eigenvectors against gdof
-				// number of evec that survive orthogonalization
-				int curr_evec = ConservedDegreesOfFreedom;
-				for( int j = 0; j < size; j++ ) { // <-- vector we're orthogonalizing
-					// to match ProtoMol we only include size instead of size + cdof vectors
-					// Note: for every vector that is skipped due to a low norm,
-					// we add an additional vector to replace it, so we could actually
-					// use all size original eigenvectors
-					if( curr_evec == size ) {
-						break;
-					}
-
-					// orthogonalize original eigenvectors in order from smallest magnitude
-					// eigenvalue to biggest
-					int col = sortedEvalPairs.at( j ).second;
-
-					// copy original vector to Qi_gdof -- updated in place
-					for( int l = 0; l < size; l++ ) {
-						Qi_gdof[l][curr_evec] = Qi[l][col];
-					}
-
-					// get dot products with previous vectors
-					for( int k = 0; k < curr_evec; k++ ) { // <-- vector orthog against
-						// dot product between original vector and previously
-						// orthogonalized vectors
-						double dot_prod = 0.0;
-						for( int l = 0; l < size; l++ ) {
-							dot_prod += Qi_gdof[l][k] * Qi[l][col];
-						}
-
-						// subtract from current vector -- update in place
-						for( int l = 0; l < size; l++ ) {
-							Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] - Qi_gdof[l][k] * dot_prod;
-						}
-					}
-
-					//normalize residual vector
-					double norm = 0.0;
-					for( int l = 0; l < size; l++ ) {
-						norm += Qi_gdof[l][curr_evec] * Qi_gdof[l][curr_evec];
-					}
-
-					// if norm less than 1/20th of original
-					// continue on to next vector
-					// we don't update curr_evec so this vector
-					// will be overwritten
-					if( norm < 0.05 ) {
-						continue;
-					}
-
-					// scale vector
-					norm = sqrt( norm );
-					for( int l = 0; l < size; l++ ) {
-						Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] / norm;
-					}
-
-					curr_evec++;
-				}
-				
-				// 4. Copy eigenpairs to big array
-				//    This is necessary because we have to sort them, and determine
-				//    the cutoff eigenvalue for everybody.
-				// we assume curr_evec <= size
-				for( int j = 0; j < curr_evec; j++ ) {
-					int col = sortedEvalPairs.at( j ).second;
-					block_eigval[total_surviving_eigvec] = di[col];
-
-					// orthogonalized eigenvectors already sorted by eigenvalue
-					for( int k = 0; k < size; k++ ) {
-						block_eigvec[startatom + k][total_surviving_eigvec] = Qi_gdof[k][j];
-					}
-					total_surviving_eigvec++;
-				}
+				DiagonalizeBlock( i, h, positions, block_eigval, block_eigvec );
 			}
 
 			gettimeofday( &tp_diag, NULL );
@@ -443,8 +250,8 @@ namespace OpenMM {
 			// First sort the eigenvectors by the absolute value of the eigenvalue.
 
 			// sort all eigenvalues by absolute magnitude to determine cutoff
-			vector<pair<double, int> > sortedEvalues( total_surviving_eigvec );
-			for( int i = 0; i < total_surviving_eigvec; i++ ) {
+			vector<pair<double, int> > sortedEvalues( n );
+			for( int i = 0; i < n; i++ ) {
 				sortedEvalues[i] = make_pair( fabs( block_eigval[i] ), i );
 			}
 			sort( sortedEvalues.begin(), sortedEvalues.end() );
@@ -454,7 +261,7 @@ namespace OpenMM {
 			
 			// get cols of all eigenvalues under cutoff
 			vector<int> selectedEigsCols;
-			for( int i = 0; i < total_surviving_eigvec; i++ ) {
+			for( int i = 0; i < n; i++ ) {
 				if( fabs( block_eigval[i] ) < cutEigen ) {
 					selectedEigsCols.push_back( i );
 				}
@@ -502,7 +309,7 @@ namespace OpenMM {
 				// forward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( system.getParticleMass( i ) );
+						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 						pos++;
 					}
 				}
@@ -514,7 +321,7 @@ namespace OpenMM {
 				// backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( system.getParticleMass( i ) );
+						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 					}
 				}
 				context.setPositions( tmppos );
@@ -524,7 +331,7 @@ namespace OpenMM {
 
 				TNT::Array2D<double> Force_diff( n, 1, 0.0 );
 				for( int i = 0; i < n; i++ ) {
-					const double scaleFactor = sqrt( system.getParticleMass( i / 3 ) ) * 2.0 * eps;
+					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
 					Force_diff[i][0] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 				}
 
@@ -652,17 +459,22 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 
-			// Store Number of Particles
-			mParticleCount = context.getState( State::Positions ).getPositions().size();
-			
 			// Get Current System
 			System &system = context.getSystem();
+			
+			// Store Particle Information
+			mParticleCount = context.getState( State::Positions ).getPositions().size();
+			
+			mParticleMass.reserve( mParticleCount );
+			for( unsigned int i = 0; i < mParticleCount; i++ ){
+				mParticleMass.push_back( system.getParticleMass( i ) );
+			}	
 			
 			// Create New System
 			System *blockSystem = new System();
 			cout << "res per block " << ltmd.res_per_block << endl;
 			for( int i = 0; i < mParticleCount; i++ ) {
-				blockSystem->addParticle( system.getParticleMass( i ) );
+				blockSystem->addParticle( mParticleMass[i] );
 			}
 
 			int block_start = 0;
@@ -766,7 +578,6 @@ namespace OpenMM {
 					// and will be one otherwise.
 					CustomBondForce *cbf = new CustomBondForce( "4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r" );
 					const NonbondedForce *nbf = dynamic_cast<const NonbondedForce *>( &system.getForce( ltmd.forces[i].index ) );
-					NonbondedForce *nonbonded = new NonbondedForce();
 
 					cbf->addPerBondParameter( "q" );
 					cbf->addPerBondParameter( "sigma" );
@@ -848,6 +659,204 @@ namespace OpenMM {
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Analysis] Initialize: " << elapsed << "ms" << std::endl;
 #endif
+		}
+		
+		void Analysis::DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
+			const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
+					
+			printf( "Diagonalizing Block: %d\n", block );
+			
+			// 1. Determine the starting and ending index for the block
+			//    This means that the upper left corner of the block will be at (startatom, startatom)
+			//    And the lower right corner will be at (endatom, endatom)
+			const int startatom = 3 * blocks[block];
+			int endatom = 3 * mParticleCount - 1 ;
+			
+			if( block != ( blocks.size() - 1 ) ) {
+				endatom = 3 * blocks[block + 1] - 1;
+			}
+
+			const int size = endatom - startatom + 1;
+
+			// 2. Get the block Hessian Hii
+			//    Right now I'm just doing a copy from the big Hessian
+			//    There's probably a more efficient way but for now I just want things to work..
+			TNT::Array2D<double> h_tilde( size, size, 0.0 );
+			for( int j = startatom; j <= endatom; j++ ) {
+				for( int k = startatom; k <= endatom; k++ ) {
+					h_tilde[k - startatom][j - startatom] = hessian[k][j];
+				}
+			}
+
+			// 3. Diagonalize the block Hessian only, and get eigenvectors
+			TNT::Array1D<double> di( size, 0.0 );
+			TNT::Array2D<double> Qi( size, size, 0.0 );
+			FindEigenvalues( h_tilde, di, Qi );
+
+			// sort eigenvalues by absolute magnitude
+			vector<pair<double, int> > sortedEvalPairs( size );
+			for( int j = 0; j < size; j++ ) {
+				sortedEvalPairs.at( j ) = make_pair( fabs( di[j] ), j );
+			}
+			sort( sortedEvalPairs.begin(), sortedEvalPairs.end() );
+
+			// find geometric dof
+			TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
+
+			Vec3 pos_center( 0.0, 0.0, 0.0 );
+			double totalmass = 0.0;
+
+			for( int j = startatom; j <= endatom; j += 3 ) {
+				double mass = mParticleMass[ j / 3 ];
+				pos_center += positions[j / 3] * mass;
+				totalmass += mass;
+			}
+
+			double norm = sqrt( totalmass );
+
+			// actual center
+			pos_center *= 1.0 / totalmass;
+
+			// create geometric dof vectors
+			// iterating over rows and filling in values for 6 vectors as we go
+			for( int j = 0; j < size; j += 3 ) {
+				double atom_index = ( startatom + j ) / 3;
+				double mass = mParticleMass[atom_index];
+				double factor = sqrt( mass ) / norm;
+
+				// translational
+				Qi_gdof[j][0]   = factor;
+				Qi_gdof[j + 1][1] = factor;
+				Qi_gdof[j + 2][2] = factor;
+
+				// rotational
+				// cross product of rotation axis and vector to center of molecule
+				// x-axis (b1=1) ja3-ka2
+				// y-axis (b2=1) ka1-ia3
+				// z-axis (b3=1) ia2-ja1
+				Vec3 diff = positions[atom_index] - pos_center;
+				// x
+				Qi_gdof[j + 1][3] =  diff[2] * factor;
+				Qi_gdof[j + 2][3] = -diff[1] * factor;
+
+				// y
+				Qi_gdof[j][4]   = -diff[2] * factor;
+				Qi_gdof[j + 2][4] =  diff[0] * factor;
+
+				// z
+				Qi_gdof[j][5]   =  diff[1] * factor;
+				Qi_gdof[j + 1][5] = -diff[0] * factor;
+			}
+
+			// normalize first rotational vector
+			double rotnorm = 0.0;
+			for( int j = 0; j < size; j++ ) {
+				rotnorm += Qi_gdof[j][3] * Qi_gdof[j][3];
+			}
+
+			rotnorm = 1.0 / sqrt( rotnorm );
+
+			for( int j = 0; j < size; j++ ) {
+				Qi_gdof[j][3] = Qi_gdof[j][3] * rotnorm;
+			}
+
+			// orthogonalize rotational vectors 2 and 3
+			for( int j = 4; j < ConservedDegreesOfFreedom; j++ ) { // <-- vector we're orthogonalizing
+				for( int k = 3; k < j; k++ ) { // <-- vectors we're orthognalizing against
+					double dot_prod = 0.0;
+					for( int l = 0; l < size; l++ ) {
+						dot_prod += Qi_gdof[l][k] * Qi_gdof[l][j];
+					}
+					for( int l = 0; l < size; l++ ) {
+						Qi_gdof[l][j] = Qi_gdof[l][j] - Qi_gdof[l][k] * dot_prod;
+					}
+				}
+
+				// normalize residual vector
+				double rotnorm = 0.0;
+				for( int l = 0; l < size; l++ ) {
+					rotnorm += Qi_gdof[l][j] * Qi_gdof[l][j];
+				}
+
+				rotnorm = 1.0 / sqrt( rotnorm );
+
+				for( int l = 0; l < size; l++ ) {
+					Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
+				}
+			}
+
+			// orthogonalize original eigenvectors against gdof
+			// number of evec that survive orthogonalization
+			int curr_evec = ConservedDegreesOfFreedom;
+			for( int j = 0; j < size; j++ ) { // <-- vector we're orthogonalizing
+				// to match ProtoMol we only include size instead of size + cdof vectors
+				// Note: for every vector that is skipped due to a low norm,
+				// we add an additional vector to replace it, so we could actually
+				// use all size original eigenvectors
+				if( curr_evec == size ) {
+					break;
+				}
+
+				// orthogonalize original eigenvectors in order from smallest magnitude
+				// eigenvalue to biggest
+				int col = sortedEvalPairs.at( j ).second;
+
+				// copy original vector to Qi_gdof -- updated in place
+				for( int l = 0; l < size; l++ ) {
+					Qi_gdof[l][curr_evec] = Qi[l][col];
+				}
+
+				// get dot products with previous vectors
+				for( int k = 0; k < curr_evec; k++ ) { // <-- vector orthog against
+					// dot product between original vector and previously
+					// orthogonalized vectors
+					double dot_prod = 0.0;
+					for( int l = 0; l < size; l++ ) {
+						dot_prod += Qi_gdof[l][k] * Qi[l][col];
+					}
+
+					// subtract from current vector -- update in place
+					for( int l = 0; l < size; l++ ) {
+						Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] - Qi_gdof[l][k] * dot_prod;
+					}
+				}
+
+				//normalize residual vector
+				double norm = 0.0;
+				for( int l = 0; l < size; l++ ) {
+					norm += Qi_gdof[l][curr_evec] * Qi_gdof[l][curr_evec];
+				}
+
+				// if norm less than 1/20th of original
+				// continue on to next vector
+				// we don't update curr_evec so this vector
+				// will be overwritten
+				if( norm < 0.05 ) {
+					continue;
+				}
+
+				// scale vector
+				norm = sqrt( norm );
+				for( int l = 0; l < size; l++ ) {
+					Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] / norm;
+				}
+
+				curr_evec++;
+			}
+			
+			// 4. Copy eigenpairs to big array
+			//    This is necessary because we have to sort them, and determine
+			//    the cutoff eigenvalue for everybody.
+			// we assume curr_evec <= size
+			for( int j = 0; j < curr_evec; j++ ) {
+				int col = sortedEvalPairs.at( j ).second;
+				eval[startatom + j] = di[col];
+
+				// orthogonalized eigenvectors already sorted by eigenvalue
+				for( int k = 0; k < size; k++ ) {
+					evec[startatom + k][startatom + j] = Qi_gdof[k][j];
+				}
+			}
 		}
 
 		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
