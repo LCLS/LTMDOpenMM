@@ -12,11 +12,8 @@
 
 void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<double>& matrixB, TNT::Array2D<double>& matrixC ) {
 #ifdef INTEL_MKL
-	const int m = matrixA.dim1();
-	const int k = matrixA.dim2();
-	const int n = matrixB.dim2();
 
-        std::vector<double> a( m * k );
+        std::vector<double> a( matrixA.dim1() * matrixA.dim2() );
 
 	for( int i = 0; i < matrixA.dim1(); i++ )
 	  {
@@ -26,7 +23,7 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 	      }
 	  }
 
-        std::vector<double> b( k * n);
+        std::vector<double> b( matrixB.dim1() * matrixB.dim2());
 
 	for( int i = 0; i < matrixB.dim1(); i++ )
 	  {
@@ -36,25 +33,32 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 	      }
 	  }
 
-	const char transa = 'N';
-	const char transb = 'N';
+	const int m = matrixA.dim1();
+	const int k = matrixA.dim2();
+	const int n = matrixB.dim2();
+
+
+	const char transa = 'T';
+	const char transb = 'T';
 	const double alpha = 1.0;
 	const double beta = 0.0;
-	const int lda = m;
-	const int ldb = k;
+	const int lda = k;
+	const int ldb = n;
 	const int ldc = m;
-	std::vector<double> c( m * n );
+	std::vector<double> c( matrixA.dim1() * matrixB.dim2() );
 	
 	dgemm( &transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc );
 	std::cout << "completed call to dgemm" << std::endl;
 
 	std::cout << m << " " << n << std::endl;
 
-	for( int i = 0; i < m; i++ ) {
-		for( int j = 0; j < n; j++ ) {
-			matrixC[i][j] = c[i * n + j];
-		}
-	}
+	for( int i = 0; i < matrixB.dim2(); i++ )
+	  {
+	    for( int j = 0; j < matrixA.dim1(); j++ )
+	      {
+		matrixC[j][i] = c[i * matrixA.dim1() + j];
+	      }
+	  }
 #else
 	matrixC = matmult( matrixA, matrixB );
 #endif
