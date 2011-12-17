@@ -94,8 +94,7 @@ namespace OpenMM {
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
 			System &system = context.getSystem();
-			int numParticles = positions.size();
-			int n = 3 * numParticles;
+			int n = 3 * mParticleCount;
 
 			/*********************************************************************/
 			/*                                                                   */
@@ -111,13 +110,13 @@ namespace OpenMM {
 			// need it to parallelize.
 
 			if( !mInitialized ) {
-				Initialize( system, *ltmd, numParticles );
+				Initialize( context, *ltmd );
 			}
 
 			// Copy the positions.
 			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
-			for( int i = 0; i < numParticles; i++ ) {
+			for( int i = 0; i < mParticleCount; i++ ) {
 				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
 				blockPositions.push_back( atom );
 			}
@@ -136,7 +135,7 @@ namespace OpenMM {
 					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
 
 					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= numParticles ) {
+					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
 						continue;
 					}
 					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
@@ -157,7 +156,7 @@ namespace OpenMM {
 					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
 
 					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= numParticles ) {
+					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
 						continue;
 					}
 					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
@@ -177,7 +176,7 @@ namespace OpenMM {
 					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
 
 					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= numParticles ) {
+					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
 						continue;
 					}
 					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
@@ -193,7 +192,7 @@ namespace OpenMM {
 					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
 
 					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= numParticles ) {
+					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
 						continue;
 					}
 					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
@@ -206,7 +205,7 @@ namespace OpenMM {
 					int start_dof = 3 * blocks[j];
 					int end_dof;
 					if( j == blocks.size() - 1 ) {
-						end_dof = 3 * numParticles;
+						end_dof = 3 * mParticleCount;
 					} else {
 						end_dof = 3 * blocks[j + 1];
 					}
@@ -248,7 +247,7 @@ namespace OpenMM {
 				int startatom = 3 * blocks[i];
 				int endatom;
 				if( i == blocks.size() - 1 ) {
-					endatom = 3 * numParticles - 1;
+					endatom = 3 * mParticleCount - 1;
 				} else {
 					endatom = 3 * blocks[i + 1] - 1;
 				}
@@ -269,7 +268,6 @@ namespace OpenMM {
 				TNT::Array1D<double> di( size, 0.0 );
 				TNT::Array2D<double> Qi( size, size, 0.0 );
 				FindEigenvalues( h_tilde, di, Qi );
-				//findEigenvaluesLapack(h_tilde, di, Qi);
 
 				// sort eigenvalues by absolute magnitude
 				vector<pair<double, int> > sortedEvalPairs( size );
@@ -421,10 +419,7 @@ namespace OpenMM {
 
 					curr_evec++;
 				}
-
-				cout << "curr evec " << curr_evec << endl;
-				cout << "size " << size << endl;
-
+				
 				// 4. Copy eigenpairs to big array
 				//    This is necessary because we have to sort them, and determine
 				//    the cutoff eigenvalue for everybody.
@@ -447,8 +442,6 @@ namespace OpenMM {
 			// This section here is only to find the cuttoff eigenvalue.
 			// First sort the eigenvectors by the absolute value of the eigenvalue.
 
-			cout << "total surviving eigs " << total_surviving_eigvec << endl;
-
 			// sort all eigenvalues by absolute magnitude to determine cutoff
 			vector<pair<double, int> > sortedEvalues( total_surviving_eigvec );
 			for( int i = 0; i < total_surviving_eigvec; i++ ) {
@@ -458,8 +451,7 @@ namespace OpenMM {
 
 			int max_eigs = ltmd->bdof * blocks.size();
 			double cutEigen = sortedEvalues[max_eigs].first;  // This is the cutoff eigenvalue
-			cout << "cutoff " << cutEigen << endl;
-
+			
 			// get cols of all eigenvalues under cutoff
 			vector<int> selectedEigsCols;
 			for( int i = 0; i < total_surviving_eigvec; i++ ) {
@@ -467,14 +459,9 @@ namespace OpenMM {
 					selectedEigsCols.push_back( i );
 				}
 			}
-
-			cout << "selected " << selectedEigsCols.size() << " eigs" << endl;
-			cout << "max_eigs " << max_eigs << endl;
-
+			
 			// we may select fewer eigs if there are duplicate eigenvalues
 			const int m = selectedEigsCols.size();
-
-			cout << "output selected" << endl;
 
 			// Inefficient, needs to improve.
 			// Basically, just setting up E and E^T by
@@ -482,7 +469,6 @@ namespace OpenMM {
 			// Again, right now I'm only worried about
 			// correctness plus this time will be marginal compared to
 			// diagonalization.
-			cout << "M: " << m << endl;
 			TNT::Array2D<double> E( n, m, 0.0 );
 			TNT::Array2D<double> E_transpose( m, n, 0.0 );
 			for( int i = 0; i < m; i++ ) {
@@ -514,7 +500,7 @@ namespace OpenMM {
 				int pos = 0;
 
 				// forward perturbations
-				for( unsigned int i = 0; i < numParticles; i++ ) {
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( system.getParticleMass( i ) );
 						pos++;
@@ -526,7 +512,7 @@ namespace OpenMM {
 				vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
 
 				// backward perturbations
-				for( unsigned int i = 0; i < numParticles; i++ ) {
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( system.getParticleMass( i ) );
 					}
@@ -551,7 +537,7 @@ namespace OpenMM {
 				}
 
 				// restore positions
-				for( unsigned int i = 0; i < numParticles; i++ ) {
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						tmppos[i][j] = positions[i][j];
 					}
@@ -609,9 +595,9 @@ namespace OpenMM {
 
 			WriteModes( U, modes );
 
-			eigenvectors.resize( modes, vector<Vec3>( numParticles ) );
+			eigenvectors.resize( modes, vector<Vec3>( mParticleCount ) );
 			for( unsigned int i = 0; i < modes; i++ ) {
-				for( unsigned int j = 0; j < numParticles; j++ ) {
+				for( unsigned int j = 0; j < mParticleCount; j++ ) {
 					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i] );
 				}
 			}
@@ -660,15 +646,22 @@ namespace OpenMM {
 #endif
 		}
 
-		void Analysis::Initialize( System &system, const Parameters &ltmd, const unsigned int Particles ) {
+		void Analysis::Initialize( Context &context, const Parameters &ltmd ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
 
+			// Store Number of Particles
+			mParticleCount = context.getState( State::Positions ).getPositions().size();
+			
+			// Get Current System
+			System &system = context.getSystem();
+			
+			// Create New System
 			System *blockSystem = new System();
 			cout << "res per block " << ltmd.res_per_block << endl;
-			for( int i = 0; i < Particles; i++ ) {
+			for( int i = 0; i < mParticleCount; i++ ) {
 				blockSystem->addParticle( system.getParticleMass( i ) );
 			}
 

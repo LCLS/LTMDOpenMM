@@ -43,7 +43,7 @@ namespace OpenMM {
 	namespace LTMD {
 		class OPENMM_EXPORT Analysis {
 			public:
-				Analysis() : mLargestBlockSize( -1 ) {
+				Analysis() : mLargestBlockSize( -1 ), mParticleCount( 0 ) {
 					mInitialized = false;
 					blockContext = NULL;
 				}
@@ -62,11 +62,11 @@ namespace OpenMM {
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 			private:
-				void Initialize( System &system, const Parameters &ltmd, const unsigned int Particles );
+				void Initialize( Context &context, const Parameters &ltmd );
 			private:
 				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
 
-				int mLargestBlockSize;
+				int mLargestBlockSize, mParticleCount;
 				bool mInitialized;
 				std::vector<std::pair<int, int> > bonds;
 				std::vector<std::vector<int> > particleBonds;
