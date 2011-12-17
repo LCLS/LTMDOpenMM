@@ -41,6 +41,9 @@
 namespace OpenMM {
 	namespace LTMD {
 		class Analysis;
+		
+		const unsigned int MaximumDiagonalizations = 5;
+		const unsigned int MaximumMinimizationCutoff = 2;
 		const unsigned int MaximumMinimizationIterations = 50;
 
 		class OPENMM_EXPORT Integrator : public OpenMM::Integrator {
@@ -144,14 +147,15 @@ namespace OpenMM {
 				void step( int steps = 1 );
 
 				//Minimizer
-				void minimize( const unsigned int maxsteps = MaximumMinimizationIterations );
+				unsigned int minimize( const unsigned int maxsteps = MaximumMinimizationIterations );
 
 			protected:
 				void initialize( OpenMM::ContextImpl &context );
 				std::vector<std::string> getKernelNames();
 			private:
 				void DoStep();
-
+				void DiagonalizeMinimize();
+				
 				// Kernel Functions
 				void IntegrateStep();
 				void TimeAndCounterStep();

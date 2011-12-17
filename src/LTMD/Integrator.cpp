@@ -95,11 +95,13 @@ namespace OpenMM {
 
 		}
 
+		/* Save before integration for DiagonalizeMinimize and add test to make 
+			sure its not done twice */
 		void Integrator::DoStep() {
 			context->updateContextState();
 
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % rediagonalizeFrequency == 0 ) {
-				computeProjectionVectors();
+				DiagonalizeMinimize();
 			}
 
 			stepsSinceDiagonalize++;
@@ -109,12 +111,14 @@ namespace OpenMM {
 			IntegrateStep();
 			eigVecChanged = false;
 
-			minimize();
+			if( minimize() == MaximumMinimizationIterations ){
+				DiagonalizeMinimize();
+			}
 
 			TimeAndCounterStep();
 		}
 
-		void Integrator::minimize( const unsigned int maxsteps ) {
+		unsigned int Integrator::minimize( const unsigned int maxsteps ) {
 #ifdef PROFILE_INTEGRATOR
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -128,7 +132,9 @@ namespace OpenMM {
 			SaveStep();
 
 			double initialPE = context->calcForcesAndEnergy( true, true );
-			for( int i = 0; i < maxsteps; ++i ) {
+			
+			unsigned int steps = 0;
+			while( steps < maxsteps ) {
 				eigVecChanged = false;
 
 				double currentPE = LinearMinimize( initialPE );
@@ -159,6 +165,15 @@ namespace OpenMM {
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			//			std::cout << "[Integrator] Minimize: " << elapsed << "ms" << std::endl;
 #endif
+			
+			return steps;
+		}
+		
+		void Integrator::DiagonalizeMinimize() {
+			for( unsigned int i = 0; i < MaximumDiagonalizations; i++ ){
+				computeProjectionVectors();
+				if( minimize() <= MaximumMinimizationCutoff ) break;
+			}
 		}
 
 		void Integrator::computeProjectionVectors() {
