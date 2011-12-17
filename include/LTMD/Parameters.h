@@ -15,8 +15,6 @@ namespace OpenMM {
 			std::string name;
 			int index;
 		};
-		
-		
 
 		struct Parameters {
 			double delta;
@@ -30,6 +28,8 @@ namespace OpenMM {
 			
 			bool ShouldForceRediagOnMinFail;
 			Preference::EPlatform BlockDiagonalizePlatform;
+			
+			Parameters();
 		};
 	}
 }
