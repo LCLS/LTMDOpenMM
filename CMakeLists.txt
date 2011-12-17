@@ -29,11 +29,6 @@ if( BUILD_VALIDATION )
 	add_definitions( "-DVALIDATION" )
 endif( BUILD_VALIDATION )
 
-# Intel
-if (${CMAKE_CXX_COMPILER} MATCHES "icc.*$") 
-	set( CUDA_NVCC_FLAGS "-ccbin=icc" )
-endif()
-
 # MKL
 option( BUILD_MKL "Build with Intel MKL code" Off )
 if( BUILD_MKL )
@@ -119,6 +114,17 @@ if( BUILD_GPU )
 
 		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cu )
 		source_group( "Kernels\\LTMD" FILES ${LTMD_CUDA_KERNELS} )
+		
+		# Fast Math
+		option( BUILD_GPU_CUDA_FAST_MATH "Build with fast math" Off )
+		if( BUILD_GPU_CUDA_FAST_MATH )
+			list( APPEND CUDA_NVCC_FLAGS "-use_fast_math" )
+		endif( BUILD_GPU_CUDA_FAST_MATH )
+		
+		# Intel
+		if (${CMAKE_CXX_COMPILER} MATCHES "icc.*$") 
+			list( APPEND CUDA_NVCC_FLAGS "-ccbin=icc" )
+		endif()
 
 		CUDA_ADD_LIBRARY( LTMDCuda SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES} ${LTMD_CUDA_KERNELS} )
 		set_target_properties( LTMDCuda PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_CUDA_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
