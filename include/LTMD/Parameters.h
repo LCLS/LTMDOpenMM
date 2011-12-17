@@ -6,11 +6,17 @@
 
 namespace OpenMM {
 	namespace LTMD {
+		namespace Preference{
+			enum EPlatform { Reference, OpenCL, CUDA };
+		}
+		
 		struct Force {
 			Force( std::string n, int i ) : name( n ), index( i ) {}
 			std::string name;
 			int index;
 		};
+		
+		
 
 		struct Parameters {
 			double delta;
@@ -23,6 +29,7 @@ namespace OpenMM {
 			double minLimit;
 			
 			bool ShouldForceRediagOnMinFail;
+			Preference::EPlatform BlockDiagonalizePlatform;
 		};
 	}
 }

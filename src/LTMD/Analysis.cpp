@@ -438,7 +438,7 @@ namespace OpenMM {
 #endif
 		}
 
-		void Analysis::Initialize( Context &context, const Parameters &ltmd ) {
+		void Analysis::Initialize( Context &context, const Parameters &params ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -457,17 +457,17 @@ namespace OpenMM {
 			
 			// Create New System
 			System *blockSystem = new System();
-			cout << "res per block " << ltmd.res_per_block << endl;
+			cout << "res per block " << params.res_per_block << endl;
 			for( int i = 0; i < mParticleCount; i++ ) {
 				blockSystem->addParticle( mParticleMass[i] );
 			}
 
 			int block_start = 0;
-			for( int i = 0; i < ltmd.residue_sizes.size(); i++ ) {
-				if( i % ltmd.res_per_block == 0 ) {
+			for( int i = 0; i < params.residue_sizes.size(); i++ ) {
+				if( i % params.res_per_block == 0 ) {
 					blocks.push_back( block_start );
 				}
-				block_start += ltmd.residue_sizes[i];
+				block_start += params.residue_sizes[i];
 			}
 
 			for( int i = 1; i < blocks.size(); i++ ) {
@@ -492,18 +492,18 @@ namespace OpenMM {
 
 			// Copy the center of mass force.
 			cout << "adding forces..." << endl;
-			for( int i = 0; i < ltmd.forces.size(); i++ ) {
-				string forcename = ltmd.forces[i].name;
-				cout << "Adding force " << forcename << " at index " << ltmd.forces[i].index << endl;
+			for( int i = 0; i < params.forces.size(); i++ ) {
+				string forcename = params.forces[i].name;
+				cout << "Adding force " << forcename << " at index " << params.forces[i].index << endl;
 				if( forcename == "CenterOfMass" ) {
-					blockSystem->addForce( &system.getForce( ltmd.forces[i].index ) );
+					blockSystem->addForce( &system.getForce( params.forces[i].index ) );
 				} else if( forcename == "Bond" ) {
 					// Create a new harmonic bond force.
 					// This only contains pairs of atoms which are in the same block.
 					// I have to iterate through each bond from the old force, then
 					// selectively add them to the new force based on this condition.
 					HarmonicBondForce *hf = new HarmonicBondForce();
-					const HarmonicBondForce *ohf = dynamic_cast<const HarmonicBondForce *>( &system.getForce( ltmd.forces[i].index ) );
+					const HarmonicBondForce *ohf = dynamic_cast<const HarmonicBondForce *>( &system.getForce( params.forces[i].index ) );
 					for( int i = 0; i < ohf->getNumBonds(); i++ ) {
 						// For our system, add bonds between atoms in the same block
 						int particle1, particle2;
@@ -517,7 +517,7 @@ namespace OpenMM {
 				} else if( forcename == "Angle" ) {
 					// Same thing with the angle force....
 					HarmonicAngleForce *af = new HarmonicAngleForce();
-					const HarmonicAngleForce *ahf = dynamic_cast<const HarmonicAngleForce *>( &system.getForce( ltmd.forces[i].index ) );
+					const HarmonicAngleForce *ahf = dynamic_cast<const HarmonicAngleForce *>( &system.getForce( params.forces[i].index ) );
 					for( int i = 0; i < ahf->getNumAngles(); i++ ) {
 						// For our system, add bonds between atoms in the same block
 						int particle1, particle2, particle3;
@@ -531,7 +531,7 @@ namespace OpenMM {
 				} else if( forcename == "Dihedral" ) {
 					// And the dihedrals....
 					PeriodicTorsionForce *ptf = new PeriodicTorsionForce();
-					const PeriodicTorsionForce *optf = dynamic_cast<const PeriodicTorsionForce *>( &system.getForce( ltmd.forces[i].index ) );
+					const PeriodicTorsionForce *optf = dynamic_cast<const PeriodicTorsionForce *>( &system.getForce( params.forces[i].index ) );
 					for( int i = 0; i < optf->getNumTorsions(); i++ ) {
 						// For our system, add bonds between atoms in the same block
 						int particle1, particle2, particle3, particle4, periodicity;
@@ -545,7 +545,7 @@ namespace OpenMM {
 				} else if( forcename == "Improper" ) {
 					// And the impropers....
 					RBTorsionForce *rbtf = new RBTorsionForce();
-					const RBTorsionForce *orbtf = dynamic_cast<const RBTorsionForce *>( &system.getForce( ltmd.forces[i].index ) );
+					const RBTorsionForce *orbtf = dynamic_cast<const RBTorsionForce *>( &system.getForce( params.forces[i].index ) );
 					for( int i = 0; i < orbtf->getNumTorsions(); i++ ) {
 						// For our system, add bonds between atoms in the same block
 						int particle1, particle2, particle3, particle4;
@@ -562,7 +562,7 @@ namespace OpenMM {
 					// Note that the step term will go to zero if block1 does not equal block 2,
 					// and will be one otherwise.
 					CustomBondForce *cbf = new CustomBondForce( "4*eps*((sigma/r)^12-(sigma/r)^6)+138.935456*q/r" );
-					const NonbondedForce *nbf = dynamic_cast<const NonbondedForce *>( &system.getForce( ltmd.forces[i].index ) );
+					const NonbondedForce *nbf = dynamic_cast<const NonbondedForce *>( &system.getForce( params.forces[i].index ) );
 
 					cbf->addPerBondParameter( "q" );
 					cbf->addPerBondParameter( "sigma" );
@@ -635,7 +635,22 @@ namespace OpenMM {
 			if( blockContext ) {
 				delete blockContext;
 			}
-			blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
+			
+			switch( params.BlockDiagonalizePlatform ){
+				case Preference::Reference:{
+					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Reference" ) );
+					break;
+				}
+				case Preference::OpenCL:{
+					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
+					break;
+				}
+				case Preference::CUDA:{
+					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Cuda" ) );
+					break;
+				}
+			}
+			
 
 			mInitialized = true;
 
