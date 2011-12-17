@@ -112,6 +112,7 @@ namespace OpenMM {
 			eigVecChanged = false;
 
 			if( minimize() == MaximumMinimizationIterations ){
+				std::cout << "Force Rediagonalization" << std::endl;
 				DiagonalizeMinimize();
 			}
 
@@ -173,6 +174,7 @@ namespace OpenMM {
 			for( unsigned int i = 0; i < MaximumDiagonalizations; i++ ){
 				computeProjectionVectors();
 				if( minimize() <= MaximumMinimizationCutoff ) break;
+				std::cout << "Force Rediagonalization" << std::endl;
 			}
 		}
 
