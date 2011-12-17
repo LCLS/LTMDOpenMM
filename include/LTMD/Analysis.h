@@ -53,7 +53,7 @@ namespace OpenMM {
 						delete blockContext;
 					}
 				}
-				void computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd );
+				void computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params );
 				const std::vector<std::vector<Vec3> >& getEigenvectors() const {
 					return eigenvectors;
 				}
@@ -67,8 +67,6 @@ namespace OpenMM {
 				void DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
 					const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
-				static double getDelta( double value, bool isDoublePrecision, Parameters *ltmd );
-
 				unsigned int mParticleCount;
 				std::vector<double> mParticleMass;
 				

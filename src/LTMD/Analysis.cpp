@@ -81,7 +81,7 @@ namespace OpenMM {
 			return true;   // They're all the same!
 		}
 
-		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd ) {
+		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 
@@ -106,7 +106,7 @@ namespace OpenMM {
 			// need it to parallelize.
 
 			if( !mInitialized ) {
-				Initialize( context, *ltmd );
+				Initialize( context, params );
 			}
 			
 			int n = 3 * mParticleCount;
@@ -125,7 +125,6 @@ namespace OpenMM {
 			TNT::Array2D<double> h( n, n, 0.0 );
 			vector<Vec3> initialBlockPositions( blockPositions );
 			for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
-				vector<double> deltas( blocks.size() );
 				// Perturb the ith degree of freedom in EACH block
 				// Note: not all blocks will have i degrees, we have to check for this
 				for( unsigned int j = 0; j < blocks.size(); j++ ) {
@@ -140,9 +139,7 @@ namespace OpenMM {
 						continue;
 					}
 
-					double blockDelta = getDelta( blockPositions[atom_to_perturb][dof_to_perturb % 3], isBlockDoublePrecision, ltmd );
-					deltas[j] = blockDelta;
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - blockDelta;
+					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - params.delta;
 				}
 
 				blockContext->setPositions( blockPositions );
@@ -161,8 +158,7 @@ namespace OpenMM {
 						continue;
 					}
 
-					double blockDelta = deltas[j];
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + blockDelta;
+					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + params.delta;
 				}
 
 				blockContext->setPositions( blockPositions );
@@ -208,9 +204,8 @@ namespace OpenMM {
 						end_dof = 3 * blocks[j + 1];
 					}
 
-					double blockDelta = deltas[j];
 					for( int k = start_dof; k < end_dof; k++ ) {
-						double blockscale = 1.0 / ( 2 * blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
+						double blockscale = 1.0 / ( 2 * params.delta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
 						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 					}
 				}
@@ -254,7 +249,7 @@ namespace OpenMM {
 			}
 			sort( sortedEvalues.begin(), sortedEvalues.end() );
 
-			int max_eigs = ltmd->bdof * blocks.size();
+			int max_eigs = params.bdof * blocks.size();
 			double cutEigen = sortedEvalues[max_eigs].first;  // This is the cutoff eigenvalue
 			
 			// get cols of all eigenvalues under cutoff
@@ -294,7 +289,7 @@ namespace OpenMM {
 			TNT::Array2D<double> S( m, m, 0.0 );
 			TNT::Array2D<double> HE(n , m, 0.0);
 			// Compute eps.
-			const double eps = ltmd->delta;
+			const double eps = params.delta;
 
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
@@ -390,7 +385,7 @@ namespace OpenMM {
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
 
-			const unsigned int modes = ltmd->modes;
+			const unsigned int modes = params.modes;
 
 			WriteModes( U, modes );
 
@@ -847,13 +842,6 @@ namespace OpenMM {
 					evec[startatom + k][startatom + j] = Qi_gdof[k][j];
 				}
 			}
-		}
-
-		double Analysis::getDelta( double value, bool isDoublePrecision, Parameters *ltmd ) {
-			double delta = sqrt( ltmd->delta ) * max( fabs( value ), 0.1 );
-			volatile double temp = value + delta;
-			delta = temp - value;
-			return ltmd->delta;
 		}
 	}
 }

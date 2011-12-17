@@ -47,16 +47,14 @@
 
 namespace OpenMM {
 	namespace LTMD {
-		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, Parameters *params )
-			: stepsSinceDiagonalize( 0 ), mAnalysis( new Analysis ) {
+		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, const Parameters &params )
+			: stepsSinceDiagonalize( 0 ), mParameters( params ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
  			setStepSize( stepSize );
 			setConstraintTolerance( 1e-4 );
-			setMinimumLimit( params->minLimit );
+			setMinimumLimit( mParameters.minLimit );
 			setRandomNumberSeed( ( int ) time( 0 ) );
-			parameters = params;
-			rediagonalizeFrequency = params->rediagFreq;
 		}
 
 		Integrator::~Integrator() {
@@ -100,7 +98,7 @@ namespace OpenMM {
 		void Integrator::DoStep() {
 			context->updateContextState();
 
-			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % rediagonalizeFrequency == 0 ) {
+			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
 			}
 
@@ -112,8 +110,10 @@ namespace OpenMM {
 			eigVecChanged = false;
 
 			if( minimize() == MaximumMinimizationIterations ){
-				std::cout << "Force Rediagonalization" << std::endl;
-				DiagonalizeMinimize();
+				if( mParameters.ShouldForceRediagOnMinFail ) {
+					std::cout << "Force Rediagonalization" << std::endl;
+					DiagonalizeMinimize();
+				}
 			}
 
 			TimeAndCounterStep();
@@ -171,10 +171,15 @@ namespace OpenMM {
 		}
 		
 		void Integrator::DiagonalizeMinimize() {
-			for( unsigned int i = 0; i < MaximumDiagonalizations; i++ ){
+			unsigned int iterations = MaximumDiagonalizations;
+			if( mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
+			
+			for( unsigned int i = 0; i < iterations; i++ ){
 				computeProjectionVectors();
 				if( minimize() <= MaximumMinimizationCutoff ) break;
-				std::cout << "Force Rediagonalization" << std::endl;
+				if( mParameters.ShouldForceRediagOnMinFail ) {
+					std::cout << "Force Rediagonalization" << std::endl;
+				}
 			}
 		}
 
@@ -183,7 +188,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			mAnalysis->computeEigenvectorsFull( *context, parameters );
+			mAnalysis->computeEigenvectorsFull( *context, mParameters );
 			setProjectionVectors( mAnalysis->getEigenvectors() );
 			maxEigenvalue = mAnalysis->getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;

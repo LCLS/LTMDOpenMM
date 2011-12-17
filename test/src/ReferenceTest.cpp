@@ -211,7 +211,7 @@ namespace LTMD {
 			ltmd.forces.push_back( OpenMM::LTMD::Force( "Nonbonded", 5 ) );
 
 
-			OpenMM::LTMD::Integrator integ( 300, 100.0, 0.05, &ltmd );
+			OpenMM::LTMD::Integrator integ( 300, 100.0, 0.05, ltmd );
 			integ.setMaxEigenvalue( 5e3 );
 			Context context( *system, integ, Platform::getPlatformByName( "Reference" ) );
 			context.setPositions( positions );

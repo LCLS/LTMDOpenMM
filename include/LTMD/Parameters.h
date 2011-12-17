@@ -21,6 +21,8 @@ namespace OpenMM {
 			int modes;
 			int rediagFreq;
 			double minLimit;
+			
+			bool ShouldForceRediagOnMinFail;
 		};
 	}
 }

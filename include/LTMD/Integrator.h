@@ -55,7 +55,7 @@ namespace OpenMM {
 				 * @param frictionCoeff  the friction coefficient which couples the system to the heat bath
 				 * @param stepSize       the step size with which to integrator the system (in picoseconds)
 				 */
-				Integrator( const double temperature, const double frictionCoeff, const double stepSize, Parameters *param );
+				Integrator( const double temperature, const double frictionCoeff, const double stepSize, const Parameters &param );
 
 				~Integrator();
 
@@ -172,10 +172,10 @@ namespace OpenMM {
 				bool eigVecChanged;
 				double minimumLimit;
 				double temperature, friction;
-				int stepsSinceDiagonalize, rediagonalizeFrequency, randomNumberSeed;
+				int stepsSinceDiagonalize, randomNumberSeed;
 				OpenMM::ContextImpl *context;
 				OpenMM::Kernel kernel;
-				Parameters *parameters;
+				const Parameters &mParameters;
 				Analysis *mAnalysis;
 		};
 	}
