@@ -82,10 +82,8 @@ namespace OpenMM {
 		}
 
 		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, Parameters *ltmd ) {
-#ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
-#endif
 
 			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u;
 
@@ -403,11 +401,9 @@ namespace OpenMM {
 				}
 			}
 
-#ifdef PROFILE_ANALYSIS
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
-#endif
 		}
 		
 		void WriteHessian( const TNT::Array2D<double>& H ) {

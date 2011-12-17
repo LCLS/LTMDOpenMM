@@ -33,9 +33,7 @@
 #include <string>
 #include <iostream>
 
-#ifdef PROFILE_INTEGRATOR
 #include <sys/time.h>
-#endif
 
 #include "openmm/System.h"
 #include "openmm/Context.h"
@@ -53,7 +51,7 @@ namespace OpenMM {
 			: stepsSinceDiagonalize( 0 ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
-			setStepSize( stepSize );
+ 			setStepSize( stepSize );
 			setConstraintTolerance( 1e-4 );
 			setMinimumLimit( params->minLimit );
 			setRandomNumberSeed( ( int ) time( 0 ) );
@@ -81,19 +79,23 @@ namespace OpenMM {
 		}
 
 		void Integrator::step( int steps ) {
+			timeval start, end;
+			gettimeofday( &start, 0 );
+
 			for( unsigned int i = 0; i < steps; ++i ) {
 				DoStep();
 			}
 
 			// Update Time
 			context->setTime( context->getTime() + getStepSize() * steps );
+
+			gettimeofday( &end, 0 );
+			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
+			std::cout << "[Integrator] Total dynamics: " << elapsed << "ms" << std::endl;
+
 		}
 
 		void Integrator::DoStep() {
-#ifdef PROFILE_INTEGRATOR
-			timeval start, end;
-			gettimeofday( &start, 0 );
-#endif
 			context->updateContextState();
 
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % rediagonalizeFrequency == 0 ) {
@@ -110,11 +112,6 @@ namespace OpenMM {
 			minimize();
 
 			TimeAndCounterStep();
-#ifdef PROFILE_INTEGRATOR
-			gettimeofday( &end, 0 );
-			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Step: " << elapsed << "ms" << std::endl;
-#endif
 		}
 
 		void Integrator::minimize( const unsigned int maxsteps ) {
@@ -160,7 +157,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Minimize: " << elapsed << "ms" << std::endl;
+			//			std::cout << "[Integrator] Minimize: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -176,7 +173,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Compute Projection: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Compute Projection: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -190,7 +187,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Integrate Step: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Integrate Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -203,7 +200,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] TimeAndCounter Step: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] TimeAndCounter Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -217,7 +214,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
 #endif
 			return retVal;
 		}
@@ -233,7 +230,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Quadratic Minimize: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Quadratic Minimize: " << elapsed << "ms" << std::endl;
 #endif
 			return retVal;
 		}
@@ -247,7 +244,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Save Step: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Save Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -260,7 +257,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[Integrator] Revert Step: " << elapsed << "ms" << std::endl;
+			//std::cout << "[Integrator] Revert Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 	}
