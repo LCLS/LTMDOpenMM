@@ -158,6 +158,8 @@ namespace OpenMM {
 
 					maxEigenvalue *= 2;
 				}
+				
+				steps++;
 			}
 
 			maxEigenvalue = eigStore;
