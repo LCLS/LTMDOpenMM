@@ -135,12 +135,16 @@ namespace OpenMM {
 			double initialPE = context->calcForcesAndEnergy( true, true );
 			
 			unsigned int steps = 0;
+			int minSteps = 0;
 			while( steps < maxsteps ) {
+			  steps++;
+			  minSteps++;
 				eigVecChanged = false;
-
+				
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
 					currentPE = QuadraticMinimize( currentPE );
+					minSteps++;
 				}
 
 				//break if satisfies end condition
@@ -159,8 +163,8 @@ namespace OpenMM {
 					maxEigenvalue *= 2;
 				}
 				
-				steps++;
 			}
+			std::cout << "Minimization took " << minSteps << " steps" << std::endl;
 
 			maxEigenvalue = eigStore;
 #ifdef PROFILE_INTEGRATOR
@@ -174,15 +178,18 @@ namespace OpenMM {
 		
 		void Integrator::DiagonalizeMinimize() {
 			unsigned int iterations = MaximumDiagonalizations;
-			if( mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
-			
-			for( unsigned int i = 0; i < iterations; i++ ){
+			if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
+
+			int i = 0;
+			for( i = 0; i < iterations; i++ ){
 				computeProjectionVectors();
 				if( minimize() <= MaximumMinimizationCutoff ) break;
-				if( mParameters.ShouldForceRediagOnMinFail ) {
+				if( i > 0 ) {
 					std::cout << "Force Rediagonalization" << std::endl;
 				}
 			}
+			std::cout << "Rediagonalized " << i << " times" << std::endl;
+
 		}
 
 		void Integrator::computeProjectionVectors() {
