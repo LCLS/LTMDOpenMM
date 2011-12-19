@@ -52,6 +52,7 @@ namespace OpenMM {
 		const unsigned int ConservedDegreesOfFreedom = 6;
 
 		// Function Declarations
+	  void WriteS(const TNT::Array2D<double>& S);
 		void WriteHessian( const TNT::Array2D<double>& H );
 		void WriteBlockEigs( const TNT::Array2D<double>& H );
 		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes );
@@ -342,6 +343,8 @@ namespace OpenMM {
 			MatrixMultiply( E_transpose, HE, S );
 
 
+			WriteS(S);
+
 			// make S symmetric
 			for( unsigned int i = 0; i < S.dim1(); i++ ) {
 				for( unsigned int j = 0; j < S.dim2(); j++ ) {
@@ -400,6 +403,19 @@ namespace OpenMM {
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
 		}
+
+	  void WriteS(const TNT::Array2D<double>& S)
+	  {
+#ifdef VALIDATION
+	    std::ofstream file("s.txt");
+	    file.precision(10);
+	    for( unsigned int i = 0; i < S.dim2(); i++ ) {
+	      for( unsigned int j = 0; j < S.dim1(); j++ ) {
+		file << j << " " << i << " " << S[j][i] << std::endl;
+	      }
+	    }
+#endif
+	  }
 		
 		void WriteHessian( const TNT::Array2D<double>& H ) {
 #ifdef VALIDATION
