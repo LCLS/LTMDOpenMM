@@ -109,7 +109,7 @@ namespace OpenMM {
 			IntegrateStep();
 			eigVecChanged = false;
 
-			if( minimize() == MaximumMinimizationIterations ){
+			if( minimize( mParameters.MaximumMinimizationIterations ) == mParameters.MaximumMinimizationIterations ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
 					std::cout << "Force Rediagonalization" << std::endl;
 					DiagonalizeMinimize();
@@ -177,13 +177,13 @@ namespace OpenMM {
 		}
 		
 		void Integrator::DiagonalizeMinimize() {
-			unsigned int iterations = MaximumDiagonalizations;
+			unsigned int iterations = mParameters.MaximumRediagonalizations;
 			if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
 
 			unsigned int iteration = 0;
 			for( iteration = 1; iteration <= iterations; iteration++){
 				computeProjectionVectors();
-				if( minimize() <= MaximumMinimizationCutoff ) break;
+				if( minimize( mParameters.MaximumMinimizationIterations) <= mParameters.MaximumMinimizationCutoff ) break;
 				if( iteration > 1 ) {
 					std::cout << "Force Rediagonalization" << std::endl;
 				}

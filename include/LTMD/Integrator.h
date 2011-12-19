@@ -41,10 +41,6 @@
 namespace OpenMM {
 	namespace LTMD {
 		class Analysis;
-		
-		const unsigned int MaximumDiagonalizations = 5;
-		const unsigned int MaximumMinimizationCutoff = 2;
-		const unsigned int MaximumMinimizationIterations = 50;
 
 		class OPENMM_EXPORT Integrator : public OpenMM::Integrator {
 			public:
@@ -147,7 +143,7 @@ namespace OpenMM {
 				void step( int steps = 1 );
 
 				//Minimizer
-				unsigned int minimize( const unsigned int maxsteps = MaximumMinimizationIterations );
+				unsigned int minimize( const unsigned int maxsteps );
 
 			protected:
 				void initialize( OpenMM::ContextImpl &context );

@@ -30,6 +30,10 @@ namespace OpenMM {
 			bool ShouldForceRediagOnMinFail;
 			Preference::EPlatform BlockDiagonalizePlatform;
 			
+			unsigned int MaximumRediagonalizations;
+			unsigned int MaximumMinimizationCutoff;
+			unsigned int MaximumMinimizationIterations;
+			
 			Parameters();
 		};
 	}

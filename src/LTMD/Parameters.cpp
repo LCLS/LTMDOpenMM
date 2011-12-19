@@ -10,6 +10,10 @@ namespace OpenMM {
 			minLimit = 0.41804;
 			ShouldForceRediagOnMinFail = false;
 			BlockDiagonalizePlatform = Preference::OpenCL;
+			
+			MaximumRediagonalizations = 5;
+			MaximumMinimizationCutoff = 2;
+			MaximumMinimizationIterations = 50;
 		}
 	}
 }
