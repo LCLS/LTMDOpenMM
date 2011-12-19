@@ -3,7 +3,8 @@
 namespace OpenMM {
 	namespace LTMD {
 		Parameters::Parameters() {
-			delta = 1e-4; //NM
+			blockDelta = 1e-4; //NM
+                        sDelta = 1e-4; // NM
 			
 			rediagFreq = 1000;
 			minLimit = 0.41804;

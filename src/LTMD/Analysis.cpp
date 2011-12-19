@@ -139,7 +139,7 @@ namespace OpenMM {
 						continue;
 					}
 
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - params.delta;
+					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - params.blockDelta;
 				}
 
 				blockContext->setPositions( blockPositions );
@@ -158,7 +158,7 @@ namespace OpenMM {
 						continue;
 					}
 
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + params.delta;
+					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + params.blockDelta;
 				}
 
 				blockContext->setPositions( blockPositions );
@@ -205,7 +205,7 @@ namespace OpenMM {
 					}
 
 					for( int k = start_dof; k < end_dof; k++ ) {
-						double blockscale = 1.0 / ( 2 * params.delta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
+						double blockscale = 1.0 / ( 2 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
 						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 					}
 				}
@@ -289,7 +289,7 @@ namespace OpenMM {
 			TNT::Array2D<double> S( m, m, 0.0 );
 			TNT::Array2D<double> HE(n , m, 0.0);
 			// Compute eps.
-			const double eps = params.delta;
+			const double eps = params.sDelta;
 
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );

@@ -17,7 +17,8 @@ namespace OpenMM {
 		};
 
 		struct Parameters {
-			double delta;
+			double blockDelta;
+		        double sDelta;
 			std::vector<int> residue_sizes;
 			int res_per_block;
 			int bdof;
