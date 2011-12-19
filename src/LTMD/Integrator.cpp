@@ -134,17 +134,14 @@ namespace OpenMM {
 
 			double initialPE = context->calcForcesAndEnergy( true, true );
 			
-			unsigned int steps = 0;
-			int minSteps = 0;
-			while( steps < maxsteps ) {
-			  steps++;
-			  minSteps++;
+			unsigned int steps = 0, quadraticSteps = 0;
+			for( steps = 1; steps <= maxsteps; steps++ ){
 				eigVecChanged = false;
 				
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
 					currentPE = QuadraticMinimize( currentPE );
-					minSteps++;
+					quadraticSteps++;
 				}
 
 				//break if satisfies end condition
@@ -164,7 +161,10 @@ namespace OpenMM {
 				}
 				
 			}
-			std::cout << "Minimization took " << minSteps << " steps" << std::endl;
+			
+			std::cout << "Minimization took " << steps << " linear steps and " 
+				<< quadraticSteps << " quadratic steps. Totalling " 
+				<< ( steps + quadraticSteps ) << " steps." << std::endl;
 
 			maxEigenvalue = eigStore;
 #ifdef PROFILE_INTEGRATOR
@@ -180,15 +180,15 @@ namespace OpenMM {
 			unsigned int iterations = MaximumDiagonalizations;
 			if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
 
-			int i = 0;
-			for( i = 0; i < iterations; i++ ){
+			unsigned int iteration = 0;
+			for( iteration = 1; iteration <= iterations; iteration++){
 				computeProjectionVectors();
 				if( minimize() <= MaximumMinimizationCutoff ) break;
-				if( i > 0 ) {
+				if( iteration > 1 ) {
 					std::cout << "Force Rediagonalization" << std::endl;
 				}
 			}
-			std::cout << "Rediagonalized " << i << " times" << std::endl;
+			std::cout << "Rediagonalized " << iteration << " times" << std::endl;
 
 		}
 
