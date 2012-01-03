@@ -66,6 +66,7 @@ namespace OpenMM {
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 				
+				const TNT::Array2D<double> CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const;
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
 			private:
 				void Initialize( Context &context, const Parameters &ltmd );

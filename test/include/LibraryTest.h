@@ -9,9 +9,11 @@ namespace LTMD {
 			private:
 				CPPUNIT_TEST_SUITE( Test );
 				CPPUNIT_TEST( SortEigenvalue );
+				CPPUNIT_TEST( CalculateQ );
 				CPPUNIT_TEST_SUITE_END();
 			public:
 				void SortEigenvalue();
+				void CalculateQ();
 		};
 	}
 }

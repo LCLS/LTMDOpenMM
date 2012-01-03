@@ -85,8 +85,6 @@ namespace OpenMM {
 		
 		bool sort_func( const EigenvalueColumn& a, const EigenvalueColumn& b ) {
 			if( std::fabs( a.first - b.first ) < 1e-8 ) {
-				std::cout << a.first << " " << b.first << std::endl;
-				std::cout << a.second << " " << b.second << std::endl << std::endl;
 				if( a.second <= b.second ) return true;
 			}else{
 				if( a.first < b.first ) return true;
@@ -107,6 +105,23 @@ namespace OpenMM {
 			// Sort Data
 			std::sort( retVal.begin(), retVal.end(), sort_func );
 			
+			return retVal;
+		}
+		
+		const TNT::Array2D<double> Analysis::CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const {
+#ifdef PROFILE_ANALYSIS
+			timeval start, end;
+			gettimeofday( &start, 0 );
+#endif
+			TNT::Array2D<double> retVal( E.dim1(), Q.dim2(), 0.0 );
+		
+			MatrixMultiply( E, Q, retVal );
+			
+#ifdef PROFILE_ANALYSIS
+			gettimeofday( &end, 0 );
+			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
+			std::cout << "[Analysis] Calculate U: " << elapsed << "ms" << std::endl;
+#endif
 			return retVal;
 		}
 
@@ -399,11 +414,8 @@ namespace OpenMM {
 
 			gettimeofday( &tp_q, NULL );
 			cout << "Time to compute Q: " << ( tp_q.tv_sec - tp_s.tv_sec ) << endl;
-
-			// Compute U, set of approximate eigenvectors.
-			// U = E*Q.
-			TNT::Array2D<double> U( E.dim1(), Q.dim2(), 0.0 );
-			MatrixMultiply( E, Q, U );
+			
+			TNT::Array2D<double> U = CalculateU( E, Q );
 			
 			gettimeofday( &tp_u, NULL );
 			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
