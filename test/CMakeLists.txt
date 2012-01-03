@@ -1,7 +1,7 @@
 include_directories( include ../include )
 
-set( TEST_HEADERS "include/ReferenceTest.h" "include/MathTest.h" )
-set( TEST_SOURCES "src/ReferenceTest.cpp" "src/MathTest.cpp" )
+set( TEST_HEADERS "include/ReferenceTest.h" "include/LibraryTest.h" "include/MathTest.h" )
+set( TEST_SOURCES "src/ReferenceTest.cpp" "src/LibraryTest.cpp" "src/MathTest.cpp" )
 set( LIBS "LTMDReference" )
 
 option( BUILD_GPU "Build GPU code" Off )

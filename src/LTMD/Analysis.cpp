@@ -37,6 +37,7 @@
 #include "openmm/internal/ForceImpl.h"
 #include <algorithm>
 #include <vector>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 
@@ -80,6 +81,33 @@ namespace OpenMM {
 			}
 
 			return true;   // They're all the same!
+		}
+		
+		bool sort_func( const EigenvalueColumn& a, const EigenvalueColumn& b ) {
+			if( std::fabs( a.first - b.first ) < 1e-8 ) {
+				std::cout << a.first << " " << b.first << std::endl;
+				std::cout << a.second << " " << b.second << std::endl << std::endl;
+				if( a.second <= b.second ) return true;
+			}else{
+				if( a.first < b.first ) return true;
+			}
+			
+			return false;
+		}
+		
+		std::vector<EigenvalueColumn> Analysis::SortEigenvalues( const EigenvalueArray& values ) {
+			std::vector<EigenvalueColumn> retVal;
+			
+			// Create Array
+			retVal.reserve( values.dim() );
+			for( unsigned int i = 0; i < values.dim(); i++ ){
+				retVal.push_back( std::make_pair( std::fabs( values[i] ), i ) );
+			}
+			
+			// Sort Data
+			std::sort( retVal.begin(), retVal.end(), sort_func );
+			
+			return retVal;
 		}
 
 		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params ) {
@@ -244,11 +272,7 @@ namespace OpenMM {
 			// First sort the eigenvectors by the absolute value of the eigenvalue.
 
 			// sort all eigenvalues by absolute magnitude to determine cutoff
-			vector<pair<double, int> > sortedEvalues( n );
-			for( int i = 0; i < n; i++ ) {
-				sortedEvalues[i] = make_pair( fabs( block_eigval[i] ), i );
-			}
-			sort( sortedEvalues.begin(), sortedEvalues.end() );
+			std::vector<EigenvalueColumn> sortedEvalues = SortEigenvalues( block_eigval );
 
 			int max_eigs = params.bdof * blocks.size();
 			double cutEigen = sortedEvalues[max_eigs].first;  // This is the cutoff eigenvalue
@@ -363,18 +387,14 @@ namespace OpenMM {
 			FindEigenvalues( S, dS, q );
 
 			// Sort by ABSOLUTE VALUE of eigenvalues.
-			sortedEvalues.clear();
-			sortedEvalues.resize( dS.dim() );
-			for( int i = 0; i < dS.dim(); i++ ) {
-				sortedEvalues[i] = make_pair( fabs( dS[i] ), i );
-			}
-			sort( sortedEvalues.begin(), sortedEvalues.end() );
-
+			sortedEvalues = SortEigenvalues( dS );
+			
 			TNT::Array2D<double> Q( q.dim2(), q.dim1(), 0.0 );
-			for( int i = 0; i < sortedEvalues.size(); i++ )
+			for( int i = 0; i < sortedEvalues.size(); i++ ){
 				for( int j = 0; j < q.dim2(); j++ ) {
 					Q[j][i] = q[j][sortedEvalues[i].second];
 				}
+			}
 			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
 
 			gettimeofday( &tp_q, NULL );
@@ -710,11 +730,7 @@ namespace OpenMM {
 			FindEigenvalues( h_tilde, di, Qi );
 
 			// sort eigenvalues by absolute magnitude
-			vector<pair<double, int> > sortedEvalPairs( size );
-			for( int j = 0; j < size; j++ ) {
-				sortedEvalPairs.at( j ) = make_pair( fabs( di[j] ), j );
-			}
-			sort( sortedEvalPairs.begin(), sortedEvalPairs.end() );
+			std::vector<EigenvalueColumn> sortedPairs = SortEigenvalues( di );
 
 			// find geometric dof
 			TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
@@ -815,7 +831,7 @@ namespace OpenMM {
 
 				// orthogonalize original eigenvectors in order from smallest magnitude
 				// eigenvalue to biggest
-				int col = sortedEvalPairs.at( j ).second;
+				int col = sortedPairs.at( j ).second;
 
 				// copy original vector to Qi_gdof -- updated in place
 				for( int l = 0; l < size; l++ ) {
@@ -865,7 +881,7 @@ namespace OpenMM {
 			//    the cutoff eigenvalue for everybody.
 			// we assume curr_evec <= size
 			for( int j = 0; j < curr_evec; j++ ) {
-				int col = sortedEvalPairs.at( j ).second;
+				int col = sortedPairs.at( j ).second;
 				eval[startatom + j] = di[col];
 
 				// orthogonalized eigenvectors already sorted by eigenvalue

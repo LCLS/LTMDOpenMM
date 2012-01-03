@@ -42,6 +42,9 @@
 
 namespace OpenMM {
 	namespace LTMD {
+		typedef TNT::Array1D<double> EigenvalueArray;
+		typedef std::pair<double,int> EigenvalueColumn;
+		
 		class OPENMM_EXPORT Analysis {
 			public:
 				Analysis() : mParticleCount( 0 ), mLargestBlockSize( -1 ) {
@@ -62,6 +65,8 @@ namespace OpenMM {
 				}
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
+				
+				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
 			private:
 				void Initialize( Context &context, const Parameters &ltmd );
 				void DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
