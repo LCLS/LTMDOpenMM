@@ -48,7 +48,7 @@
 namespace OpenMM {
 	namespace LTMD {
 		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, const Parameters &params )
-			: stepsSinceDiagonalize( 0 ), mParameters( params ), mAnalysis( new Analysis ) {
+			: stepsSinceDiagonalize( 0 ), mParameters( params ), maxEigenvalue( 5e5 ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
  			setStepSize( stepSize );
@@ -177,19 +177,20 @@ namespace OpenMM {
 		}
 		
 		void Integrator::DiagonalizeMinimize() {
-			unsigned int iterations = mParameters.MaximumRediagonalizations;
-			if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
+			if( !mParameters.ShouldProtoMolDiagonalize ) {
+				unsigned int iterations = mParameters.MaximumRediagonalizations;
+				if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
 
-			unsigned int iteration = 0;
-			for( iteration = 1; iteration <= iterations; iteration++){
-				computeProjectionVectors();
-				if( minimize( mParameters.MaximumMinimizationIterations) <= mParameters.MaximumMinimizationCutoff ) break;
-				if( iteration > 1 ) {
-					std::cout << "Force Rediagonalization" << std::endl;
+				unsigned int iteration = 0;
+				for( iteration = 1; iteration <= iterations; iteration++){
+					computeProjectionVectors();
+					if( minimize( mParameters.MaximumMinimizationIterations) <= mParameters.MaximumMinimizationCutoff ) break;
+					if( iteration > 1 ) {
+						std::cout << "Force Rediagonalization" << std::endl;
+					}
 				}
+				std::cout << "Rediagonalized " << iteration << " times" << std::endl;
 			}
-			std::cout << "Rediagonalized " << iteration << " times" << std::endl;
-
 		}
 
 		void Integrator::computeProjectionVectors() {

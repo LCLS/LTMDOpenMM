@@ -18,7 +18,7 @@ namespace OpenMM {
 
 		struct Parameters {
 			double blockDelta;
-		        double sDelta;
+			double sDelta;
 			std::vector<int> residue_sizes;
 			int res_per_block;
 			int bdof;
@@ -33,6 +33,8 @@ namespace OpenMM {
 			unsigned int MaximumRediagonalizations;
 			unsigned int MaximumMinimizationCutoff;
 			unsigned int MaximumMinimizationIterations;
+			
+			bool ShouldProtoMolDiagonalize;
 			
 			Parameters();
 		};

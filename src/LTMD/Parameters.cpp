@@ -14,6 +14,8 @@ namespace OpenMM {
 			MaximumRediagonalizations = 5;
 			MaximumMinimizationCutoff = 2;
 			MaximumMinimizationIterations = 50;
+			
+			ShouldProtoMolDiagonalize = false;
 		}
 	}
 }
