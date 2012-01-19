@@ -53,13 +53,13 @@ if( BUILD_OPENMP )
 endif( BUILD_OPENMP )
 
 # OpenMM
-set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
+set( OPENMM_DIR "$ENV{OPENMM_HOME}" CACHE PATH "OpenMM Install Directory")
 if( OPENMM_DIR )
 	link_directories( "${OPENMM_DIR}/lib/" )
 	include_directories( "${OPENMM_DIR}/include/" )
 endif()
 
-set( OPENMM_SOURCE_DIR "" CACHE PATH "OpenMM Source Directory")
+set( OPENMM_SOURCE_DIR "$ENV{OPENMM_SOURCE}" CACHE PATH "OpenMM Source Directory")
 if( OPENMM_SOURCE_DIR )
 	# JAMA
 	include_directories( "${OPENMM_SOURCE_DIR}/libraries/jama/include/" )
