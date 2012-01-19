@@ -101,6 +101,12 @@ target_link_libraries( LTMDReference OpenMMLTMD )
 
 option( BUILD_GPU "Build GPU code" Off )
 if( BUILD_GPU )
+	option( BUILD_GPU_DOUBLE "Build GPU code with double precision" Off )
+	if( BUILD_GPU_DOUBLE )
+		add_definitions( "-DDOUBLE_PRECISION" )
+		set( CMAKE_NVCC_FLAGS "${CMAKE_NVCC_FLAGS} -gencode;arch=compute_11,code=sm_11;-gencode;arch=compute_12,code=sm_12;-gencode;arch=compute_13,code=sm_13;-gencode;arch=compute_20,code=sm_20;" )
+	endif( BUILD_GPU_DOUBLE )
+
 	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
 	if( BUILD_GPU_CUDA )
 		find_package( CUDA REQUIRED )
