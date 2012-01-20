@@ -80,22 +80,25 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 
-			for( unsigned int i = 0; i < steps; ++i ) {
-				DoStep();
+			for( mLastCompleted = 0; mLastCompleted < steps; ++mLastCompleted ) {
+				if( DoStep() == false ) break;
 			}
 
 			// Update Time
-			context->setTime( context->getTime() + getStepSize() * steps );
+			context->setTime( context->getTime() + getStepSize() * mLastCompleted );
 
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Integrator] Total dynamics: " << elapsed << "ms" << std::endl;
-
+		}
+		
+		unsigned int Integrator::CompletedSteps() const {
+			return mLastCompleted;
 		}
 
 		/* Save before integration for DiagonalizeMinimize and add test to make 
 			sure its not done twice */
-		void Integrator::DoStep() {
+		bool Integrator::DoStep() {
 			context->updateContextState();
 
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
@@ -113,10 +116,14 @@ namespace OpenMM {
 				if( mParameters.ShouldForceRediagOnMinFail ) {
 					std::cout << "Force Rediagonalization" << std::endl;
 					DiagonalizeMinimize();
+				}else{
+					return false;
 				}
 			}
 
 			TimeAndCounterStep();
+
+			return true;
 		}
 
 		unsigned int Integrator::minimize( const unsigned int maxsteps ) {

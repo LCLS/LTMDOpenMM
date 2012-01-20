@@ -141,6 +141,8 @@ namespace OpenMM {
 				 * @param steps   the number of time steps to take
 				 */
 				void step( int steps = 1 );
+				
+				unsigned int CompletedSteps() const;
 
 				//Minimizer
 				unsigned int minimize( const unsigned int maxsteps );
@@ -149,7 +151,7 @@ namespace OpenMM {
 				void initialize( OpenMM::ContextImpl &context );
 				std::vector<std::string> getKernelNames();
 			private:
-				void DoStep();
+				bool DoStep();
 				void DiagonalizeMinimize();
 				
 				// Kernel Functions
@@ -162,6 +164,7 @@ namespace OpenMM {
 				void SaveStep();
 				void RevertStep();
 			private:
+				unsigned int mLastCompleted;
 				void computeProjectionVectors();
 				double maxEigenvalue;
 				std::vector<std::vector<OpenMM::Vec3> > eigenvectors;
