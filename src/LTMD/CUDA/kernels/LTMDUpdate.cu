@@ -51,10 +51,11 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 		const float4 n = random[rpos + atom];
 		const float4 randomNoise = make_float4( n.x * noisescale, n.y * noisescale, n.z * noisescale, n.w * noisescale );
 
+		const Real sqrtInvMass = sqrt( velm[atom].w );
+
 #ifdef DOUBLE_PRECISION
 		double vx = velm[atom].x, vy = velm[atom].y, vz = velm[atom].z, vw = velm[atom].w;
 		double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
-		const double sqrtInvMass = sqrt( vw );
 
 		vx = ( vscale * vx ) + ( fscale * fx * vw ) + ( randomNoise.x * sqrtInvMass );
 		vy = ( vscale * vy ) + ( fscale * fy * vw ) + ( randomNoise.y * sqrtInvMass );
@@ -64,7 +65,6 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 #else
 		float4 v = velm[atom];
 		float4 f = force[atom];
-		const float Real sqrtInvMass = sqrt( v.w );
 
 		v.x = ( vscale * v.x ) + ( fscale * f.x * v.w ) + ( randomNoise.x * sqrtInvMass );
 		v.y = ( vscale * v.y ) + ( fscale * f.y * v.w ) + ( randomNoise.y * sqrtInvMass );
@@ -83,25 +83,23 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 }
 
 __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float4 *velm, float4 *modes, float *modeWeights ) {
-	extern __shared__ Real dotBuffer[];
+	extern __shared__ float dotBuffer[];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
 		// Compute the projection of the mass weighted velocity onto one normal mode vector.
 		Real dot = 0.0f;
 
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
 			const int modePos = mode * numAtoms + atom;
+			const Real scale = 1.0f / sqrt( velm[atom].w );
+#ifdef DOUBLE_PRECISION
+			const double vx = velm[atom].x, vy = velm[atom].y, vz = velm[atom].z;
+			const double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
 
-#ifndef DOUBLE_PRECISION
-			double vx = velm[atom].x, vy = velm[atom].y, vz = velm[atom].z, vw = velm[atom].w;
-			double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z, mw = modes[modePos].w;
-
-			const double scale = 1.0f / sqrt( vw );
 			dot += scale * ( vx * mx + vy * my + vz * mz );
 #else
 			float4 v = velm[atom];
 			float4 m = modes[modePos];
 
-			const float scale = 1.0f / sqrt( v.w );
 			dot += scale * ( v.x * m.x + v.y * m.y + v.z * m.z );
 #endif
 		}
@@ -121,7 +119,7 @@ __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float4 *velm, fl
 
 __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes, float *modeWeights ) {
 	// Load the weights into shared memory.
-	extern __shared__ Real weightBuffer[];
+	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
 		weightBuffer[mode] = modeWeights[mode];
 	}
@@ -226,21 +224,31 @@ void kNMLAcceptMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerSca
 }
 
 __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int numModes, float4 *velm, float4 *force, float4 *modes, float *modeWeights ) {
-	extern __shared__ Real dotBuffer[];
+	extern __shared__ float dotBuffer[];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
 		// Compute the projection of the mass weighted force onto one normal mode vector.
-
-		float dot = 0.0f;
+		Real dot = 0.0f;
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
+			const Real scale = sqrt( velm[atom].w );
+			const int modePos = mode * numAtoms + atom;
+
+#ifdef DOUBLE_PRECISION
+			double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
+			double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
+
+			dot += scale * ( fx * mx + fy * my + fz * mz );
+#else
 			float4 f = force[atom];
-			float4 m = modes[mode * numAtoms + atom];
-			float scale = sqrt( velm[atom].w );
+			float4 m = modes[modePos];
+	
 			dot += scale * ( f.x * m.x + f.y * m.y + f.z * m.z );
+#endif
 		}
 		dotBuffer[threadIdx.x] = dot;
+
 		__syncthreads();
 		if( threadIdx.x == 0 ) {
-			float sum = 0;
+			Real sum = 0;
 			for( int i = 0; i < blockDim.x; i++ ) {
 				sum += dotBuffer[i];
 			}
@@ -251,7 +259,7 @@ __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int numModes, float4 *
 
 __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float4 *force, float4 *modes, float *modeWeights, float *minimizerScale ) {
 	// Load the weights into shared memory.
-	extern __shared__ Real weightBuffer[];
+	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
 		weightBuffer[mode] = modeWeights[mode];
 	}
@@ -328,7 +336,7 @@ void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDA
 
 __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, float4 *posqP, float4 *velm, float4 *force, float *blockSlope ) {
 	// Compute the slope along the minimization direction.
-	extern __shared__ Real slopeBuffer[];
+	extern __shared__ float slopeBuffer[];
 
 	Real slope = 0.0f;
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
@@ -356,7 +364,7 @@ __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, float4 *posqP, floa
 
 __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, float lastPE, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float *blockSlope ) {
 	// Load the block contributions into shared memory.
-	extern __shared__ Real slopeBuffer[];
+	extern __shared__ float slopeBuffer[];
 	for( int block = threadIdx.x; block < gridDim.x; block += blockDim.x ) {
 		slopeBuffer[block] = blockSlope[block];
 	}
@@ -394,17 +402,15 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 
 #ifdef DOUBLE_PRECISION
 		double px = posq[atom].x, py = posq[atom].y, pz = posq[atom].z, pw = posq[atom].w;
-		const double xx = posqP[atom].x, xy = posqP[atom].y, xz = posqP[atom].z;
-		px += factor * xx;
-		py += factor * xy;
-		pz += factor * xz;
+		px += factor * posqP[atom].x;
+		py += factor * posqP[atom].y;
+		pz += factor * posqP[atom].z;
 		posq[atom] = make_float4( px, py, pz, pw );
 #else
 		float4 pos = posq[atom];
-		const float4 xp = posqP[atom];
-		pos.x += factor * xp.x;
-		pos.y += factor * xp.y;
-		pos.z += factor * xp.z;
+		pos.x += factor * posqP[atom].x;
+		pos.y += factor * posqP[atom].y;
+		pos.z += factor * posqP[atom].z;
 		posq[atom] = pos;
 #endif
 	}

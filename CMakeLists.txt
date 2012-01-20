@@ -85,7 +85,7 @@ source_group( "include\\LTMD" FILES ${LTMD_HEADERS} )
 file( GLOB LTMD_SOURCES src/LTMD/*.cpp )
 source_group( "src\\LTMD" FILES ${LTMD_SOURCES} )
 
-add_library( OpenMMLTMD STATIC ${LTMD_HEADERS} ${LTMD_SOURCES})
+add_library( OpenMMLTMD SHARED ${LTMD_HEADERS} ${LTMD_SOURCES})
 target_link_libraries( OpenMMLTMD ${OPENMM_LIB} )
 
 # LTMD Reference Plugin
