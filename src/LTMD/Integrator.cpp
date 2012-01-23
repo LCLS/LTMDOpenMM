@@ -207,7 +207,6 @@ namespace OpenMM {
 #endif
 			mAnalysis->computeEigenvectorsFull( *context, mParameters );
 			setProjectionVectors( mAnalysis->getEigenvectors() );
-			maxEigenvalue = mAnalysis->getMaxEigenvalue();
 			stepsSinceDiagonalize = 0;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );

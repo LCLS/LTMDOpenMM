@@ -108,10 +108,6 @@ namespace OpenMM {
 					stepsSinceDiagonalize = 0;
 				}
 
-				void setMaxEigenvalue( double max ) {
-					maxEigenvalue = max;
-				}
-
 				double getMaxEigenvalue() const {
 					return maxEigenvalue;
 				}
