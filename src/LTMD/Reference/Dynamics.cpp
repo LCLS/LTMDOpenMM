@@ -29,6 +29,7 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include <cmath>
 #include <vector>
 #include <string>
 #include <sstream>
@@ -144,14 +145,14 @@ namespace OpenMM {
 					case 1: {
 						// Update the velocity.
 						double deltaT = getDeltaT();
-						double tau = getTau();
+						double tau = _tau;
 						const double vscale = EXP( -deltaT / tau );
 						const double fscale = ( 1 - vscale ) * tau;
-						const double noisescale = SQRT( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
+						const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
 						for( int i = 0; i < numberOfAtoms; i++ )
 							for( int j = 0; j < 3; j++ )
 								velocities[i][j] = vscale * velocities[i][j] + fscale * forces[i][j] * inverseMasses[i] +
-												   noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() * SQRT( inverseMasses[i] );
+												   noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() * std::sqrt( inverseMasses[i] );
 
 						// Project resulting velocities onto subspace
 						subspaceProjection( velocities, velocities, numberOfAtoms, masses, inverseMasses, false );
@@ -302,7 +303,7 @@ namespace OpenMM {
 				//a'=M^{-1/2}*f for forces, OR a'= M^{1/2}*x for positions
 				//
 				for( int i = 0; i < numberOfAtoms; i++ ) {        //N loops
-					double  weight = SQRT( scale[i] );
+					double  weight = std::sqrt( scale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {         //times 3 loops
 						outArray[i][j] *= weight;
 					}
@@ -365,7 +366,7 @@ namespace OpenMM {
 				//a'''=M^{1/2}*a'' or a'''=M^{-1/2}*a''
 				//
 				for( int i = 0; i < numberOfAtoms; i++ ) {
-					double  unweight = SQRT( inverseScale[i] );
+					double  unweight = std::sqrt( inverseScale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {
 						outArray[i][j] *= unweight;
 					}
