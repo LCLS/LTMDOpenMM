@@ -48,7 +48,7 @@ namespace OpenMM {
 					VectorArray xPrime, oldPositions;
 					DoubleArray inverseMasses;
 
-					double _tau;
+					const double mTau;
 					double *_projectionVectors;
 					unsigned int _numProjectionVectors;
 					double _minimumLimit, _maxEig;
@@ -87,14 +87,24 @@ namespace OpenMM {
 					   @return ReferenceDynamics::DefaultReturn
 
 					   --------------------------------------------------------------------------------------- */
-
+					
 					int update( int numberOfAtoms, VectorArray& atomCoordinates, VectorArray& velocities, VectorArray& forces, DoubleArray& masses, const double currentPE, const int stepType );
 
+				private:
 					/**---------------------------------------------------------------------------------------
 					 Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 					 Take 'array' as input, 'outArray' as output (may be the same vector).
 					 ----------------------------------------------------------------------------------------- */
-					void subspaceProjection( VectorArray& arrayParam, VectorArray& outArrayParam, int numberOfAtoms, DoubleArray& scale, DoubleArray& inverseScale, bool projectIntoComplement );
+					void subspaceProjection( VectorArray& arrayParam, VectorArray& outArrayParam, DoubleArray& scale, DoubleArray& inverseScale, bool projectIntoComplement );
+
+					void Integrate();
+					void UpdateTime();
+
+					void AcceptStep( VectorArray& coordinates );
+					void RejectStep();
+
+					void LinearMinimize();
+					void QuadraticMinimize();
 			};
 		}
 	}

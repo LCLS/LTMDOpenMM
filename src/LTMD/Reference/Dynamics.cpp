@@ -245,14 +245,7 @@ namespace OpenMM {
 						break;
 					}
 					case 6: {
-						// Save the current atom positions in case we need to roll back the next step.
-
-						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							oldPositions[ii][0] = atomCoordinates[ii][0];
-							oldPositions[ii][1] = atomCoordinates[ii][1];
-							oldPositions[ii][2] = atomCoordinates[ii][2];
-						}
-						minimizerScale = 1.0;
+						AcceptStep( atomCoordinates );
 						break;
 					}
 				}
@@ -260,6 +253,36 @@ namespace OpenMM {
 
 				return 0; // ReferenceDynamics::DefaultReturn;
 
+			}
+
+			void Dynamics::Integrate() {
+				
+			}
+			
+			void Dynamics::UpdateTime() {
+
+			}
+			
+			void Dynamics::AcceptStep( VectorArray& coordinates ) {
+				const unsigned int atoms = oldPositions.size();
+				for( unsigned int i = 0; i < atoms; i++ ) {
+					oldPositions[i][0] = coordinates[i][0];
+					oldPositions[i][1] = coordinates[i][1];
+					oldPositions[i][2] = coordinates[i][2];
+				}
+				minimizerScale = 1.0;
+			}
+			
+			void Dynamics::RejectStep() {
+				
+			}
+			
+			void Dynamics::LinearMinimize() {
+				
+			}
+			
+			void Dynamics::QuadraticMinimize() {
+				
 			}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
