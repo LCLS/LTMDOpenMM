@@ -27,11 +27,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
  * -------------------------------------------------------------------------- */
 
+#include "LTMD/StepKernel.h"
+
 #include "CudaPlatform.h"
 #include "kernels/gputypes.h"
-
-#include "LTMD/StepKernel.h"
-#include "LTMD/CUDA/Kernels.h"
 
 static const float KILO                     =    1e3;                      // Thousand
 static const float BOLTZMANN                =    1.380658e-23f;            // (J/K)

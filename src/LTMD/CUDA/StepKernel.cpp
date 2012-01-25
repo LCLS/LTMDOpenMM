@@ -24,6 +24,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
  * -------------------------------------------------------------------------- */
 
+#include "LTMD/CUDA/StepKernel.h"
+
 #include <cmath>
 
 #include "OpenMM.h"
@@ -31,7 +33,7 @@
 #include "openmm/internal/ContextImpl.h"
 
 #include "LTMD/Integrator.h"
-#include "LTMD/CUDA/Kernels.h"
+
 
 extern void kGenerateRandoms( gpuContext gpu );
 void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );

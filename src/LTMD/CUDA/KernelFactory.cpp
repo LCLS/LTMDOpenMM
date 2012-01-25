@@ -31,7 +31,7 @@
 
 #include <iostream>
 
-#include "LTMD/CUDA/Kernels.h"
+#include "LTMD/CUDA/StepKernel.h"
 #include "LTMD/CUDA/KernelFactory.h"
 
 #include "openmm/internal/ContextImpl.h"
