@@ -180,10 +180,8 @@ namespace OpenMM {
 					prevFriction = friction;
 					prevStepSize = stepSize;
 				}
-				//for minimization quadratic fit we need the potential energy
-				RealOpenMM currentPE2 = static_cast<RealOpenMM>( currentPE );
 				dynamics->SetMaxEigenValue( maxEig );
-				dynamics->update( posData, velData, forceData, masses, currentPE2, stepType );
+				dynamics->update( posData, velData, forceData, masses, currentPE, stepType );
 				//update at dynamic step 2
 				if( stepType == 2 ) {
 					data.time += stepSize;
