@@ -154,10 +154,10 @@ namespace OpenMM {
 							}
 						break;
 					}
-					case 2:
-						// Do nothing.
+					case 2:{
+						UpdateTime();
 						break;
-
+					}
 						//simple minimizer step, assume quadratic line search value is correct
 						//accept move if new PE < old PE
 					case 3: {
