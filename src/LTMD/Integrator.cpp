@@ -264,8 +264,9 @@ namespace OpenMM {
 #endif
 			context->calcForcesAndEnergy( true, true );
 			const double lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+#ifdef KERNEL_VALIDATION
 			std::cout << "[QuadraticMinimize] Lambda: " << lambda << std::endl;
-			
+#endif
 			double retVal = context->calcForcesAndEnergy( false, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
