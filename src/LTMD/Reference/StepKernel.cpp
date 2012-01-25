@@ -39,23 +39,6 @@
 namespace OpenMM {
 	namespace LTMD {
 		namespace Reference {
-			static int **allocateIntArray( int length, int width ) {
-				int **array = new int*[length];
-				for( int i = 0; i < length; ++i ) {
-					array[i] = new int[width];
-				}
-				return array;
-			}
-
-			static void disposeIntArray( int **array, int size ) {
-				if( array ) {
-					for( int i = 0; i < size; ++i ) {
-						delete[] array[i];
-					}
-					delete[] array;
-				}
-			}
-
 			static std::vector<RealVec>& extractPositions( ContextImpl &context ) {
 				ReferencePlatform::PlatformData *data = reinterpret_cast<ReferencePlatform::PlatformData *>( context.getPlatformData() );
 				return *( ( std::vector<RealVec>* ) data->positions );
@@ -71,33 +54,9 @@ namespace OpenMM {
 				return *( ( std::vector<RealVec>* ) data->forces );
 			}
 
-			static void findAnglesForCCMA( const System &system, std::vector<ReferenceCCMAAlgorithm::AngleInfo>& angles ) {
-				for( int i = 0; i < system.getNumForces(); i++ ) {
-					const HarmonicAngleForce *force = dynamic_cast<const HarmonicAngleForce *>( &system.getForce( i ) );
-					if( force != NULL ) {
-						for( int j = 0; j < force->getNumAngles(); j++ ) {
-							int atom1, atom2, atom3;
-							double angle, k;
-							force->getAngleParameters( j, atom1, atom2, atom3, angle, k );
-							angles.push_back( ReferenceCCMAAlgorithm::AngleInfo( atom1, atom2, atom3, ( RealOpenMM )angle ) );
-						}
-					}
-				}
-			}
-
-
 			StepKernel::~StepKernel() {
 				if( dynamics ) {
 					delete dynamics;
-				}
-				if( constraints ) {
-					delete constraints;
-				}
-				if( constraintIndices ) {
-					disposeIntArray( constraintIndices, numConstraints );
-				}
-				if( constraintDistances ) {
-					delete[] constraintDistances;
 				}
 				if( projectionVectors ) {
 					delete projectionVectors;
@@ -106,35 +65,23 @@ namespace OpenMM {
 
 			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
 				int numParticles = system.getNumParticles();
+				
 				masses.resize( numParticles );
 				for( int i = 0; i < numParticles; ++i ) {
 					masses[i] = static_cast<RealOpenMM>( system.getParticleMass( i ) );
 				}
-				numConstraints = system.getNumConstraints();
-				constraintIndices = allocateIntArray( numConstraints, 2 );
-				constraintDistances = new RealOpenMM[numConstraints];
-				for( int i = 0; i < numConstraints; ++i ) {
-					int particle1, particle2;
-					double distance;
-					system.getConstraintParameters( i, particle1, particle2, distance );
-					constraintIndices[i][0] = particle1;
-					constraintIndices[i][1] = particle2;
-					constraintDistances[i] = static_cast<RealOpenMM>( distance );
-				}
+				
 				SimTKOpenMMUtilities::setRandomNumberSeed( ( unsigned int ) integrator.getRandomNumberSeed() );
 			}
 
 			void StepKernel::execute( ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType ) {
-
 				double temperature = integrator.getTemperature();
 				double friction = integrator.getFriction();
 				double stepSize = integrator.getStepSize();
 				const std::vector<std::vector<Vec3> >& dProjectionVectors = integrator.getProjectionVectors();
 				unsigned int numProjectionVectors = integrator.getNumProjectionVectors();
 				bool projVecChanged = integrator.getProjVecChanged();
-				double minimumLimit = integrator.getMinimumLimit();
 				double maxEig = integrator.getMaxEigenvalue();
-
 
 				std::vector<RealVec>& posData = extractPositions( context );
 				std::vector<RealVec>& velData = extractVelocities( context );
@@ -156,10 +103,8 @@ namespace OpenMM {
 
 				if( dynamics == 0 || temperature != prevTemp || friction != prevFriction || stepSize != prevStepSize ) {
 					// Recreate the computation objects with the new parameters.
-
 					if( dynamics ) {
 						delete dynamics;
-						delete constraints;
 					}
 					RealOpenMM tau = static_cast<RealOpenMM>( friction == 0.0 ? 0.0 : 1.0 / friction );
 
@@ -172,10 +117,6 @@ namespace OpenMM {
 											 numProjectionVectors,
 											 static_cast<RealOpenMM>( maxEig ) );
 
-					std::vector<ReferenceCCMAAlgorithm::AngleInfo> angles;
-					findAnglesForCCMA( context.getSystem(), angles );
-					constraints = new ReferenceCCMAAlgorithm( context.getSystem().getNumParticles(), numConstraints, constraintIndices, constraintDistances, masses, angles, ( RealOpenMM )integrator.getConstraintTolerance() );
-					dynamics->setReferenceConstraintAlgorithm( constraints );
 					prevTemp = temperature;
 					prevFriction = friction;
 					prevStepSize = stepSize;

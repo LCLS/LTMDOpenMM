@@ -64,11 +64,6 @@ namespace OpenMM {
 				ReferenceDynamics( numberOfAtoms, deltaT, temperature ), mTau( tau == 0.0 ? 1.0 : tau ),
 				mAtomCount( numberOfAtoms ), _projectionVectors( projectionVectors ), _numProjectionVectors( numProjectionVectors ), _maxEig( maxEig )  {
 
-				// ---------------------------------------------------------------------------------------
-
-				static const char *methodName      = "\nReferenceNMLDynamics::ReferenceNMLDynamics";
-
-				// ---------------------------------------------------------------------------------------
 				xPrime.resize( mAtomCount );
 				oldPositions.resize( mAtomCount );
 				inverseMasses.resize( mAtomCount );
@@ -115,12 +110,12 @@ namespace OpenMM {
 					int errors = 0;
 
 					// invert masses
-					for( int ii = 0; ii < mAtomCount; ii++ ) {
-						if( masses[ii] <= 0.0 ) {
-							message << "mass at atom index=" << ii << " (" << masses[ii] << ") is <= 0" << std::endl;
+					for( unsigned int i = 0; i < mAtomCount; i++ ) {
+						if( masses[i] <= 0.0 ) {
+							message << "mass at atom index=" << i << " (" << masses[i] << ") is <= 0" << std::endl;
 							errors++;
 						} else {
-							inverseMasses[ii] = 1.0 / masses[ii];
+							inverseMasses[i] = 1.0 / masses[i];
 						}
 					}
 
@@ -205,7 +200,7 @@ namespace OpenMM {
 			}
 			
 			void Dynamics::RejectStep( VectorArray& coordinates ) {
-				for( int i = 0; i < mAtomCount; i++ ) {
+				for( unsigned int i = 0; i < mAtomCount; i++ ) {
 					coordinates[i][0] = oldPositions[i][0];
 					coordinates[i][1] = oldPositions[i][1];
 					coordinates[i][2] = oldPositions[i][2];
@@ -329,10 +324,10 @@ namespace OpenMM {
 				//Q_{j,i}=_projectionVectors[j * numberOfAtoms * 3 + i]
 
 				DoubleArray tmpC( _numProjectionVectors );
-				for( int i = 0; i < ( int ) _numProjectionVectors; i++ ) {
+				for( unsigned int i = 0; i < _numProjectionVectors; i++ ) {
 
 					tmpC[i] = 0.0;
-					for( int j = 0; j < ( int ) _3N; j++ ) {
+					for( unsigned int j = 0; j < _3N; j++ ) {
 						tmpC[i] += _projectionVectors[j  + i * _3N] * out[j / 3][j % 3];
 					}
 				}
@@ -342,20 +337,20 @@ namespace OpenMM {
 				//so outArray_i  = \sum_{j=1}^n Q_{i,j} tmpC_i
 
 				//find product
-				for( int i = 0; i < ( int ) _3N; i++ ) {
+				for( unsigned int i = 0; i < _3N; i++ ) {
 
 					//if sub-space do Q*c
 					//else do a'-Q(Q^T a') = (I-QQ^T)a'
-					const int ii = i / 3;
-					const int jj = i % 3;
+					const unsigned int ii = i / 3;
+					const unsigned int jj = i % 3;
 					if( !compliment ) {
 						out[ii][jj] = 0.0;
 
-						for( int j = 0; j < _numProjectionVectors; j++ ) {
+						for( unsigned int j = 0; j < _numProjectionVectors; j++ ) {
 							out[ii][jj] += _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 					} else {
-						for( int j = 0; j < _numProjectionVectors; j++ ) {
+						for( unsigned int j = 0; j < _numProjectionVectors; j++ ) {
 							out[ii][jj] -= _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 

@@ -43,7 +43,7 @@ namespace OpenMM {
 			class StepKernel : public LTMD::StepKernel {
 				public:
 					StepKernel( std::string name, const OpenMM::Platform &platform, OpenMM::ReferencePlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
-						data( data ), dynamics( 0 ), constraints( 0 ), masses( 0 ), constraintDistances( 0 ), constraintIndices( 0 ), projectionVectors( 0 ) {
+						data( data ), dynamics( 0 ), masses( 0 ), projectionVectors( 0 ) {
 					}
 					~StepKernel();
 					/**
@@ -63,11 +63,7 @@ namespace OpenMM {
 				private:
 					OpenMM::ReferencePlatform::PlatformData &data;
 					Dynamics *dynamics;
-					ReferenceConstraintAlgorithm *constraints;
 					std::vector<RealOpenMM> masses;
-					RealOpenMM *constraintDistances;
-					int **constraintIndices;
-					int numConstraints;
 					double prevTemp, prevFriction, prevStepSize;
 					//double prevTemp, prevFriction, prevErrorTol;
 					RealOpenMM *projectionVectors;
