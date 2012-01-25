@@ -29,6 +29,7 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include <iostream>
 #include "LTMD/Reference/StepKernel.h"
 #include "openmm/HarmonicAngleForce.h"
 #include "openmm/internal/ContextImpl.h"
@@ -64,10 +65,10 @@ namespace OpenMM {
 			}
 
 			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
-				int numParticles = system.getNumParticles();
+				mParticles = system.getNumParticles();
 				
-				masses.resize( numParticles );
-				for( int i = 0; i < numParticles; ++i ) {
+				masses.resize( mParticles );
+				for( unsigned int i = 0; i < mParticles; ++i ) {
 					masses[i] = static_cast<RealOpenMM>( system.getParticleMass( i ) );
 				}
 				
@@ -89,16 +90,18 @@ namespace OpenMM {
 
 				//projection vectors
 				if( projectionVectors == 0 || projVecChanged ) {
-					unsigned int arraySz = numProjectionVectors * context.getSystem().getNumParticles() * 3;
+					unsigned int arraySz = numProjectionVectors * mParticles * 3;
 					if( projectionVectors == 0 ) {
 						projectionVectors = new RealOpenMM[arraySz];
 					}
 					int index = 0;
-					for( int i = 0; i < ( int ) dProjectionVectors.size(); i++ )
-						for( int j = 0; j < ( int ) dProjectionVectors[i].size(); j++ )
+					for( int i = 0; i < ( int ) dProjectionVectors.size(); i++ ){
+						for( int j = 0; j < ( int ) dProjectionVectors[i].size(); j++ ){
 							for( int k = 0; k < 3; k++ ) {
 								projectionVectors[index++] = static_cast<RealOpenMM>( dProjectionVectors[i][j][k] );
 							}
+						}
+					}
 				}
 
 				if( dynamics == 0 || temperature != prevTemp || friction != prevFriction || stepSize != prevStepSize ) {
@@ -108,7 +111,7 @@ namespace OpenMM {
 					}
 					RealOpenMM tau = static_cast<RealOpenMM>( friction == 0.0 ? 0.0 : 1.0 / friction );
 
-					dynamics = new Dynamics( context.getSystem().getNumParticles(),
+					dynamics = new Dynamics( mParticles,
 											 static_cast<RealOpenMM>( stepSize ),
 											 static_cast<RealOpenMM>( tau ),
 

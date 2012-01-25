@@ -61,6 +61,8 @@ namespace OpenMM {
 					 */
 					void execute( OpenMM::ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType );
 				private:
+					unsigned int mParticles;
+					
 					OpenMM::ReferencePlatform::PlatformData &data;
 					Dynamics *dynamics;
 					std::vector<RealOpenMM> masses;
