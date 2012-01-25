@@ -56,12 +56,12 @@ namespace OpenMM {
 			   --------------------------------------------------------------------------------------- */
 
 			Dynamics::Dynamics( int numberOfAtoms,
-								double deltaT, double tau,
+								double deltaT, const double tau,
 								double temperature,
 								double *projectionVectors,
 								unsigned int numProjectionVectors,
 								double minimumLimit, double maxEig ) :
-				ReferenceDynamics( numberOfAtoms, deltaT, temperature ), _tau( tau ),
+				ReferenceDynamics( numberOfAtoms, deltaT, temperature ), mTau( tau == 0.0 ? 1.0 : tau ),
 				_projectionVectors( projectionVectors ), _numProjectionVectors( numProjectionVectors ),
 				_minimumLimit( minimumLimit ), _maxEig( maxEig )  {
 
@@ -70,16 +70,6 @@ namespace OpenMM {
 				static const char *methodName      = "\nReferenceNMLDynamics::ReferenceNMLDynamics";
 
 				// ---------------------------------------------------------------------------------------
-
-				// insure tau is not zero -- if it is print warning message
-				if( _tau == 0.0 ) {
-					std::stringstream message;
-					message << methodName;
-					message << " input tau value=" << tau << " is invalid -- setting to 1.";
-					SimTKOpenMMLog::printError( message );
-
-					_tau = 1.0;
-				}
 				xPrime.resize( numberOfAtoms );
 				oldPositions.resize( numberOfAtoms );
 				inverseMasses.resize( numberOfAtoms );
@@ -145,7 +135,7 @@ namespace OpenMM {
 					case 1: {
 						// Update the velocity.
 						double deltaT = getDeltaT();
-						double tau = _tau;
+						double tau = mTau;
 						const double vscale = EXP( -deltaT / tau );
 						const double fscale = ( 1 - vscale ) * tau;
 						const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
