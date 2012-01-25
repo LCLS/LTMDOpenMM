@@ -162,54 +162,8 @@ namespace OpenMM {
 						LinearMinimize( currentPE, atomCoordinates, forces, masses );
 						break;
 					}
-
-					//quadratic correction if simple minimizer new PE value is greater than the old PE value
 					case 4: {
-						//We assume the move direction is still in xPrime
-
-						//Get quadratic 'line search' value
-						double lambda = ( double )( 1.0 / _maxEig );
-						double oldLambda = lambda;
-
-						//Solve quadratic for slope at new point
-						//get slope dPE/d\lambda for quadratic, just equal to minus dot product of 'proposed position move' and forces (=-\nabla PE)
-						double newSlope = 0.0;
-						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							for( int jj = 0; jj < 3; jj++ ) {
-								newSlope -= xPrime[ii][jj] * forces[ii][jj] * inverseMasses[ii];
-							}
-						}
-
-						//solve for minimum for quadratic fit using two PE vales and the slope with /lambda=0
-						//for 'newSlope' use PE=a(\lambda_e-\lambda)^2+b(\lambda_e-\lambda)+c, \lambda_e is 1/maxEig.
-						double a, b;
-
-						//a = (((currentPE - lastPE) / lambda - lastSlope) / lambda);
-						a = ( ( ( lastPE - currentPE ) / oldLambda + newSlope ) / oldLambda );
-						//b = lastSlope;
-						b = -newSlope;
-
-						//calculate \lambda at minimum of quadratic fit
-						if( a != 0.0 ) {
-							//lambda = -b / (2 * a);
-							lambda = b / ( 2 * a ) + oldLambda;
-						} else {
-							lambda = ( double )( oldLambda / 2.0 );
-						}
-
-						//test if lambda negative, if so just use smaller lambda
-						if( lambda <= 0.0 ) {
-							lambda = ( double )( oldLambda / 2.0 );
-						}
-
-						//Remove previous position update (-oldLambda) and add new move (lambda)
-						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							const double factor = inverseMasses[ii] * ( lambda - oldLambda );
-
-							atomCoordinates[ii][0] += factor * xPrime[ii][0];
-							atomCoordinates[ii][1] += factor * xPrime[ii][1];
-							atomCoordinates[ii][2] += factor * xPrime[ii][2];
-						}
+						QuadraticMinimize( currentPE, atomCoordinates, forces );
 						break;
 					}
 					case 5: {
@@ -284,8 +238,48 @@ namespace OpenMM {
 				}
 			}
 			
-			void Dynamics::QuadraticMinimize() {
+			void Dynamics::QuadraticMinimize( const double energy, VectorArray& coordinates, const VectorArray& forces ) {
+				//Get quadratic 'line search' value
+				double lambda = 1.0 / _maxEig;
+				const double oldLambda = lambda;
 				
+				//Solve quadratic for slope at new point
+				//get slope dPE/d\lambda for quadratic, just equal to minus dot product of 'proposed position move' and forces (=-\nabla PE)
+				double newSlope = 0.0;
+				
+				const unsigned int xatoms = xPrime.size();
+				for( unsigned int i = 0; i < xatoms; i++ ) {
+					for( unsigned int j = 0; j < 3; j++ ) {
+						newSlope -= xPrime[i][j] * forces[i][j] * inverseMasses[i];
+					}
+				}
+				
+				//solve for minimum for quadratic fit using two PE vales and the slope with /lambda=0
+				//for 'newSlope' use PE=a(\lambda_e-\lambda)^2+b(\lambda_e-\lambda)+c, \lambda_e is 1/maxEig.
+				const double a = ( ( ( lastPE - energy ) / oldLambda + newSlope ) / oldLambda );
+				const double b = -newSlope;
+				
+				//calculate \lambda at minimum of quadratic fit
+				if( a != 0.0 ) {
+					lambda = b / ( 2 * a ) + oldLambda;
+				} else {
+					lambda = oldLambda / 2.0;
+				}
+				
+				//test if lambda negative, if so just use smaller lambda
+				if( lambda <= 0.0 ) {
+					lambda = oldLambda / 2.0;
+				}
+				
+				//Remove previous position update (-oldLambda) and add new move (lambda)
+				const unsigned int atoms = coordinates.size();
+				for( unsigned int i = 0; i < atoms; i++ ) {
+					const double factor = inverseMasses[i] * ( lambda - oldLambda );
+					
+					coordinates[i][0] += factor * xPrime[i][0];
+					coordinates[i][1] += factor * xPrime[i][1];
+					coordinates[i][2] += factor * xPrime[i][2];
+				}
 			}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

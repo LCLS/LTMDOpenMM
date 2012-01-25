@@ -104,7 +104,7 @@ namespace OpenMM {
 					void RejectStep( VectorArray& coordinates );
 
 					void LinearMinimize( const double energy, VectorArray& coordinates, const VectorArray& forces, const DoubleArray& masses );
-					void QuadraticMinimize();
+					void QuadraticMinimize( const double energy, VectorArray& coordinates, const VectorArray& forces );
 			};
 		}
 	}
