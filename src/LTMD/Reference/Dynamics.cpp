@@ -71,55 +71,21 @@ namespace OpenMM {
 				// ---------------------------------------------------------------------------------------
 
 				// insure tau is not zero -- if it is print warning message
-
 				if( _tau == 0.0 ) {
-
 					std::stringstream message;
 					message << methodName;
 					message << " input tau value=" << tau << " is invalid -- setting to 1.";
 					SimTKOpenMMLog::printError( message );
 
 					_tau = 1.0;
-
 				}
 				xPrime.resize( numberOfAtoms );
 				oldPositions.resize( numberOfAtoms );
 				inverseMasses.resize( numberOfAtoms );
 			}
 
-			/**---------------------------------------------------------------------------------------
-
-			   ReferenceNMLDynamics destructor
-
-			   --------------------------------------------------------------------------------------- */
-
 			Dynamics::~Dynamics( ) {
 
-				// ---------------------------------------------------------------------------------------
-
-				// static const char* methodName = "\nReferenceNMLDynamics::~ReferenceNMLDynamics";
-
-				// ---------------------------------------------------------------------------------------
-
-			}
-
-			/**---------------------------------------------------------------------------------------
-
-			   Get tau
-
-			   @return tau
-
-			   --------------------------------------------------------------------------------------- */
-
-			double Dynamics::getTau( void ) const {
-
-				// ---------------------------------------------------------------------------------------
-
-				// static const char* methodName  = "\nReferenceNMLDynamics::getTau";
-
-				// ---------------------------------------------------------------------------------------
-
-				return _tau;
 			}
 
 			void Dynamics::SetMaxEigenValue( double value ) {
@@ -141,9 +107,9 @@ namespace OpenMM {
 
 			   --------------------------------------------------------------------------------------- */
 
-			int Dynamics::update( int numberOfAtoms, std::vector<RealVec>& atomCoordinates,
-								  std::vector<RealVec>& velocities,
-								  std::vector<RealVec>& forces, std::vector<double>& masses,
+			int Dynamics::update( int numberOfAtoms, VectorArray& atomCoordinates,
+								  VectorArray& velocities,
+								  VectorArray& forces, DoubleArray& masses,
 								  const double currentPE, const int stepType ) {
 
 				// ---------------------------------------------------------------------------------------
@@ -153,7 +119,6 @@ namespace OpenMM {
 				// ---------------------------------------------------------------------------------------
 
 				// first-time-through initialization
-
 				if( getTimeStep() == 0 ) {
 					std::stringstream message;
 					message << methodName;
@@ -189,11 +154,9 @@ namespace OpenMM {
 												   noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() * SQRT( inverseMasses[i] );
 
 						// Project resulting velocities onto subspace
-
 						subspaceProjection( velocities, velocities, numberOfAtoms, masses, inverseMasses, false );
 
 						// Update the positions.
-
 						for( int i = 0; i < numberOfAtoms; i++ )
 							for( int j = 0; j < 3; j++ ) {
 								atomCoordinates[i][j] += deltaT * velocities[i][j];
@@ -202,7 +165,6 @@ namespace OpenMM {
 					}
 					case 2:
 						// Do nothing.
-
 						break;
 
 						//simple minimizer step, assume quadratic line search value is correct
@@ -313,11 +275,11 @@ namespace OpenMM {
 // Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 // Take 'array' as input, 'outArray' as output (may be the same vector).
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			void Dynamics::subspaceProjection( std::vector<RealVec>& array,
-											   std::vector<RealVec>& outArray,
+			void Dynamics::subspaceProjection( VectorArray& array,
+											   VectorArray& outArray,
 											   int numberOfAtoms,
-											   std::vector<double>& scale,
-											   std::vector<double>& inverseScale,
+											   DoubleArray& scale,
+											   DoubleArray& inverseScale,
 											   bool projectIntoComplement ) {
 
 				//If 'array' and 'outArray are not the same array
@@ -360,7 +322,7 @@ namespace OpenMM {
 				//so tmpC_i = \sum_{j=1}^n Q_{j,i} outArray_j
 				//Q_{j,i}=_projectionVectors[j * numberOfAtoms * 3 + i]
 
-				std::vector<double> tmpC( _numProjectionVectors );
+				DoubleArray tmpC( _numProjectionVectors );
 				for( int i = 0; i < ( int ) _numProjectionVectors; i++ ) { //over all eigenvectors
 
 					tmpC[i] = 0.0;  //clear

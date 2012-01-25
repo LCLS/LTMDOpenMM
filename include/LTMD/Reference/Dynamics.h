@@ -40,11 +40,13 @@
 namespace OpenMM {
 	namespace LTMD {
 		namespace Reference {
+			typedef std::vector<double> DoubleArray;
+			typedef std::vector<OpenMM::RealVec> VectorArray;
+			
 			class Dynamics : public ReferenceDynamics {
 				private:
-					std::vector<OpenMM::RealVec> xPrime;
-					std::vector<OpenMM::RealVec> oldPositions;
-					std::vector<double> inverseMasses;
+					VectorArray xPrime, oldPositions;
+					DoubleArray inverseMasses;
 
 					double _tau;
 					double *_projectionVectors;
@@ -68,23 +70,7 @@ namespace OpenMM {
 							  double minimumLimit, double maxEig
 							);
 
-					/**---------------------------------------------------------------------------------------
-
-					   Destructor
-
-					   --------------------------------------------------------------------------------------- */
-
 					~Dynamics( );
-
-					/**---------------------------------------------------------------------------------------
-
-					   Get tau
-
-					   @return tau
-
-					   --------------------------------------------------------------------------------------- */
-
-					double getTau( void ) const;
 
 					void SetMaxEigenValue( double value );
 
@@ -102,21 +88,13 @@ namespace OpenMM {
 
 					   --------------------------------------------------------------------------------------- */
 
-					int update( int numberOfAtoms, std::vector<OpenMM::RealVec>& atomCoordinates,
-								std::vector<OpenMM::RealVec>& velocities, std::vector<OpenMM::RealVec>& forces,
-								std::vector<double>& masses, const double currentPE, const int stepType );
+					int update( int numberOfAtoms, VectorArray& atomCoordinates, VectorArray& velocities, VectorArray& forces, DoubleArray& masses, const double currentPE, const int stepType );
 
 					/**---------------------------------------------------------------------------------------
 					 Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 					 Take 'array' as input, 'outArray' as output (may be the same vector).
 					 ----------------------------------------------------------------------------------------- */
-					void subspaceProjection( std::vector<OpenMM::RealVec>& arrayParam,
-											 std::vector<OpenMM::RealVec>& outArrayParam,
-											 int numberOfAtoms,
-											 std::vector<double>& scale,
-											 std::vector<double>& inverseScale,
-											 bool projectIntoComplement );
-
+					void subspaceProjection( VectorArray& arrayParam, VectorArray& outArrayParam, int numberOfAtoms, DoubleArray& scale, DoubleArray& inverseScale, bool projectIntoComplement );
 			};
 		}
 	}
