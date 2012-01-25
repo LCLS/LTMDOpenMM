@@ -145,7 +145,7 @@ namespace OpenMM {
 												   noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() * std::sqrt( inverseMasses[i] );
 
 						// Project resulting velocities onto subspace
-						subspaceProjection( velocities, velocities, numberOfAtoms, masses, inverseMasses, false );
+						subspaceProjection( velocities, velocities, masses, inverseMasses, false );
 
 						// Update the positions.
 						for( int i = 0; i < numberOfAtoms; i++ )
@@ -165,7 +165,7 @@ namespace OpenMM {
 						lastPE = currentPE;
 
 						//project forces into complement space, put in xPrime
-						subspaceProjection( forces, xPrime, numberOfAtoms, inverseMasses, masses, true );
+						subspaceProjection( forces, xPrime, inverseMasses, masses, true );
 						if( minimizerScale != 1.0 )
 							for( int ii = 0; ii < numberOfAtoms; ii++ )
 								for( int jj = 0; jj < 3; jj++ ) {
@@ -268,16 +268,17 @@ namespace OpenMM {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 			void Dynamics::subspaceProjection( VectorArray& array,
 											   VectorArray& outArray,
-											   int numberOfAtoms,
 											   DoubleArray& scale,
 											   DoubleArray& inverseScale,
 											   bool projectIntoComplement ) {
 
+				const unsigned int AtomCount = array.size();
+	
 				//If 'array' and 'outArray are not the same array
 				//copy 'array' into outArray
-				const unsigned int _3N = numberOfAtoms * 3;
+				const unsigned int _3N = AtomCount * 3;
 				if( &array != &outArray ) {
-					for( unsigned int i = 0; i < numberOfAtoms; i++ ) {
+					for( unsigned int i = 0; i < AtomCount; i++ ) {
 						for( unsigned int j = 0; j < 3; j++ ) {
 							outArray[i][j] = array[i][j];
 						}
@@ -292,7 +293,7 @@ namespace OpenMM {
 				//
 				//a'=M^{-1/2}*f for forces, OR a'= M^{1/2}*x for positions
 				//
-				for( int i = 0; i < numberOfAtoms; i++ ) {        //N loops
+				for( int i = 0; i < AtomCount; i++ ) {        //N loops
 					double  weight = std::sqrt( scale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {         //times 3 loops
 						outArray[i][j] *= weight;
@@ -355,7 +356,7 @@ namespace OpenMM {
 				//
 				//a'''=M^{1/2}*a'' or a'''=M^{-1/2}*a''
 				//
-				for( int i = 0; i < numberOfAtoms; i++ ) {
+				for( int i = 0; i < AtomCount; i++ ) {
 					double  unweight = std::sqrt( inverseScale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {
 						outArray[i][j] *= unweight;
