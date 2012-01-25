@@ -133,25 +133,34 @@ namespace OpenMM {
 
 				switch( stepType ) {
 					case 1: {
-						// Update the velocity.
-						double deltaT = getDeltaT();
-						double tau = mTau;
-						const double vscale = EXP( -deltaT / tau );
-						const double fscale = ( 1 - vscale ) * tau;
+						// Calculate Constants
+						const double deltaT = getDeltaT();
+						const double vscale = EXP( -deltaT / mTau );
+						const double fscale = ( 1 - vscale ) * mTau;
 						const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
-						for( int i = 0; i < numberOfAtoms; i++ )
-							for( int j = 0; j < 3; j++ )
-								velocities[i][j] = vscale * velocities[i][j] + fscale * forces[i][j] * inverseMasses[i] +
-												   noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() * std::sqrt( inverseMasses[i] );
+
+						// Update the velocity.
+						const unsigned int vatoms = velocities.size();
+						for( unsigned int i = 0; i < vatoms; i++ ){
+							for( unsigned int j = 0; j < 3; j++ ) {
+								const double velocity = vscale * velocities[i][j];
+								const double force = fscale * forces[i][j];
+								const double noise = noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber();
+								
+								velocities[i][j] = velocity + force * inverseMasses[i] + noise * std::sqrt( inverseMasses[i] );
+							}
+						}
 
 						// Project resulting velocities onto subspace
 						subspaceProjection( velocities, velocities, masses, inverseMasses, false );
 
 						// Update the positions.
-						for( int i = 0; i < numberOfAtoms; i++ )
-							for( int j = 0; j < 3; j++ ) {
-								atomCoordinates[i][j] += deltaT * velocities[i][j];
-							}
+						const unsigned int atoms = atomCoordinates.size();
+						for( unsigned int i = 0; i < atoms; i++ ){
+							atomCoordinates[i][0] += deltaT * velocities[i][0];
+							atomCoordinates[i][1] += deltaT * velocities[i][1];
+							atomCoordinates[i][2] += deltaT * velocities[i][2];
+						}
 						break;
 					}
 					case 2:{
