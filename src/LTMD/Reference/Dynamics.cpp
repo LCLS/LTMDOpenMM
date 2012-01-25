@@ -60,19 +60,18 @@ namespace OpenMM {
 								double temperature,
 								double *projectionVectors,
 								unsigned int numProjectionVectors,
-								double minimumLimit, double maxEig ) :
+								double maxEig ) :
 				ReferenceDynamics( numberOfAtoms, deltaT, temperature ), mTau( tau == 0.0 ? 1.0 : tau ),
-				_projectionVectors( projectionVectors ), _numProjectionVectors( numProjectionVectors ),
-				_minimumLimit( minimumLimit ), _maxEig( maxEig )  {
+				mAtomCount( numberOfAtoms ), _projectionVectors( projectionVectors ), _numProjectionVectors( numProjectionVectors ), _maxEig( maxEig )  {
 
 				// ---------------------------------------------------------------------------------------
 
 				static const char *methodName      = "\nReferenceNMLDynamics::ReferenceNMLDynamics";
 
 				// ---------------------------------------------------------------------------------------
-				xPrime.resize( numberOfAtoms );
-				oldPositions.resize( numberOfAtoms );
-				inverseMasses.resize( numberOfAtoms );
+				xPrime.resize( mAtomCount );
+				oldPositions.resize( mAtomCount );
+				inverseMasses.resize( mAtomCount );
 			}
 
 			Dynamics::~Dynamics( ) {
@@ -98,7 +97,7 @@ namespace OpenMM {
 
 			   --------------------------------------------------------------------------------------- */
 
-			int Dynamics::update( int numberOfAtoms, VectorArray& atomCoordinates,
+			int Dynamics::update( VectorArray& atomCoordinates,
 								  VectorArray& velocities,
 								  VectorArray& forces, DoubleArray& masses,
 								  const double currentPE, const int stepType ) {
@@ -108,7 +107,7 @@ namespace OpenMM {
 				static const char *methodName      = "\nReferenceNMLDynamics::update";
 
 				// ---------------------------------------------------------------------------------------
-
+				
 				// first-time-through initialization
 				if( getTimeStep() == 0 ) {
 					std::stringstream message;
@@ -116,7 +115,7 @@ namespace OpenMM {
 					int errors = 0;
 
 					// invert masses
-					for( int ii = 0; ii < numberOfAtoms; ii++ ) {
+					for( int ii = 0; ii < mAtomCount; ii++ ) {
 						if( masses[ii] <= 0.0 ) {
 							message << "mass at atom index=" << ii << " (" << masses[ii] << ") is <= 0" << std::endl;
 							errors++;
@@ -171,8 +170,7 @@ namespace OpenMM {
 				const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
 				
 				// Update the velocity.
-				const unsigned int vatoms = velocities.size();
-				for( unsigned int i = 0; i < vatoms; i++ ){
+				for( unsigned int i = 0; i < mAtomCount; i++ ){
 					for( unsigned int j = 0; j < 3; j++ ) {
 						const double velocity = vscale * velocities[i][j];
 						const double force = fscale * forces[i][j];
@@ -183,11 +181,10 @@ namespace OpenMM {
 				}
 				
 				// Project resulting velocities onto subspace
-				subspaceProjection( velocities, velocities, masses, inverseMasses, false );
+				Project( velocities, velocities, masses, inverseMasses, false );
 				
 				// Update the positions.
-				const unsigned int atoms = coordinates.size();
-				for( unsigned int i = 0; i < atoms; i++ ){
+				for( unsigned int i = 0; i < mAtomCount; i++ ){
 					coordinates[i][0] += deltaT * velocities[i][0];
 					coordinates[i][1] += deltaT * velocities[i][1];
 					coordinates[i][2] += deltaT * velocities[i][2];
@@ -199,8 +196,7 @@ namespace OpenMM {
 			}
 			
 			void Dynamics::AcceptStep( VectorArray& coordinates ) {
-				const unsigned int atoms = oldPositions.size();
-				for( unsigned int i = 0; i < atoms; i++ ) {
+				for( unsigned int i = 0; i < mAtomCount; i++ ) {
 					oldPositions[i][0] = coordinates[i][0];
 					oldPositions[i][1] = coordinates[i][1];
 					oldPositions[i][2] = coordinates[i][2];
@@ -209,8 +205,7 @@ namespace OpenMM {
 			}
 			
 			void Dynamics::RejectStep( VectorArray& coordinates ) {
-				const unsigned int atoms = coordinates.size();
-				for( int i = 0; i < atoms; i++ ) {
+				for( int i = 0; i < mAtomCount; i++ ) {
 					coordinates[i][0] = oldPositions[i][0];
 					coordinates[i][1] = oldPositions[i][1];
 					coordinates[i][2] = oldPositions[i][2];
@@ -223,12 +218,11 @@ namespace OpenMM {
 				lastPE = energy;
 				
 				//project forces into complement space, put in xPrime
-				subspaceProjection( forces, xPrime, inverseMasses, masses, true );
+				Project( forces, xPrime, inverseMasses, masses, true );
 				
 				// Scale xPrime if needed
 				if( minimizerScale != 1.0 ){
-					const unsigned int atoms = xPrime.size();
-					for( unsigned int i = 0; i < atoms; i++ ){
+					for( unsigned int i = 0; i < mAtomCount; i++ ){
 						xPrime[i][0] *= minimizerScale;
 						xPrime[i][1] *= minimizerScale;
 						xPrime[i][2] *= minimizerScale;
@@ -237,8 +231,7 @@ namespace OpenMM {
 				
 				//Add minimizer position update to atomCoordinates
 				// with 'line search guess = 1/maxEig (the solution if the system was quadratic)
-				const unsigned int atoms = coordinates.size();
-				for( unsigned int i = 0; i < atoms; i++ ) {
+				for( unsigned int i = 0; i < mAtomCount; i++ ) {
 					double factor = inverseMasses[i] / _maxEig;
 					
 					coordinates[i][0] += factor * xPrime[i][0];
@@ -256,8 +249,7 @@ namespace OpenMM {
 				//get slope dPE/d\lambda for quadratic, just equal to minus dot product of 'proposed position move' and forces (=-\nabla PE)
 				double newSlope = 0.0;
 				
-				const unsigned int xatoms = xPrime.size();
-				for( unsigned int i = 0; i < xatoms; i++ ) {
+				for( unsigned int i = 0; i < mAtomCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						newSlope -= xPrime[i][j] * forces[i][j] * inverseMasses[i];
 					}
@@ -281,8 +273,7 @@ namespace OpenMM {
 				}
 				
 				//Remove previous position update (-oldLambda) and add new move (lambda)
-				const unsigned int atoms = coordinates.size();
-				for( unsigned int i = 0; i < atoms; i++ ) {
+				for( unsigned int i = 0; i < mAtomCount; i++ ) {
 					const double factor = inverseMasses[i] * ( lambda - oldLambda );
 					
 					coordinates[i][0] += factor * xPrime[i][0];
@@ -295,39 +286,33 @@ namespace OpenMM {
 // Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 // Take 'array' as input, 'outArray' as output (may be the same vector).
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			void Dynamics::subspaceProjection( const VectorArray& in,
-											   VectorArray& out,
-											   const DoubleArray& scale,
-											   const DoubleArray& inverseScale,
-											   const bool projectIntoComplement ) {
-
-				const unsigned int AtomCount = in.size();
-	
-				//If 'array' and 'outArray are not the same array
-				//copy 'array' into outArray
-				const unsigned int _3N = AtomCount * 3;
+			void CopyArray( const VectorArray& in, VectorArray& out ){
 				if( &in != &out ) {
-					for( unsigned int i = 0; i < AtomCount; i++ ) {
-						for( unsigned int j = 0; j < 3; j++ ) {
-							out[i][j] = in[i][j];
-						}
+					const unsigned int size = in.size();
+					for( unsigned int i = 0; i < size; i++ ){
+						out[i][0] = in[i][0];
+						out[i][1] = in[i][1];
+						out[i][2] = in[i][2];
 					}
 				}
+			}
 
-				//~~~~We need to calculate M^{1/2}QQ^TM^{-1/2}force or M^{-1/2}QQ^TM^{1/2}positions~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-				//First we weight the array by multiplying by
-				//the square-root of the atomic masses for positions
-				//or the the inverse of the square-root of the atomic masses for forces.
-				//
-				//a'=M^{-1/2}*f for forces, OR a'= M^{1/2}*x for positions
-				//
-				for( int i = 0; i < AtomCount; i++ ) {        //N loops
-					double  weight = std::sqrt( scale[i] );
-					for( unsigned int j = 0; j < 3; j++ ) {         //times 3 loops
-						out[i][j] *= weight;
-					}
+			void ScaleArray( const DoubleArray& scale, VectorArray& out ){
+				const unsigned int size = out.size();
+				for( unsigned int i = 0; i < size; i++ ){
+					const double weight = std::sqrt( scale[i] );
+				
+					out[i][0] *= weight;
+					out[i][1] *= weight;
+					out[i][2] *= weight;
 				}
+			}
+			
+			void Dynamics::Project( const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool compliment ) {
+				CopyArray( in, out );
+				ScaleArray( scale, out );
+
+				const unsigned int _3N = in.size() * 3;
 
 				//Project onto mode space by taking the matrix product of
 				//the transpose of the eigenvectors Q with the array.
@@ -344,11 +329,10 @@ namespace OpenMM {
 				//Q_{j,i}=_projectionVectors[j * numberOfAtoms * 3 + i]
 
 				DoubleArray tmpC( _numProjectionVectors );
-				for( int i = 0; i < ( int ) _numProjectionVectors; i++ ) { //over all eigenvectors
+				for( int i = 0; i < ( int ) _numProjectionVectors; i++ ) {
 
-					tmpC[i] = 0.0;  //clear
-
-					for( int j = 0; j < ( int ) _3N; j++ ) { //over each element in the vector
+					tmpC[i] = 0.0;
+					for( int j = 0; j < ( int ) _3N; j++ ) {
 						tmpC[i] += _projectionVectors[j  + i * _3N] * out[j / 3][j % 3];
 					}
 				}
@@ -358,20 +342,20 @@ namespace OpenMM {
 				//so outArray_i  = \sum_{j=1}^n Q_{i,j} tmpC_i
 
 				//find product
-				for( int i = 0; i < ( int ) _3N; i++ ) { //over each element in the vector
+				for( int i = 0; i < ( int ) _3N; i++ ) {
 
 					//if sub-space do Q*c
 					//else do a'-Q(Q^T a') = (I-QQ^T)a'
 					const int ii = i / 3;
 					const int jj = i % 3;
-					if( !projectIntoComplement ) {
-						out[ii][jj] = 0.0; //if not complement
+					if( !compliment ) {
+						out[ii][jj] = 0.0;
 
-						for( int j = 0; j < _numProjectionVectors; j++ ) { //over all eigenvectors
+						for( int j = 0; j < _numProjectionVectors; j++ ) {
 							out[ii][jj] += _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 					} else {
-						for( int j = 0; j < _numProjectionVectors; j++ ) { //over all eigenvectors
+						for( int j = 0; j < _numProjectionVectors; j++ ) {
 							out[ii][jj] -= _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 
@@ -379,18 +363,7 @@ namespace OpenMM {
 
 				}
 
-				//Finally we weight the array by multiplying by
-				//the inverse of the square-root of the atomic masses for positions
-				//or the the square-root of the atomic masses for forces.
-				//
-				//a'''=M^{1/2}*a'' or a'''=M^{-1/2}*a''
-				//
-				for( int i = 0; i < AtomCount; i++ ) {
-					double  unweight = std::sqrt( inverseScale[i] );
-					for( unsigned int j = 0; j < 3; j++ ) {
-						out[i][j] *= unweight;
-					}
-				}
+				ScaleArray( inverseScale, out );
 			}
 		}
 	}

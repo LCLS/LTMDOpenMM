@@ -170,7 +170,6 @@ namespace OpenMM {
 											 static_cast<RealOpenMM>( temperature ),
 											 projectionVectors,
 											 numProjectionVectors,
-											 static_cast<RealOpenMM>( minimumLimit ),
 											 static_cast<RealOpenMM>( maxEig ) );
 
 					std::vector<ReferenceCCMAAlgorithm::AngleInfo> angles;
@@ -184,7 +183,7 @@ namespace OpenMM {
 				//for minimization quadratic fit we need the potential energy
 				RealOpenMM currentPE2 = static_cast<RealOpenMM>( currentPE );
 				dynamics->SetMaxEigenValue( maxEig );
-				dynamics->update( context.getSystem().getNumParticles(), posData, velData, forceData, masses, currentPE2, stepType );
+				dynamics->update( posData, velData, forceData, masses, currentPE2, stepType );
 				//update at dynamic step 2
 				if( stepType == 2 ) {
 					data.time += stepSize;

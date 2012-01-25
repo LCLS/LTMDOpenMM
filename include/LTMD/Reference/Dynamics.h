@@ -45,10 +45,12 @@ namespace OpenMM {
 			
 			class Dynamics : public ReferenceDynamics {
 				private:
+					const double mTau;
+					const unsigned int mAtomCount;
+					
 					VectorArray xPrime, oldPositions;
 					DoubleArray inverseMasses;
 
-					const double mTau;
 					double *_projectionVectors;
 					unsigned int _numProjectionVectors;
 					double _minimumLimit, _maxEig;
@@ -67,7 +69,7 @@ namespace OpenMM {
 
 					Dynamics( int numberOfAtoms, double deltaT, double tau, double temperature,
 							  double *projectionVectors, unsigned int numProjectionVectors,
-							  double minimumLimit, double maxEig
+							  double maxEig
 							);
 
 					~Dynamics( );
@@ -88,14 +90,14 @@ namespace OpenMM {
 
 					   --------------------------------------------------------------------------------------- */
 					
-					int update( int numberOfAtoms, VectorArray& atomCoordinates, VectorArray& velocities, VectorArray& forces, DoubleArray& masses, const double currentPE, const int stepType );
+					int update( VectorArray& atomCoordinates, VectorArray& velocities, VectorArray& forces, DoubleArray& masses, const double currentPE, const int stepType );
 
 				private:
 					/**---------------------------------------------------------------------------------------
 					 Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 					 Take 'array' as input, 'outArray' as output (may be the same vector).
 					 ----------------------------------------------------------------------------------------- */
-					void subspaceProjection( const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool projectIntoComplement );
+					void Project( const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool compliment );
 
 					void Integrate( VectorArray& coordinates, VectorArray& velocities, const VectorArray& forces, const DoubleArray& masses );
 					void UpdateTime();
