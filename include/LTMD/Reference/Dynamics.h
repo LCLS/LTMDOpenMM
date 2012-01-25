@@ -95,7 +95,7 @@ namespace OpenMM {
 					 Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 					 Take 'array' as input, 'outArray' as output (may be the same vector).
 					 ----------------------------------------------------------------------------------------- */
-					void subspaceProjection( VectorArray& arrayParam, VectorArray& outArrayParam, DoubleArray& scale, DoubleArray& inverseScale, bool projectIntoComplement );
+					void subspaceProjection( const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool projectIntoComplement );
 
 					void Integrate();
 					void UpdateTime();
@@ -103,7 +103,7 @@ namespace OpenMM {
 					void AcceptStep( VectorArray& coordinates );
 					void RejectStep( VectorArray& coordinates );
 
-					void LinearMinimize();
+					void LinearMinimize( const double energy, VectorArray& coordinates, const VectorArray& forces, const DoubleArray& masses );
 					void QuadraticMinimize();
 			};
 		}

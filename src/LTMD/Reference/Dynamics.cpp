@@ -158,35 +158,8 @@ namespace OpenMM {
 						UpdateTime();
 						break;
 					}
-						//simple minimizer step, assume quadratic line search value is correct
-						//accept move if new PE < old PE
 					case 3: {
-						//save current PE in case quadratic required
-						lastPE = currentPE;
-
-						//project forces into complement space, put in xPrime
-						subspaceProjection( forces, xPrime, inverseMasses, masses, true );
-
-						// Scale xPrime if needed
-						if( minimizerScale != 1.0 ){
-							const unsigned int atoms = xPrime.size();
-							for( unsigned int i = 0; i < atoms; i++ ){
-								xPrime[i][0] *= minimizerScale;
-								xPrime[i][1] *= minimizerScale;
-								xPrime[i][2] *= minimizerScale;
-							}
-						}
-
-						//Add minimizer position update to atomCoordinates
-						// with 'line search guess = 1/maxEig (the solution if the system was quadratic)
-						const unsigned int atoms = atomCoordinates.size();
-						for( unsigned int i = 0; i < atoms; i++ ) {
-							double factor = inverseMasses[i] / _maxEig;
-
-							atomCoordinates[i][0] += factor * xPrime[i][0];
-							atomCoordinates[i][1] += factor * xPrime[i][1];
-							atomCoordinates[i][2] += factor * xPrime[i][2];
-						}
+						LinearMinimize( currentPE, atomCoordinates, forces, masses );
 						break;
 					}
 
@@ -282,8 +255,33 @@ namespace OpenMM {
 				minimizerScale *= 0.25;
 			}
 			
-			void Dynamics::LinearMinimize() {
+			void Dynamics::LinearMinimize( const double energy, VectorArray& coordinates, const VectorArray& forces, const DoubleArray& masses ) {
+				//save current PE in case quadratic required
+				lastPE = energy;
 				
+				//project forces into complement space, put in xPrime
+				subspaceProjection( forces, xPrime, inverseMasses, masses, true );
+				
+				// Scale xPrime if needed
+				if( minimizerScale != 1.0 ){
+					const unsigned int atoms = xPrime.size();
+					for( unsigned int i = 0; i < atoms; i++ ){
+						xPrime[i][0] *= minimizerScale;
+						xPrime[i][1] *= minimizerScale;
+						xPrime[i][2] *= minimizerScale;
+					}
+				}
+				
+				//Add minimizer position update to atomCoordinates
+				// with 'line search guess = 1/maxEig (the solution if the system was quadratic)
+				const unsigned int atoms = coordinates.size();
+				for( unsigned int i = 0; i < atoms; i++ ) {
+					double factor = inverseMasses[i] / _maxEig;
+					
+					coordinates[i][0] += factor * xPrime[i][0];
+					coordinates[i][1] += factor * xPrime[i][1];
+					coordinates[i][2] += factor * xPrime[i][2];
+				}
 			}
 			
 			void Dynamics::QuadraticMinimize() {
@@ -294,21 +292,21 @@ namespace OpenMM {
 // Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
 // Take 'array' as input, 'outArray' as output (may be the same vector).
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-			void Dynamics::subspaceProjection( VectorArray& array,
-											   VectorArray& outArray,
-											   DoubleArray& scale,
-											   DoubleArray& inverseScale,
-											   bool projectIntoComplement ) {
+			void Dynamics::subspaceProjection( const VectorArray& in,
+											   VectorArray& out,
+											   const DoubleArray& scale,
+											   const DoubleArray& inverseScale,
+											   const bool projectIntoComplement ) {
 
-				const unsigned int AtomCount = array.size();
+				const unsigned int AtomCount = in.size();
 	
 				//If 'array' and 'outArray are not the same array
 				//copy 'array' into outArray
 				const unsigned int _3N = AtomCount * 3;
-				if( &array != &outArray ) {
+				if( &in != &out ) {
 					for( unsigned int i = 0; i < AtomCount; i++ ) {
 						for( unsigned int j = 0; j < 3; j++ ) {
-							outArray[i][j] = array[i][j];
+							out[i][j] = in[i][j];
 						}
 					}
 				}
@@ -324,7 +322,7 @@ namespace OpenMM {
 				for( int i = 0; i < AtomCount; i++ ) {        //N loops
 					double  weight = std::sqrt( scale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {         //times 3 loops
-						outArray[i][j] *= weight;
+						out[i][j] *= weight;
 					}
 				}
 
@@ -348,7 +346,7 @@ namespace OpenMM {
 					tmpC[i] = 0.0;  //clear
 
 					for( int j = 0; j < ( int ) _3N; j++ ) { //over each element in the vector
-						tmpC[i] += _projectionVectors[j  + i * _3N] * outArray[j / 3][j % 3];
+						tmpC[i] += _projectionVectors[j  + i * _3N] * out[j / 3][j % 3];
 					}
 				}
 
@@ -364,14 +362,14 @@ namespace OpenMM {
 					const int ii = i / 3;
 					const int jj = i % 3;
 					if( !projectIntoComplement ) {
-						outArray[ii][jj] = 0.0; //if not complement
+						out[ii][jj] = 0.0; //if not complement
 
 						for( int j = 0; j < _numProjectionVectors; j++ ) { //over all eigenvectors
-							outArray[ii][jj] += _projectionVectors[i + j * _3N] * tmpC[j];
+							out[ii][jj] += _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 					} else {
 						for( int j = 0; j < _numProjectionVectors; j++ ) { //over all eigenvectors
-							outArray[ii][jj] -= _projectionVectors[i + j * _3N] * tmpC[j];
+							out[ii][jj] -= _projectionVectors[i + j * _3N] * tmpC[j];
 						}
 
 					}
@@ -387,7 +385,7 @@ namespace OpenMM {
 				for( int i = 0; i < AtomCount; i++ ) {
 					double  unweight = std::sqrt( inverseScale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {
-						outArray[i][j] *= unweight;
+						out[i][j] *= unweight;
 					}
 				}
 			}
