@@ -221,7 +221,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 1 );
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).Integrate( *context, *this );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -234,7 +234,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 2 );
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -247,7 +247,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 3 );
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
 			double retVal = context->calcForcesAndEnergy( false, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
@@ -263,7 +263,9 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			context->calcForcesAndEnergy( true, true );
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, energy, 4 );
+			const double lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+			std::cout << "[QuadraticMinimize] Lambda: " << lambda << std::endl;
+			
 			double retVal = context->calcForcesAndEnergy( false, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
@@ -278,7 +280,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 6 );
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).AcceptStep( *context );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -291,7 +293,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).execute( *context, *this, 0.0, 5 );
+			dynamic_cast<StepKernel &>( kernel.getImpl() ).RejectStep( *context );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;

@@ -33,19 +33,24 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "ReferencePlatform.h"
 #include "LTMD/StepKernel.h"
-#include "LTMD/Reference/Dynamics.h"
+
+#include "ReferencePlatform.h"
+#include "SimTKUtilities/RealVec.h"
 
 namespace OpenMM {
 	namespace LTMD {
 		namespace Reference {
+			typedef std::vector<double> DoubleArray;
+			typedef std::vector<OpenMM::RealVec> VectorArray;
+			
 			class StepKernel : public LTMD::StepKernel {
 				public:
 					StepKernel( std::string name, const OpenMM::Platform &platform, OpenMM::ReferencePlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
-						data( data ), dynamics( 0 ), projectionVectors( 0 ) {
+						data( data ) {
 					}
 					~StepKernel();
+
 					/**
 					 * Initialize the kernel, setting up the particle masses.
 					 *
@@ -53,24 +58,23 @@ namespace OpenMM {
 					 * @param integrator the NMLIntegrator this kernel will be used for
 					 */
 					void initialize( const OpenMM::System &system, const Integrator &integrator );
-					/**
-					 * Execute the kernel.
-					 *
-					 * @param context    the context in which to execute this kernel
-					 * @param integrator the NMLIntegrator this kernel is being used for
-					 */
-					void execute( OpenMM::ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType );
+					
+					void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator );
+					void UpdateTime(  const Integrator &integrator );
+
+					void AcceptStep( OpenMM::ContextImpl &context );
+					void RejectStep( OpenMM::ContextImpl &context );
+
+					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
+					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
+				private:
+					void Project( const Integrator &integrator, const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool compliment );
 				private:
 					unsigned int mParticles;
-					DoubleArray mMasses, mInverseMasses;
-					
-					
+					double mPreviousEnergy, mMinimizerScale;
+					DoubleArray mMasses, mInverseMasses, mProjectionVectors;
+					VectorArray mPreviousPositions, mXPrime;
 					OpenMM::ReferencePlatform::PlatformData &data;
-					Dynamics *dynamics;
-					double prevTemp, prevFriction, prevStepSize;
-					//double prevTemp, prevFriction, prevErrorTol;
-					RealOpenMM *projectionVectors;
-
 			};
 		}
 	}
