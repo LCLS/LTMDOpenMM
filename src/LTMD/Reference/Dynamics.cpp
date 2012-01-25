@@ -166,20 +166,26 @@ namespace OpenMM {
 
 						//project forces into complement space, put in xPrime
 						subspaceProjection( forces, xPrime, inverseMasses, masses, true );
-						if( minimizerScale != 1.0 )
-							for( int ii = 0; ii < numberOfAtoms; ii++ )
-								for( int jj = 0; jj < 3; jj++ ) {
-									xPrime[ii][jj] *= minimizerScale;
-								}
+
+						// Scale xPrime if needed
+						if( minimizerScale != 1.0 ){
+							const unsigned int atoms = xPrime.size();
+							for( unsigned int i = 0; i < atoms; i++ ){
+								xPrime[i][0] *= minimizerScale;
+								xPrime[i][1] *= minimizerScale;
+								xPrime[i][2] *= minimizerScale;
+							}
+						}
 
 						//Add minimizer position update to atomCoordinates
 						// with 'line search guess = 1/maxEig (the solution if the system was quadratic)
-						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							double factor = inverseMasses[ii] / _maxEig;
+						const unsigned int atoms = atomCoordinates.size();
+						for( unsigned int i = 0; i < atoms; i++ ) {
+							double factor = inverseMasses[i] / _maxEig;
 
-							atomCoordinates[ii][0] += factor * xPrime[ii][0];
-							atomCoordinates[ii][1] += factor * xPrime[ii][1];
-							atomCoordinates[ii][2] += factor * xPrime[ii][2];
+							atomCoordinates[i][0] += factor * xPrime[i][0];
+							atomCoordinates[i][1] += factor * xPrime[i][1];
+							atomCoordinates[i][2] += factor * xPrime[i][2];
 						}
 						break;
 					}
