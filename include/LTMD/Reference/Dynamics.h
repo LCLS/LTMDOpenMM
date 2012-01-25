@@ -101,7 +101,7 @@ namespace OpenMM {
 					void UpdateTime();
 
 					void AcceptStep( VectorArray& coordinates );
-					void RejectStep();
+					void RejectStep( VectorArray& coordinates );
 
 					void LinearMinimize();
 					void QuadraticMinimize();
