@@ -43,7 +43,7 @@ namespace OpenMM {
 			class StepKernel : public LTMD::StepKernel {
 				public:
 					StepKernel( std::string name, const OpenMM::Platform &platform, OpenMM::ReferencePlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
-						data( data ), dynamics( 0 ), masses( 0 ), projectionVectors( 0 ) {
+						data( data ), dynamics( 0 ), projectionVectors( 0 ) {
 					}
 					~StepKernel();
 					/**
@@ -62,10 +62,11 @@ namespace OpenMM {
 					void execute( OpenMM::ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType );
 				private:
 					unsigned int mParticles;
+					DoubleArray mMasses, mInverseMasses;
+					
 					
 					OpenMM::ReferencePlatform::PlatformData &data;
 					Dynamics *dynamics;
-					std::vector<RealOpenMM> masses;
 					double prevTemp, prevFriction, prevStepSize;
 					//double prevTemp, prevFriction, prevErrorTol;
 					RealOpenMM *projectionVectors;

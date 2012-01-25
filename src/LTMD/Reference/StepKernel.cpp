@@ -67,26 +67,19 @@ namespace OpenMM {
 			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
 				mParticles = system.getNumParticles();
 				
-				masses.resize( mParticles );
+				mMasses.resize( mParticles );
+				mInverseMasses.resize( mParticles );
 				for( unsigned int i = 0; i < mParticles; ++i ) {
-					masses[i] = static_cast<RealOpenMM>( system.getParticleMass( i ) );
+					mMasses[i] = system.getParticleMass( i );
+					mInverseMasses[i] = 1.0f / mMasses[i];
 				}
 				
 				SimTKOpenMMUtilities::setRandomNumberSeed( ( unsigned int ) integrator.getRandomNumberSeed() );
 			}
 
 			void StepKernel::execute( ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType ) {
-				double temperature = integrator.getTemperature();
-				double friction = integrator.getFriction();
-				double stepSize = integrator.getStepSize();
-				const std::vector<std::vector<Vec3> >& dProjectionVectors = integrator.getProjectionVectors();
-				unsigned int numProjectionVectors = integrator.getNumProjectionVectors();
 				bool projVecChanged = integrator.getProjVecChanged();
-				double maxEig = integrator.getMaxEigenvalue();
-
-				std::vector<RealVec>& posData = extractPositions( context );
-				std::vector<RealVec>& velData = extractVelocities( context );
-				std::vector<RealVec>& forceData = extractForces( context );
+				unsigned int numProjectionVectors = integrator.getNumProjectionVectors();
 
 				//projection vectors
 				if( projectionVectors == 0 || projVecChanged ) {
@@ -94,6 +87,9 @@ namespace OpenMM {
 					if( projectionVectors == 0 ) {
 						projectionVectors = new RealOpenMM[arraySz];
 					}
+
+					const std::vector<std::vector<Vec3> >& dProjectionVectors = integrator.getProjectionVectors();
+					
 					int index = 0;
 					for( int i = 0; i < ( int ) dProjectionVectors.size(); i++ ){
 						for( int j = 0; j < ( int ) dProjectionVectors[i].size(); j++ ){
@@ -104,6 +100,9 @@ namespace OpenMM {
 					}
 				}
 
+				double maxEig = integrator.getMaxEigenvalue();
+
+				double temperature = integrator.getTemperature(), friction = integrator.getFriction(), stepSize = integrator.getStepSize();
 				if( dynamics == 0 || temperature != prevTemp || friction != prevFriction || stepSize != prevStepSize ) {
 					// Recreate the computation objects with the new parameters.
 					if( dynamics ) {
@@ -125,13 +124,12 @@ namespace OpenMM {
 					prevStepSize = stepSize;
 				}
 				dynamics->SetMaxEigenValue( maxEig );
-				dynamics->update( posData, velData, forceData, masses, currentPE, stepType );
+				dynamics->update( extractPositions( context ), extractVelocities( context ), extractForces( context ), mMasses, currentPE, stepType );
 				//update at dynamic step 2
 				if( stepType == 2 ) {
 					data.time += stepSize;
 					data.stepCount++;
 				}
-
 			}
 		}
 	}
