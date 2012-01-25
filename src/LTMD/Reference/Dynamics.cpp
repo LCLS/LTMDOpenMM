@@ -133,34 +133,7 @@ namespace OpenMM {
 
 				switch( stepType ) {
 					case 1: {
-						// Calculate Constants
-						const double deltaT = getDeltaT();
-						const double vscale = EXP( -deltaT / mTau );
-						const double fscale = ( 1 - vscale ) * mTau;
-						const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
-
-						// Update the velocity.
-						const unsigned int vatoms = velocities.size();
-						for( unsigned int i = 0; i < vatoms; i++ ){
-							for( unsigned int j = 0; j < 3; j++ ) {
-								const double velocity = vscale * velocities[i][j];
-								const double force = fscale * forces[i][j];
-								const double noise = noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber();
-								
-								velocities[i][j] = velocity + force * inverseMasses[i] + noise * std::sqrt( inverseMasses[i] );
-							}
-						}
-
-						// Project resulting velocities onto subspace
-						subspaceProjection( velocities, velocities, masses, inverseMasses, false );
-
-						// Update the positions.
-						const unsigned int atoms = atomCoordinates.size();
-						for( unsigned int i = 0; i < atoms; i++ ){
-							atomCoordinates[i][0] += deltaT * velocities[i][0];
-							atomCoordinates[i][1] += deltaT * velocities[i][1];
-							atomCoordinates[i][2] += deltaT * velocities[i][2];
-						}
+						Integrate( atomCoordinates, velocities, forces, masses );
 						break;
 					}
 					case 2:{
@@ -190,8 +163,35 @@ namespace OpenMM {
 
 			}
 
-			void Dynamics::Integrate() {
+			void Dynamics::Integrate( VectorArray& coordinates, VectorArray& velocities, const VectorArray& forces, const DoubleArray& masses ) {
+				// Calculate Constants
+				const double deltaT = getDeltaT();
+				const double vscale = EXP( -deltaT / mTau );
+				const double fscale = ( 1 - vscale ) * mTau;
+				const double noisescale = std::sqrt( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
 				
+				// Update the velocity.
+				const unsigned int vatoms = velocities.size();
+				for( unsigned int i = 0; i < vatoms; i++ ){
+					for( unsigned int j = 0; j < 3; j++ ) {
+						const double velocity = vscale * velocities[i][j];
+						const double force = fscale * forces[i][j];
+						const double noise = noisescale * SimTKOpenMMUtilities::getNormallyDistributedRandomNumber();
+						
+						velocities[i][j] = velocity + force * inverseMasses[i] + noise * std::sqrt( inverseMasses[i] );
+					}
+				}
+				
+				// Project resulting velocities onto subspace
+				subspaceProjection( velocities, velocities, masses, inverseMasses, false );
+				
+				// Update the positions.
+				const unsigned int atoms = coordinates.size();
+				for( unsigned int i = 0; i < atoms; i++ ){
+					coordinates[i][0] += deltaT * velocities[i][0];
+					coordinates[i][1] += deltaT * velocities[i][1];
+					coordinates[i][2] += deltaT * velocities[i][2];
+				}
 			}
 			
 			void Dynamics::UpdateTime() {

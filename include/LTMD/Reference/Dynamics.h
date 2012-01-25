@@ -97,7 +97,7 @@ namespace OpenMM {
 					 ----------------------------------------------------------------------------------------- */
 					void subspaceProjection( const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool projectIntoComplement );
 
-					void Integrate();
+					void Integrate( VectorArray& coordinates, VectorArray& velocities, const VectorArray& forces, const DoubleArray& masses );
 					void UpdateTime();
 
 					void AcceptStep( VectorArray& coordinates );
