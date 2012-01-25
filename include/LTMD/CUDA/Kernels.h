@@ -53,18 +53,24 @@ namespace OpenMM {
 					 * @param integrator the LangevinIntegrator this kernel will be used for
 					 */
 					void initialize( const OpenMM::System &system, const Integrator &integrator );
-					/**
-					 * Execute the kernel.
-					 *
-					 * @param context    the context in which to execute this kernel
-					 * @param integrator the LangevinIntegrator this kernel is being used for
-					 */
-					void execute( OpenMM::ContextImpl &context, const Integrator &integrator, const double currentPE, const int stepType );
+
+					void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator );
+					void UpdateTime(  const Integrator &integrator );
+					
+					void AcceptStep( OpenMM::ContextImpl &context );
+					void RejectStep( OpenMM::ContextImpl &context );
+					
+					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
+					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 				private:
+					void ProjectionVectors( const Integrator &integrator );
+				private:
+					unsigned int mParticles;
 					OpenMM::CudaPlatform::PlatformData &data;
 					CUDAStream<float4>* modes;
 					CUDAStream<float>* modeWeights;
 					CUDAStream<float>* minimizerScale;
+					CUDAStream<float>* MinimizeLambda;
 					double lastPE;
 					double prevTemp, prevFriction, prevStepSize;
 			};

@@ -362,7 +362,7 @@ __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, float4 *posqP, floa
 	}
 }
 
-__global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, float lastPE, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float *blockSlope ) {
+__global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, float lastPE, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float *blockSlope, float *lambdaval ) {
 	// Load the block contributions into shared memory.
 	extern __shared__ float slopeBuffer[];
 	for( int block = threadIdx.x; block < gridDim.x; block += blockDim.x ) {
@@ -396,6 +396,8 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	__syncthreads();
 	const Real dlambda = slopeBuffer[0];
 
+	lambdaval[0] = dlambda;
+
 	// Remove previous position update (-oldLambda) and add new move (lambda).
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real factor = velm[atom].w * dlambda;
@@ -416,11 +418,11 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	}
 }
 
-void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer ) {
+void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer, CUDAStream<float>& lambdaval ) {
 	kNMLQuadraticMinimize1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> ( gpu->natoms,
 			gpu->sim.pPosqP, gpu->sim.pVelm4, gpu->sim.pForce4, slopeBuffer._pDevData );
 	LAUNCHERROR( "kNMLQuadraticMinimize1" );
 	kNMLQuadraticMinimize2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.blocks *sizeof( float ) >>> ( gpu->natoms, currentPE,
-			lastPE, 1.0f / maxEigenvalue, gpu->sim.pPosq, gpu->sim.pPosqP, gpu->sim.pVelm4, slopeBuffer._pDevData );
+			lastPE, 1.0f / maxEigenvalue, gpu->sim.pPosq, gpu->sim.pPosqP, gpu->sim.pVelm4, slopeBuffer._pDevData, lambdaval._pDevData );
 	LAUNCHERROR( "kNMLQuadraticMinimize2" );
 }
