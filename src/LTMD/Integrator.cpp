@@ -112,12 +112,14 @@ namespace OpenMM {
 			IntegrateStep();
 			eigVecChanged = false;
 
-			if( minimize( mParameters.MaximumMinimizationIterations ) == mParameters.MaximumMinimizationIterations ){
+			if( minimize( mParameters.MaximumMinimizationIterations ) >= mParameters.MaximumMinimizationIterations ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
-					std::cout << "Force Rediagonalization" << std::endl;
-					DiagonalizeMinimize();
-				}else{
-					return false;
+					if( mParameters.ShouldProtoMolDiagonalize ) {
+						return false;
+					}else{
+						std::cout << "Force Rediagonalization" << std::endl;
+						DiagonalizeMinimize();
+					}
 				}
 			}
 
