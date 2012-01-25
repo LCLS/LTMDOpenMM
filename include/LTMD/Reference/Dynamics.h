@@ -44,13 +44,13 @@ namespace OpenMM {
 				private:
 					std::vector<OpenMM::RealVec> xPrime;
 					std::vector<OpenMM::RealVec> oldPositions;
-					std::vector<RealOpenMM> inverseMasses;
+					std::vector<double> inverseMasses;
 
-					RealOpenMM _tau;
-					RealOpenMM *_projectionVectors;
+					double _tau;
+					double *_projectionVectors;
 					unsigned int _numProjectionVectors;
-					RealOpenMM _minimumLimit, _maxEig;
-					RealOpenMM lastPE, lastSlope, minimizerScale;
+					double _minimumLimit, _maxEig;
+					double lastPE, lastSlope, minimizerScale;
 				public:
 					/**---------------------------------------------------------------------------------------
 
@@ -63,9 +63,9 @@ namespace OpenMM {
 
 					   --------------------------------------------------------------------------------------- */
 
-					Dynamics( int numberOfAtoms, RealOpenMM deltaT, RealOpenMM tau, RealOpenMM temperature,
-							  RealOpenMM *projectionVectors, unsigned int numProjectionVectors,
-							  RealOpenMM minimumLimit, RealOpenMM maxEig
+					Dynamics( int numberOfAtoms, double deltaT, double tau, double temperature,
+							  double *projectionVectors, unsigned int numProjectionVectors,
+							  double minimumLimit, double maxEig
 							);
 
 					/**---------------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ namespace OpenMM {
 
 					   --------------------------------------------------------------------------------------- */
 
-					RealOpenMM getTau( void ) const;
+					double getTau( void ) const;
 
 					void SetMaxEigenValue( double value );
 
@@ -104,7 +104,7 @@ namespace OpenMM {
 
 					int update( int numberOfAtoms, std::vector<OpenMM::RealVec>& atomCoordinates,
 								std::vector<OpenMM::RealVec>& velocities, std::vector<OpenMM::RealVec>& forces,
-								std::vector<RealOpenMM>& masses, const RealOpenMM currentPE, const int stepType );
+								std::vector<double>& masses, const double currentPE, const int stepType );
 
 					/**---------------------------------------------------------------------------------------
 					 Find forces OR positions inside subspace (defined as the span of the 'eigenvectors' Q)
@@ -113,8 +113,8 @@ namespace OpenMM {
 					void subspaceProjection( std::vector<OpenMM::RealVec>& arrayParam,
 											 std::vector<OpenMM::RealVec>& outArrayParam,
 											 int numberOfAtoms,
-											 std::vector<RealOpenMM>& scale,
-											 std::vector<RealOpenMM>& inverseScale,
+											 std::vector<double>& scale,
+											 std::vector<double>& inverseScale,
 											 bool projectIntoComplement );
 
 			};

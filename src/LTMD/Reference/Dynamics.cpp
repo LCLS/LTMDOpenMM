@@ -55,11 +55,11 @@ namespace OpenMM {
 			   --------------------------------------------------------------------------------------- */
 
 			Dynamics::Dynamics( int numberOfAtoms,
-								RealOpenMM deltaT, RealOpenMM tau,
-								RealOpenMM temperature,
-								RealOpenMM *projectionVectors,
+								double deltaT, double tau,
+								double temperature,
+								double *projectionVectors,
 								unsigned int numProjectionVectors,
-								RealOpenMM minimumLimit, RealOpenMM maxEig ) :
+								double minimumLimit, double maxEig ) :
 				ReferenceDynamics( numberOfAtoms, deltaT, temperature ), _tau( tau ),
 				_projectionVectors( projectionVectors ), _numProjectionVectors( numProjectionVectors ),
 				_minimumLimit( minimumLimit ), _maxEig( maxEig )  {
@@ -111,7 +111,7 @@ namespace OpenMM {
 
 			   --------------------------------------------------------------------------------------- */
 
-			RealOpenMM Dynamics::getTau( void ) const {
+			double Dynamics::getTau( void ) const {
 
 				// ---------------------------------------------------------------------------------------
 
@@ -143,8 +143,8 @@ namespace OpenMM {
 
 			int Dynamics::update( int numberOfAtoms, std::vector<RealVec>& atomCoordinates,
 								  std::vector<RealVec>& velocities,
-								  std::vector<RealVec>& forces, std::vector<RealOpenMM>& masses,
-								  const RealOpenMM currentPE, const int stepType ) {
+								  std::vector<RealVec>& forces, std::vector<double>& masses,
+								  const double currentPE, const int stepType ) {
 
 				// ---------------------------------------------------------------------------------------
 
@@ -178,12 +178,11 @@ namespace OpenMM {
 				switch( stepType ) {
 					case 1: {
 						// Update the velocity.
-
-						RealOpenMM deltaT = getDeltaT();
-						RealOpenMM tau = getTau();
-						const RealOpenMM vscale = EXP( -deltaT / tau );
-						const RealOpenMM fscale = ( 1 - vscale ) * tau;
-						const RealOpenMM noisescale = SQRT( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
+						double deltaT = getDeltaT();
+						double tau = getTau();
+						const double vscale = EXP( -deltaT / tau );
+						const double fscale = ( 1 - vscale ) * tau;
+						const double noisescale = SQRT( BOLTZ * getTemperature() * ( 1 - vscale * vscale ) );
 						for( int i = 0; i < numberOfAtoms; i++ )
 							for( int j = 0; j < 3; j++ )
 								velocities[i][j] = vscale * velocities[i][j] + fscale * forces[i][j] * inverseMasses[i] +
@@ -223,7 +222,7 @@ namespace OpenMM {
 						//Add minimizer position update to atomCoordinates
 						// with 'line search guess = 1/maxEig (the solution if the system was quadratic)
 						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							RealOpenMM factor = inverseMasses[ii] / _maxEig;
+							double factor = inverseMasses[ii] / _maxEig;
 
 							atomCoordinates[ii][0] += factor * xPrime[ii][0];
 							atomCoordinates[ii][1] += factor * xPrime[ii][1];
@@ -237,12 +236,12 @@ namespace OpenMM {
 						//We assume the move direction is still in xPrime
 
 						//Get quadratic 'line search' value
-						RealOpenMM lambda = ( RealOpenMM )( 1.0 / _maxEig );
-						RealOpenMM oldLambda = lambda;
+						double lambda = ( double )( 1.0 / _maxEig );
+						double oldLambda = lambda;
 
 						//Solve quadratic for slope at new point
 						//get slope dPE/d\lambda for quadratic, just equal to minus dot product of 'proposed position move' and forces (=-\nabla PE)
-						RealOpenMM newSlope = 0.0;
+						double newSlope = 0.0;
 						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
 							for( int jj = 0; jj < 3; jj++ ) {
 								newSlope -= xPrime[ii][jj] * forces[ii][jj] * inverseMasses[ii];
@@ -251,7 +250,7 @@ namespace OpenMM {
 
 						//solve for minimum for quadratic fit using two PE vales and the slope with /lambda=0
 						//for 'newSlope' use PE=a(\lambda_e-\lambda)^2+b(\lambda_e-\lambda)+c, \lambda_e is 1/maxEig.
-						RealOpenMM a, b;
+						double a, b;
 
 						//a = (((currentPE - lastPE) / lambda - lastSlope) / lambda);
 						a = ( ( ( lastPE - currentPE ) / oldLambda + newSlope ) / oldLambda );
@@ -263,17 +262,17 @@ namespace OpenMM {
 							//lambda = -b / (2 * a);
 							lambda = b / ( 2 * a ) + oldLambda;
 						} else {
-							lambda = ( RealOpenMM )( oldLambda / 2.0 );
+							lambda = ( double )( oldLambda / 2.0 );
 						}
 
 						//test if lambda negative, if so just use smaller lambda
 						if( lambda <= 0.0 ) {
-							lambda = ( RealOpenMM )( oldLambda / 2.0 );
+							lambda = ( double )( oldLambda / 2.0 );
 						}
 
 						//Remove previous position update (-oldLambda) and add new move (lambda)
 						for( int ii = 0; ii < numberOfAtoms; ii++ ) {
-							const RealOpenMM factor = inverseMasses[ii] * ( lambda - oldLambda );
+							const double factor = inverseMasses[ii] * ( lambda - oldLambda );
 
 							atomCoordinates[ii][0] += factor * xPrime[ii][0];
 							atomCoordinates[ii][1] += factor * xPrime[ii][1];
@@ -317,8 +316,8 @@ namespace OpenMM {
 			void Dynamics::subspaceProjection( std::vector<RealVec>& array,
 											   std::vector<RealVec>& outArray,
 											   int numberOfAtoms,
-											   std::vector<RealOpenMM>& scale,
-											   std::vector<RealOpenMM>& inverseScale,
+											   std::vector<double>& scale,
+											   std::vector<double>& inverseScale,
 											   bool projectIntoComplement ) {
 
 				//If 'array' and 'outArray are not the same array
@@ -341,7 +340,7 @@ namespace OpenMM {
 				//a'=M^{-1/2}*f for forces, OR a'= M^{1/2}*x for positions
 				//
 				for( int i = 0; i < numberOfAtoms; i++ ) {        //N loops
-					RealOpenMM  weight = SQRT( scale[i] );
+					double  weight = SQRT( scale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {         //times 3 loops
 						outArray[i][j] *= weight;
 					}
@@ -361,7 +360,7 @@ namespace OpenMM {
 				//so tmpC_i = \sum_{j=1}^n Q_{j,i} outArray_j
 				//Q_{j,i}=_projectionVectors[j * numberOfAtoms * 3 + i]
 
-				std::vector<RealOpenMM> tmpC( _numProjectionVectors );
+				std::vector<double> tmpC( _numProjectionVectors );
 				for( int i = 0; i < ( int ) _numProjectionVectors; i++ ) { //over all eigenvectors
 
 					tmpC[i] = 0.0;  //clear
@@ -404,7 +403,7 @@ namespace OpenMM {
 				//a'''=M^{1/2}*a'' or a'''=M^{-1/2}*a''
 				//
 				for( int i = 0; i < numberOfAtoms; i++ ) {
-					RealOpenMM  unweight = SQRT( inverseScale[i] );
+					double  unweight = SQRT( inverseScale[i] );
 					for( unsigned int j = 0; j < 3; j++ ) {
 						outArray[i][j] *= unweight;
 					}
