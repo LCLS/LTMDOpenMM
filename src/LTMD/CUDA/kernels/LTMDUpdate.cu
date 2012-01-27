@@ -392,11 +392,12 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 		}
 
 		slopeBuffer[0] = lambda - oldLambda;
+		slopeBuffer[1] = lambda;
 	}
 	__syncthreads();
 	const Real dlambda = slopeBuffer[0];
 
-	lambdaval[0] = dlambda;
+	lambdaval[0] = slopeBuffer[1];
 
 	// Remove previous position update (-oldLambda) and add new move (lambda).
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
