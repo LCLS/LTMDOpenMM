@@ -141,7 +141,7 @@ namespace OpenMM {
 				unsigned int CompletedSteps() const;
 
 				//Minimizer
-				unsigned int minimize( const unsigned int maxsteps );
+				bool minimize( const unsigned int maxsteps );
 
 			protected:
 				void initialize( OpenMM::ContextImpl &context );
@@ -155,7 +155,7 @@ namespace OpenMM {
 				void TimeAndCounterStep();
 
 				double LinearMinimize( const double energy );
-				double QuadraticMinimize( const double energy );
+				double QuadraticMinimize( const double energy, double& lambda );
 
 				void SaveStep();
 				void RevertStep();

@@ -33,6 +33,8 @@ namespace OpenMM {
 			unsigned int MaximumRediagonalizations;
 			unsigned int MaximumMinimizationCutoff;
 			unsigned int MaximumMinimizationIterations;
+
+			double MinimumLambdaValue;
 			
 			bool ShouldProtoMolDiagonalize;
 			

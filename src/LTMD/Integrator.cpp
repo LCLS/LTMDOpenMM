@@ -112,12 +112,11 @@ namespace OpenMM {
 			IntegrateStep();
 			eigVecChanged = false;
 
-			if( minimize( mParameters.MaximumMinimizationIterations ) >= mParameters.MaximumMinimizationIterations ){
+			if( !minimize( mParameters.MaximumMinimizationIterations ) ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
 					if( mParameters.ShouldProtoMolDiagonalize ) {
 						return false;
 					}else{
-						std::cout << "Force Rediagonalization" << std::endl;
 						DiagonalizeMinimize();
 					}
 				}
@@ -128,7 +127,7 @@ namespace OpenMM {
 			return true;
 		}
 
-		unsigned int Integrator::minimize( const unsigned int maxsteps ) {
+		bool Integrator::minimize( const unsigned int maxsteps ) {
 #ifdef PROFILE_INTEGRATOR
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -149,23 +148,30 @@ namespace OpenMM {
 				
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
-					currentPE = QuadraticMinimize( currentPE );
-					quadraticSteps++;
-				}
+					double lambda = 0.0;
+					currentPE = QuadraticMinimize( currentPE, lambda );
 
+					// Minimization failed if lambda is less than the minimum specified lambda
+					if( lambda < mParameters.MinimumLambdaValue ) {
+						//RevertStep();
+						//context->calcForcesAndEnergy( true, false );
+						//return false;
+					}
+				}
+				
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
 					break;
 				}
-
+				
 				if( diff > 0.0 ) {
 					SaveStep();
 					initialPE = currentPE;
 				} else {
 					RevertStep();
 					context->calcForcesAndEnergy( true, false );
-
+					
 					maxEigenvalue *= 2;
 				}
 				
@@ -179,10 +185,15 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//			std::cout << "[Integrator] Minimize: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Minimize: " << elapsed << "ms" << std::endl;
 #endif
+
+			// Test to see if we reached the maximum number of minimizations
+			if( steps >= maxsteps ) {
+				std::cout << "[OpenMM::Minimize] Maximum minimization steps reached" << std::endl;
+			}
 			
-			return steps;
+			return true;
 		}
 		
 		void Integrator::DiagonalizeMinimize() {
@@ -193,12 +204,12 @@ namespace OpenMM {
 				unsigned int iteration = 0;
 				for( iteration = 1; iteration <= iterations; iteration++){
 					computeProjectionVectors();
-					if( minimize( mParameters.MaximumMinimizationIterations) <= mParameters.MaximumMinimizationCutoff ) break;
+					if( !minimize( mParameters.MaximumMinimizationIterations) ) break;
 					if( iteration > 1 ) {
-						std::cout << "Force Rediagonalization" << std::endl;
+						std::cout << "[OpenMM::Integrator] Force Rediagonalization" << std::endl;
 					}
 				}
-				std::cout << "Rediagonalized " << iteration << " times" << std::endl;
+				std::cout << "[OpenMM::Integrator] Rediagonalized " << iteration << " times" << std::endl;
 			}
 		}
 
@@ -213,7 +224,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Compute Projection: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Compute Projection: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -227,7 +238,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Integrate Step: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Integrate Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -240,7 +251,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] TimeAndCounter Step: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] TimeAndCounter Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -250,30 +261,31 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
-			double retVal = context->calcForcesAndEnergy( false, true );
+			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
 #endif
 			return retVal;
 		}
 
-		double Integrator::QuadraticMinimize( const double energy ) {
+		double Integrator::QuadraticMinimize( const double energy, double& lambda ) {
 #ifdef PROFILE_INTEGRATOR
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
 			context->calcForcesAndEnergy( true, true );
-			const double lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+			lambda = std::abs( lambda );
 #ifdef KERNEL_VALIDATION
-			std::cout << "[QuadraticMinimize] Lambda: " << lambda << std::endl;
+			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / ( 1 / 5e5 ) ) << std::endl;
 #endif
-			double retVal = context->calcForcesAndEnergy( false, true );
+			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Quadratic Minimize: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Quadratic Minimize: " << elapsed << "ms" << std::endl;
 #endif
 			return retVal;
 		}
@@ -287,7 +299,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Save Step: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Save Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 
@@ -300,7 +312,7 @@ namespace OpenMM {
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			//std::cout << "[Integrator] Revert Step: " << elapsed << "ms" << std::endl;
+			std::cout << "[OpenMM::Integrator] Revert Step: " << elapsed << "ms" << std::endl;
 #endif
 		}
 	}
