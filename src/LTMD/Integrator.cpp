@@ -148,6 +148,8 @@ namespace OpenMM {
 				
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
+					quadraticSteps++;
+
 					double lambda = 0.0;
 					currentPE = QuadraticMinimize( currentPE, lambda );
 
@@ -158,7 +160,6 @@ namespace OpenMM {
 						//return false;
 					}
 				}
-				
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
@@ -275,7 +276,6 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			context->calcForcesAndEnergy( true, true );
 			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
 			lambda = std::abs( lambda );
 #ifdef KERNEL_VALIDATION

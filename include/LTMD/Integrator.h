@@ -36,6 +36,8 @@
 #include "openmm/Kernel.h"
 #include "openmm/internal/windowsExport.h"
 
+#include <iostream>
+
 #include "LTMD/Parameters.h"
 
 namespace OpenMM {
