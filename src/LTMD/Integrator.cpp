@@ -192,6 +192,7 @@ namespace OpenMM {
 			// Test to see if we reached the maximum number of minimizations
 			if( steps >= maxsteps ) {
 				std::cout << "[OpenMM::Minimize] Maximum minimization steps reached" << std::endl;
+				return false;
 			}
 			
 			return true;
