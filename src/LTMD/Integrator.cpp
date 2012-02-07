@@ -146,16 +146,20 @@ namespace OpenMM {
 			for( steps = 1; steps <= maxsteps; steps++ ){
 				eigVecChanged = false;
 				
-				double lambda = 0.0;
-				double currentPE = QuadraticMinimize( LinearMinimize( initialPE ), lambda );
+				double currentPE = LinearMinimize( initialPE );
+				if( currentPE > initialPE ) {
+					quadraticSteps++;
 
-				// Minimization failed if lambda is less than the minimum specified lambda
-				if( lambda < mParameters.MinimumLambdaValue ) {
-					//RevertStep();
-					//context->calcForcesAndEnergy( true, false );
-					//return false;
+					double lambda = 0.0;
+					currentPE = QuadraticMinimize( currentPE, lambda );
+
+					// Minimization failed if lambda is less than the minimum specified lambda
+					if( lambda < mParameters.MinimumLambdaValue ) {
+						//RevertStep();
+						//context->calcForcesAndEnergy( true, false );
+						//return false;
+					}
 				}
-
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
@@ -258,7 +262,7 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
-			double retVal = context->calcForcesAndEnergy( false, true );
+			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -273,8 +277,9 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+			lambda = std::abs( lambda );
 #ifdef KERNEL_VALIDATION
-			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " OldLambda: " << 1.0 / maxEigenvalue << " Ratio: " << lambda * maxEigenvalue << std::endl;
+			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / ( 1 / 5e5 ) ) << std::endl;
 #endif
 			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR

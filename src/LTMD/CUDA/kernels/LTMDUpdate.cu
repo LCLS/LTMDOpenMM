@@ -344,10 +344,12 @@ __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, float4 *posqP, floa
 
 #ifdef DOUBLE_PRECISION
 		const double xx = posqP[atom].x, xy = posqP[atom].y, xz = posqP[atom].z;
-		slope -= invMass * ( xx * xx + xy * xy + xz * xz );
+		const double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
+		slope -= invMass * ( xx * fx + xy * fy + xz * fz );
 #else
 		const float4 xp = posqP[atom];
-		slope -= invMass * ( xp.x * xp.x + xp.y * xp.y + xp.z * xp.z );
+		const float4 f = force[atom];
+		slope -= invMass * ( xp.x * f.x + xp.y * f.y + xp.z * f.z );
 #endif
 	}
 	slopeBuffer[threadIdx.x] = slope;
@@ -374,14 +376,13 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 		for( int i = 0; i < gridDim.x; i++ ) {
 			slope += slopeBuffer[i];
 		}
-		
 		Real lambda = invMaxEigen;
 		Real oldLambda = lambda;
-		
-		Real a = ( ( currentPE - lastPE ) - slope * oldLambda ) / ( oldLambda * oldLambda );
+		Real a = ( ( ( lastPE - currentPE ) / oldLambda + slope ) / oldLambda );
 
 		if( a != 0.0f ) {
-			lambda = -slope / ( 2.0f * a );
+			const Real b = -slope;
+			lambda = b / ( 2.0f * a ) + oldLambda;
 		} else {
 			lambda = 0.5f * oldLambda;
 		}

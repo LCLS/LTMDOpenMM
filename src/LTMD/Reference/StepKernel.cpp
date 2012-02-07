@@ -182,30 +182,27 @@ namespace OpenMM {
 				
 				for( unsigned int i = 0; i < mParticles; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						newSlope -= mXPrime[i][j] * mXPrime[i][j] * mInverseMasses[i];
+						newSlope -= mXPrime[i][j] * forces[i][j] * mInverseMasses[i];
 					}
 				}
 				
 				//solve for minimum for quadratic fit using two PE vales and the slope with /lambda=0
 				//for 'newSlope' use PE=a(\lambda_e-\lambda)^2+b(\lambda_e-\lambda)+c, \lambda_e is 1/maxEig.
-				//const double a = ( ( ( mPreviousEnergy - energy ) / oldLambda + newSlope ) / oldLambda );
-				//const double b = -newSlope;
-				const double a =  ( ( energy - mPreviousEnergy ) - newSlope *  oldLambda ) / ( oldLambda * oldLambda );
-				const double b = newSlope;
+				const double a = ( ( ( mPreviousEnergy - energy ) / oldLambda + newSlope ) / oldLambda );
+				const double b = -newSlope;
 				
 				//calculate \lambda at minimum of quadratic fit
 				if( a != 0.0 ) {
-					//lambda = b / ( 2 * a ) + oldLambda;
-					lambda = -b / ( 2 * a );
+					lambda = b / ( 2 * a ) + oldLambda;
 				} else {
 					lambda = oldLambda / 2.0;
 				}
-
+				
 				//test if lambda negative, if so just use smaller lambda
 				if( lambda <= 0.0 ) {
 					lambda = oldLambda / 2.0;
 				}
-
+				
 				//Remove previous position update (-oldLambda) and add new move (lambda)
 				for( unsigned int i = 0; i < mParticles; i++ ) {
 					const double factor = mInverseMasses[i] * ( lambda - oldLambda );
