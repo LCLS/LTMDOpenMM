@@ -79,6 +79,9 @@ namespace OpenMM {
 		void Integrator::step( int steps ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
+			
+			mSimpleMinimizations = 0;
+			mQuadraticMinimizations = 0;
 
 			for( mLastCompleted = 0; mLastCompleted < steps; ++mLastCompleted ) {
 				if( DoStep() == false ) break;
@@ -86,6 +89,18 @@ namespace OpenMM {
 
 			// Update Time
 			context->setTime( context->getTime() + getStepSize() * mLastCompleted );
+			
+			// Print Minimizations
+			const unsigned int total = mSimpleMinimizations + mQuadraticMinimizations;
+			
+			const double averageSimple = (double)mSimpleMinimizations / (double)mLastCompleted;
+			const double averageQuadratic = (double)mQuadraticMinimizations / (double)mLastCompleted;
+			const double averageTotal = (double)total / (double)mLastCompleted;
+			
+			std::cout << "[OpenMM::Minimize] " << total << " total minimizations( " 
+						<< mSimpleMinimizations << " simple, " << mQuadraticMinimizations << " quadratic ). " 
+						<< averageTotal << " per-step minimizations( " << averageSimple << " simple, " 
+						<< averageQuadratic << " quadratic )." << std::endl;
 
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -175,12 +190,10 @@ namespace OpenMM {
 					
 					maxEigenvalue *= 2;
 				}
-				
 			}
 			
-			std::cout << "Minimization took " << steps << " linear steps and " 
-				<< quadraticSteps << " quadratic steps. Totalling " 
-				<< ( steps + quadraticSteps ) << " steps." << std::endl;
+			mSimpleMinimizations += steps;
+			mQuadraticMinimizations += quadraticSteps;
 
 			maxEigenvalue = eigStore;
 #ifdef PROFILE_INTEGRATOR

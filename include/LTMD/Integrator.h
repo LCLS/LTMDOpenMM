@@ -162,6 +162,7 @@ namespace OpenMM {
 				void SaveStep();
 				void RevertStep();
 			private:
+				unsigned int mSimpleMinimizations, mQuadraticMinimizations;
 				unsigned int mLastCompleted;
 				void computeProjectionVectors();
 				double maxEigenvalue;
