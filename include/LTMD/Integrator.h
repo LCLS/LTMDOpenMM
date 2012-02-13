@@ -142,15 +142,16 @@ namespace OpenMM {
 				
 				unsigned int CompletedSteps() const;
 
-				//Minimizer
-				bool minimize( const unsigned int maxsteps );
-
+				bool minimize( const unsigned int upperbound );
+				bool minimize( const unsigned int upperbound, const unsigned int lowerbound );
 			protected:
 				void initialize( OpenMM::ContextImpl &context );
 				std::vector<std::string> getKernelNames();
 			private:
 				bool DoStep();
 				void DiagonalizeMinimize();
+			
+				void Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps );
 				
 				// Kernel Functions
 				void IntegrateStep();

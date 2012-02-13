@@ -141,39 +141,51 @@ namespace OpenMM {
 
 			return true;
 		}
-
-		bool Integrator::minimize( const unsigned int maxsteps ) {
-#ifdef PROFILE_INTEGRATOR
-			timeval start, end;
-			gettimeofday( &start, 0 );
-#endif
-			const double eigStore = maxEigenvalue;
-
-			if( eigenvectors.size() == 0 ) {
-				computeProjectionVectors();
+		
+		bool Integrator::minimize( const unsigned int upperbound ){ 
+			unsigned int simple = 0, quadratic = 0;
+			Minimize( upperbound, simple, quadratic );
+			
+			if( simple + quadratic < upperbound ){
+				return true;
 			}
-
+			
+			return false;
+		}
+		
+		bool Integrator::minimize( const unsigned int upperbound, const unsigned int lowerbound ){
+			unsigned int simple = 0, quadratic = 0;
+			Minimize( upperbound, simple, quadratic );
+			
+			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
+			if( simple + quadratic < lowerbound ){
+				return true;
+			}
+			
+			return false;
+		}
+		
+		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
+			const double eigStore = maxEigenvalue;
+			
+			if( !mParameters.ShouldProtoMolDiagonalize && eigenvectors.size() == 0 ) computeProjectionVectors();
+			
 			SaveStep();
-
+			
 			double initialPE = context->calcForcesAndEnergy( true, true );
 			
-			unsigned int steps = 0, quadraticSteps = 0;
-			for( steps = 1; steps <= maxsteps; steps++ ){
+			simpleSteps = 0;
+			quadraticSteps = 0;
+			
+			for( unsigned int i = 0; i < max; i++ ){
 				eigVecChanged = false;
 				
+				simpleSteps++;
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
 					quadraticSteps++;
-
 					double lambda = 0.0;
 					currentPE = QuadraticMinimize( currentPE, lambda );
-
-					// Minimization failed if lambda is less than the minimum specified lambda
-					if( lambda < mParameters.MinimumLambdaValue ) {
-						//RevertStep();
-						//context->calcForcesAndEnergy( true, false );
-						//return false;
-					}
 				}
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
@@ -192,23 +204,10 @@ namespace OpenMM {
 				}
 			}
 			
-			mSimpleMinimizations += steps;
+			mSimpleMinimizations += simpleSteps;
 			mQuadraticMinimizations += quadraticSteps;
-
-			maxEigenvalue = eigStore;
-#ifdef PROFILE_INTEGRATOR
-			gettimeofday( &end, 0 );
-			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[OpenMM::Integrator] Minimize: " << elapsed << "ms" << std::endl;
-#endif
-
-			// Test to see if we reached the maximum number of minimizations
-			if( steps >= maxsteps ) {
-				std::cout << "[OpenMM::Minimize] Maximum minimization steps reached" << std::endl;
-				return false;
-			}
 			
-			return true;
+			maxEigenvalue = eigStore;
 		}
 		
 		void Integrator::DiagonalizeMinimize() {
