@@ -100,7 +100,7 @@ namespace OpenMM {
 			std::cout << "[OpenMM::Minimize] " << total << " total minimizations( " 
 						<< mSimpleMinimizations << " simple, " << mQuadraticMinimizations << " quadratic ). " 
 						<< averageTotal << " per-step minimizations( " << averageSimple << " simple, " 
-						<< averageQuadratic << " quadratic )." << std::endl;
+						<< averageQuadratic << " quadratic ). Steps: " << mLastCompleted << std::endl;
 
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -146,8 +146,10 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-			if( simple + quadratic < upperbound ){
-				return true;
+			if( quadratic == 0 && simple < upperbound ) return true;
+			
+			if( quadratic != 0 ){
+				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
 			}
 			
 			return false;
@@ -157,9 +159,13 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
-			if( simple + quadratic < lowerbound ){
+			if( quadratic == 0 && simple < upperbound ) {
+				std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
 				return true;
+			}
+			
+			if( quadratic != 0 ){
+				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
 			}
 			
 			return false;
@@ -184,9 +190,15 @@ namespace OpenMM {
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
 					quadraticSteps++;
-					double lambda = 0.0;
-					currentPE = QuadraticMinimize( currentPE, lambda );
+
+					RevertStep();
+					context->calcForcesAndEnergy( true, false );
+					break;
+					
+					//double lambda = 0.0;
+					//currentPE = QuadraticMinimize( currentPE, lambda );
 				}
+				
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
