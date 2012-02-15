@@ -159,8 +159,10 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-			if( quadratic == 0 && simple < upperbound ) {
-				std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
+			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
+			
+			const unsigned int total = simple + quadratic;
+			if( quadratic == 0 && total < lowerbound ) {
 				return true;
 			}
 			
