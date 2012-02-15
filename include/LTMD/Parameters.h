@@ -28,6 +28,7 @@ namespace OpenMM {
 			double minLimit;
 			
 			bool ShouldForceRediagOnMinFail;
+			bool ShouldForceRediagOnQuadratic;
 			Preference::EPlatform BlockDiagonalizePlatform;
 			
 			unsigned int MaximumRediagonalizations;

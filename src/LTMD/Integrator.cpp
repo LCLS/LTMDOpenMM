@@ -146,13 +146,14 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-			if( quadratic == 0 && simple < upperbound ) return true;
-			
-			if( quadratic != 0 ){
+			if( mParameters.ShouldForceRediagOnQuadratic && quadratic != 0 ){
 				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
+				return false;
+			}else{
+				const unsigned int total = simple + quadratic;
+				
+				return ( total < upperbound );
 			}
-			
-			return false;
 		}
 		
 		bool Integrator::minimize( const unsigned int upperbound, const unsigned int lowerbound ){
@@ -161,16 +162,14 @@ namespace OpenMM {
 			
 			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
 			
-			const unsigned int total = simple + quadratic;
-			if( quadratic == 0 && total < lowerbound ) {
-				return true;
-			}
-			
-			if( quadratic != 0 ){
+			if( mParameters.ShouldForceRediagOnQuadratic && quadratic != 0 ){
 				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
+				return false;
+			}else{
+				const unsigned int total = simple + quadratic;
+				
+				return ( total < lowerbound );
 			}
-			
-			return false;
 		}
 		
 		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
@@ -192,13 +191,15 @@ namespace OpenMM {
 				double currentPE = LinearMinimize( initialPE );
 				if( currentPE > initialPE ) {
 					quadraticSteps++;
-
-					RevertStep();
-					context->calcForcesAndEnergy( true, false );
-					break;
 					
-					//double lambda = 0.0;
-					//currentPE = QuadraticMinimize( currentPE, lambda );
+					if( !mParameters.ShouldForceRediagOnQuadratic ){
+						double lambda = 0.0;
+						currentPE = QuadraticMinimize( currentPE, lambda );
+					}else{
+						RevertStep();
+						context->calcForcesAndEnergy( true, false );
+						break;
+					}
 				}
 				
 				//break if satisfies end condition
