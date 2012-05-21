@@ -227,18 +227,8 @@ namespace OpenMM {
 		
 		void Integrator::DiagonalizeMinimize() {
 			if( !mParameters.ShouldProtoMolDiagonalize ) {
-				unsigned int iterations = mParameters.MaximumRediagonalizations;
-				if( !mParameters.ShouldForceRediagOnMinFail ) iterations = 1;
-
-				unsigned int iteration = 0;
-				for( iteration = 1; iteration <= iterations; iteration++){
-					computeProjectionVectors();
-					if( !minimize( mParameters.MaximumMinimizationIterations) ) break;
-					if( iteration > 1 ) {
-						std::cout << "[OpenMM::Integrator] Force Rediagonalization" << std::endl;
-					}
-				}
-				std::cout << "[OpenMM::Integrator] Rediagonalized " << iteration << " times" << std::endl;
+        computeProjectionVectors();
+        minimize( mParameters.MaximumMinimizationIterations);
 			}
 		}
 

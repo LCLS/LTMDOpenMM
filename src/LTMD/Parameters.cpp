@@ -12,7 +12,6 @@ namespace OpenMM {
 			ShouldForceRediagOnQuadratic = true;
 			BlockDiagonalizePlatform = Preference::OpenCL;
 			
-			MaximumRediagonalizations = 5;
 			MaximumMinimizationCutoff = 2;
 			MaximumMinimizationIterations = 25;
 

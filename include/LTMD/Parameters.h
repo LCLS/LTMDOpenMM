@@ -31,7 +31,6 @@ namespace OpenMM {
 			bool ShouldForceRediagOnQuadratic;
 			Preference::EPlatform BlockDiagonalizePlatform;
 			
-			unsigned int MaximumRediagonalizations;
 			unsigned int MaximumMinimizationCutoff;
 			unsigned int MaximumMinimizationIterations;
 
