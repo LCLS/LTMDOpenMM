@@ -133,7 +133,7 @@ if( BUILD_GPU )
 		endif( BUILD_GPU_CUDA_FAST_MATH )
 		
 		# Intel
-		if (${CMAKE_CXX_COMPILER} MATCHES "icc.*$") 
+		if (${CMAKE_CXX_COMPILER} MATCHES "icpc.*$") 
 			list( APPEND CUDA_NVCC_FLAGS "-ccbin=icc" )
 		endif()
 
