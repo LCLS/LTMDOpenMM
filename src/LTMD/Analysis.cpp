@@ -256,7 +256,9 @@ namespace OpenMM {
 			}
 
 			gettimeofday( &tp_hess, NULL );
-			cout << "Time to compute hessian: " << ( tp_hess.tv_sec - tp_begin.tv_sec ) << endl;
+      
+      const double hessElapsed = ( tp_hess.tv_sec - tp_begin.tv_sec ) * 1000.0 + ( tp_hess.tv_usec - tp_begin.tv_usec ) / 1000.0;
+			cout << "Time to compute hessian: " << hessElapsed << "ms" << endl;
 
 			// Make sure it is exactly symmetric.
 			for( int i = 0; i < n; i++ ) {
@@ -281,7 +283,10 @@ namespace OpenMM {
 			}
 
 			gettimeofday( &tp_diag, NULL );
-			cout << "Time to diagonalize block hessian: " << ( tp_diag.tv_sec - tp_hess.tv_sec ) << endl;
+      
+      const double diagElapsed = ( tp_diag.tv_sec - tp_hess.tv_sec ) * 1000.0 + ( tp_diag.tv_usec - tp_hess.tv_usec ) / 1000.0;
+			cout << "Time to diagonalize block hessian: " << diagElapsed << "ms" << endl;
+      
 			//***********************************************************
 			// This section here is only to find the cuttoff eigenvalue.
 			// First sort the eigenvectors by the absolute value of the eigenvalue.
@@ -320,7 +325,9 @@ namespace OpenMM {
 			}
 
 			gettimeofday( &tp_e, NULL );
-			cout << "Time to compute E: " << ( tp_e.tv_sec - tp_diag.tv_sec ) << endl;
+      
+      const double eElapsed = ( tp_e.tv_sec - tp_diag.tv_sec ) * 1000.0 + ( tp_e.tv_usec - tp_diag.tv_usec ) / 1000.0;
+      std::cout << "Time to compute E: " << eElapsed << "ms" << std::endl;
 
 			WriteBlockEigs( E );
 
@@ -394,7 +401,9 @@ namespace OpenMM {
 			}
 
 			gettimeofday( &tp_s, NULL );
-			cout << "Time to compute S: " << ( tp_s.tv_sec - tp_e.tv_sec ) << endl;
+      
+      const double sElapsed = ( tp_s.tv_sec - tp_e.tv_sec ) * 1000.0 + ( tp_s.tv_usec - tp_e.tv_usec ) / 1000.0;
+			cout << "Time to compute S: " << sElapsed << "ms" << endl;
 
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
 			TNT::Array1D<double> dS( m, 0.0 );
@@ -413,12 +422,16 @@ namespace OpenMM {
 			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
 
 			gettimeofday( &tp_q, NULL );
-			cout << "Time to compute Q: " << ( tp_q.tv_sec - tp_s.tv_sec ) << endl;
+      
+      const double qElapsed = ( tp_q.tv_sec - tp_s.tv_sec ) * 1000.0 + ( tp_q.tv_usec - tp_s.tv_usec ) / 1000.0;
+			cout << "Time to compute Q: " << qElapsed << "ms" << endl;
 			
 			TNT::Array2D<double> U = CalculateU( E, Q );
 			
 			gettimeofday( &tp_u, NULL );
-			cout << "Time to compute U: " << ( tp_u.tv_sec - tp_q.tv_sec ) << endl;
+      
+      const double uElapsed = ( tp_u.tv_sec - tp_q.tv_sec ) * 1000.0 + ( tp_u.tv_usec - tp_q.tv_usec ) / 1000.0;
+			cout << "Time to compute U: " << uElapsed << "ms" << endl;
 
 			const unsigned int modes = params.modes;
 
