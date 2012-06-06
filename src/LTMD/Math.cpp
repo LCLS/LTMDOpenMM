@@ -5,38 +5,32 @@
 #include <mkl_lapack.h>
 #include <mkl_lapacke.h>
 #endif
+
 #include "tnt_array2d_utils.h"
-//#endif
 
 #include <vector>
 
 void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<double>& matrixB, TNT::Array2D<double>& matrixC ) {
 #ifdef INTEL_MKL
+  std::vector<double> a( matrixA.dim1() * matrixA.dim2() );
 
-        std::vector<double> a( matrixA.dim1() * matrixA.dim2() );
+  for( int i = 0; i < matrixA.dim1(); i++ ) {
+    for( int j = 0; j < matrixA.dim2(); j++ ) {
+      a[i * matrixA.dim2() + j] = matrixA[i][j];
+    }
+  }
 
-	for( int i = 0; i < matrixA.dim1(); i++ )
-	  {
-	    for( int j = 0; j < matrixA.dim2(); j++ )
-	      {
-		a[i * matrixA.dim2() + j] = matrixA[i][j];
-	      }
-	  }
+  std::vector<double> b( matrixB.dim1() * matrixB.dim2());
 
-        std::vector<double> b( matrixB.dim1() * matrixB.dim2());
-
-	for( int i = 0; i < matrixB.dim1(); i++ )
-	  {
-	    for( int j = 0; j < matrixB.dim2(); j++ )
-	      {
-		b[i * matrixB.dim2() + j] = matrixB[i][j];
-	      }
-	  }
+	for( int i = 0; i < matrixB.dim1(); i++ ) {
+    for( int j = 0; j < matrixB.dim2(); j++ ) {
+      b[i * matrixB.dim2() + j] = matrixB[i][j];
+    }
+  }
 
 	const int m = matrixA.dim1();
 	const int k = matrixA.dim2();
 	const int n = matrixB.dim2();
-
 
 	const char transa = 'T';
 	const char transb = 'T';
@@ -49,13 +43,11 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 	
 	dgemm( &transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc );
 
-	for( int i = 0; i < matrixB.dim2(); i++ )
-	  {
-	    for( int j = 0; j < matrixA.dim1(); j++ )
-	      {
-		matrixC[j][i] = c[i * matrixA.dim1() + j];
-	      }
-	  }
+	for( int i = 0; i < matrixB.dim2(); i++ ) {
+    for( int j = 0; j < matrixA.dim1(); j++ ) {
+      matrixC[j][i] = c[i * matrixA.dim1() + j];
+    }
+  }
 #else
 	matrixC = matmult( matrixA, matrixB );
 #endif
@@ -66,7 +58,6 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
  */
 void FindEigenvalues( const TNT::Array2D<double>& matrix, TNT::Array1D<double>& values, TNT::Array2D<double>& vectors ) {
 #ifdef INTEL_MKL
-  std::cout << "calling mkl diagonalize" << std::endl;
 	const int dim = matrix.dim1();
 
 	const char cmach = 'S';
@@ -112,8 +103,6 @@ void FindEigenvalues( const TNT::Array2D<double>& matrix, TNT::Array1D<double>& 
 
 	if( wPointer != &w[0] ) std::cout << "WDiffers" << std::endl;
 	if( zPointer != &z[0] ) std::cout << "ZDiffers" << std::endl;
-
-	std::cout << "info " << info << std::endl;
 	
 	for( int i = 0; i < dim; i++ ) {
 		values[i] = w[i];
