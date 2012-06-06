@@ -129,7 +129,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 
-			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_q, tp_u;
+			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_s_matrix, tp_q, tp_u;
 
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
@@ -385,9 +385,13 @@ namespace OpenMM {
 			// *****************************************************************
 			// restore unperturbed positions
 			context.setPositions( positions );
+      
+      gettimeofday( &tp_s, NULL );
+      
+      const double sElapsed = ( tp_s.tv_sec - tp_e.tv_sec ) * 1000.0 + ( tp_s.tv_usec - tp_e.tv_usec ) / 1000.0;
+			cout << "Time to compute S: " << sElapsed << "ms" << endl;
 
 			MatrixMultiply( E_transpose, HE, S );
-
 
 			WriteS(S);
 
@@ -400,10 +404,10 @@ namespace OpenMM {
 				}
 			}
 
-			gettimeofday( &tp_s, NULL );
+			gettimeofday( &tp_s_matrix, NULL );
       
-      const double sElapsed = ( tp_s.tv_sec - tp_e.tv_sec ) * 1000.0 + ( tp_s.tv_usec - tp_e.tv_usec ) / 1000.0;
-			cout << "Time to compute S: " << sElapsed << "ms" << endl;
+      const double sMatrixElapsed = ( tp_s_matrix.tv_sec - tp_s.tv_sec ) * 1000.0 + ( tp_s_matrix.tv_usec - tp_s.tv_usec ) / 1000.0;
+			cout << "Time to compute matrix S: " << sMatrixElapsed << "ms" << endl;
 
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
 			TNT::Array1D<double> dS( m, 0.0 );
