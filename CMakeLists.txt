@@ -39,11 +39,11 @@ option( BUILD_MKL "Build with Intel MKL code" Off )
 if( BUILD_MKL )
 	add_definitions( "-DINTEL_MKL" )
 
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mkl=parallel")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mkl=parallel")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mkl=parallel")
-	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -mkl=parallel")
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mkl=parallel")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mkl=sequential")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mkl=sequential")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mkl=sequential")
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -mkl=sequential")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mkl=sequential")
 endif( BUILD_MKL )
 
 # OpenMP
