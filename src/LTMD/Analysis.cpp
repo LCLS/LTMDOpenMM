@@ -166,6 +166,10 @@ namespace OpenMM {
 			blockContext->setPositions( blockPositions );
 			/*********************************************************************/
 
+#ifdef FIRST_ORDER
+      vector<Vec3> block_start_forces = blockContext->getState( State::Forces ).getForces();
+#endif
+      
 			TNT::Array2D<double> h( n, n, 0.0 );
 			vector<Vec3> initialBlockPositions( blockPositions );
 			for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
@@ -189,6 +193,7 @@ namespace OpenMM {
 				blockContext->setPositions( blockPositions );
 				vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
 
+#ifndef FIRST_ORDER
 				// Now, do it again...
 				for( int j = 0; j < blocks.size(); j++ ) {
 					int dof_to_perturb = 3 * blocks[j] + i;
@@ -207,7 +212,8 @@ namespace OpenMM {
 
 				blockContext->setPositions( blockPositions );
 				vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
-
+#endif
+        
 				// revert block positions
 				for( int j = 0; j < blocks.size(); j++ ) {
 					int dof_to_perturb = 3 * blocks[j] + i;
@@ -237,8 +243,7 @@ namespace OpenMM {
 						continue;
 					}
 
-					int col = dof_to_perturb; //(atom_to_perturb*3)+(dof_to_perturb % 3);
-					int row = 0;
+					int col = dof_to_perturb;
 
 					int start_dof = 3 * blocks[j];
 					int end_dof;
@@ -249,8 +254,13 @@ namespace OpenMM {
 					}
 
 					for( int k = start_dof; k < end_dof; k++ ) {
+#ifdef FIRST_ORDER
+            double blockscale = 1.0 / ( params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
+            h[k][col] = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
+#else
 						double blockscale = 1.0 / ( 2 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
 						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
+#endif
 					}
 				}
 			}
@@ -340,6 +350,10 @@ namespace OpenMM {
 
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
+      
+#ifdef FIRST_ORDER
+      vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
+#endif
 
 			// Loop over i.
 			for( unsigned int k = 0; k < m; k++ ) {
@@ -358,6 +372,7 @@ namespace OpenMM {
 				// Calculate F(xi).
 				vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
 
+#ifndef FIRST_ORDER
 				// backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
@@ -368,10 +383,16 @@ namespace OpenMM {
 
 				// Calculate forces
 				vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
+#endif
 
 				for( int i = 0; i < n; i++ ) {
+#ifdef FIRST_ORDER
+          const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 1.0 * eps;
+          HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
+#else
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
 					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
+#endif
 				}
 
 				// restore positions

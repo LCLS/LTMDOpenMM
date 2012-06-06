@@ -83,6 +83,12 @@ endif()
 
 find_library( OPENMM_LIB "OpenMM" HINT ${OPENMM_DIR}/lib )
 
+# First Order
+option( BUILD_FIRST_ORDER "Build with first order perterb" Off )
+if( BUILD_FIRST_ORDER )
+	add_definitions( "-DFIRST_ORDER" )
+endif( BUILD_FIRST_ORDER )
+
 # LTMD Library
 file( GLOB LTMD_HEADERS include/LTMD/*.h )
 source_group( "include\\LTMD" FILES ${LTMD_HEADERS} )
