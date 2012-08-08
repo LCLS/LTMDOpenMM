@@ -157,21 +157,6 @@ if( BUILD_GPU )
 
 		install( TARGETS LTMDCuda LIBRARY DESTINATION "lib/plugins" )
 	endif( BUILD_GPU_CUDA )
-
-	option( BUILD_GPU_OPENCL "Build OpenCL GPU code" Off )
-	if( BUILD_GPU_OPENCL )
-		file( GLOB LTMD_OPENCL_HEADERS include/LTMD/OpenCL/*.h )
-		source_group( "include\\LTMD\\OpenCL" FILES ${LTMD_OPENCL_HEADERS} )
-
-		file( GLOB LTMD_OPENCL_SOURCES src/LTMD/OpenCL/*.cpp )
-		source_group( "src\\LTMD\\OpenCL" FILES ${LTMD_OPENCL_SOURCES} )
-
-		add_library( LTMDOpenCL SHARED ${LTMD_OPENCL_HEADERS} ${LTMD_OPENCL_SOURCES})
-		set_target_properties( LTMDOpenCL PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
-		target_link_libraries( LTMDOpenCL OpenMMLTMD )
-
-		install( TARGETS LTMDOpenCL LIBRARY DESTINATION "lib/plugins" )
-	endif( BUILD_GPU_OPENCL )
 endif( BUILD_GPU )
 
 # Testing
@@ -187,7 +172,6 @@ install(
 	PATTERN "*.h"
 	PATTERN ".*" EXCLUDE
 	PATTERN "include/LTMD/CUDA" EXCLUDE
-	PATTERN "include/LTMD/OpenCL" EXCLUDE
 	PATTERN "include/LTMD/Reference" EXCLUDE
 )
 
