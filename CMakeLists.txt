@@ -32,7 +32,7 @@ endif( BUILD_VALIDATION )
 option( BUILD_KERNEL_VALIDATION "Build Kernel Validation Code" Off )
 if( BUILD_KERNEL_VALIDATION )
 	add_definitions( "-DKERNEL_VALIDATION" )
-	endif( BUILD_KERNEL_VALIDATION )
+endif( BUILD_KERNEL_VALIDATION )
 
 # MKL
 option( BUILD_MKL "Build with Intel MKL code" Off )
