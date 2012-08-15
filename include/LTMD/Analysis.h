@@ -77,6 +77,7 @@ namespace OpenMM {
 				void Initialize( Context &context, const Parameters &ltmd );
                 void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 				static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
+                static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
 				unsigned int mParticleCount;
 				std::vector<double> mParticleMass;

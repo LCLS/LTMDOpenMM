@@ -8,10 +8,12 @@ namespace LTMD {
 		class Test : public CppUnit::TestFixture  {
 			private:
 				CPPUNIT_TEST_SUITE( Test );
-				CPPUNIT_TEST( BlockDiagonalize );
+                CPPUNIT_TEST( BlockDiagonalize );
+                CPPUNIT_TEST( GeometricDOF );
 				CPPUNIT_TEST_SUITE_END();
 			public:
 				void BlockDiagonalize();
+                void GeometricDOF();
 		};
 	}
 }
