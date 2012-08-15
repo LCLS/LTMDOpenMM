@@ -156,7 +156,6 @@ namespace OpenMM {
 			int n = 3 * mParticleCount;
 
 			// Copy the positions.
-			bool isBlockDoublePrecision = blockContext->getPlatform().supportsDoublePrecision();
 			vector<Vec3> blockPositions;
 			for( unsigned int i = 0; i < mParticleCount; i++ ) {
 				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
@@ -286,11 +285,8 @@ namespace OpenMM {
 
 			TNT::Array1D<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
-			
-			#pragma omp parallel for
-			for( int i = 0; i < blocks.size(); i++ ) {
-				DiagonalizeBlock( i, h, positions, block_eigval, block_eigvec );
-			}
+
+            DiagonalizeBlocks( h, positions, block_eigval, block_eigvec );
 
 			gettimeofday( &tp_diag, NULL );
       
@@ -746,50 +742,71 @@ namespace OpenMM {
 			std::cout << "[Analysis] Initialize: " << elapsed << "ms" << std::endl;
 #endif
 		}
+        
+        void Analysis::DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ){
+            std::vector<Block> HTilde( blocks.size() );
+            
+            // Create Blocks
+            for( int i = 0; i < blocks.size(); i++ ) {
+                // Find block size
+                const int startatom = 3 * blocks[i];
+                int endatom = 3 * mParticleCount - 1 ;
+                
+                if( i != ( blocks.size() - 1 ) ) {
+                    endatom = 3 * blocks[i + 1] - 1;
+                }
+                
+                const int size = endatom - startatom + 1;
+                
+                // Copy data from big hessian
+                TNT::Array2D<double> h_tilde( size, size, 0.0 );
+                for( int j = startatom; j <= endatom; j++ ) {
+                    for( int k = startatom; k <= endatom; k++ ) {
+                        h_tilde[k - startatom][j - startatom] = hessian[k][j];
+                    }
+                }
+                
+                HTilde[i].StartAtom = startatom;
+                HTilde[i].EndAtom = endatom;
+                HTilde[i].Data = h_tilde;
+            }
+            
+            // Diagonalize Blocks
+            #pragma omp parallel for
+            for( int i = 0; i < blocks.size(); i++ ) {
+                printf( "Diagonalizing Block: %d\n", i );
+                DiagonalizeBlock( HTilde[i], positions, mParticleMass, eval, evec );
+            }
+        }
 		
-		void Analysis::DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
-			const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
-					
-			printf( "Diagonalizing Block: %d\n", block );
-			
-			// 1. Determine the starting and ending index for the block
-			//    This means that the upper left corner of the block will be at (startatom, startatom)
-			//    And the lower right corner will be at (endatom, endatom)
-			const int startatom = 3 * blocks[block];
-			int endatom = 3 * mParticleCount - 1 ;
-			
-			if( block != ( blocks.size() - 1 ) ) {
-				endatom = 3 * blocks[block + 1] - 1;
-			}
-
-			const int size = endatom - startatom + 1;
-
-			// 2. Get the block Hessian Hii
-			//    Right now I'm just doing a copy from the big Hessian
-			//    There's probably a more efficient way but for now I just want things to work..
-			TNT::Array2D<double> h_tilde( size, size, 0.0 );
-			for( int j = startatom; j <= endatom; j++ ) {
-				for( int k = startatom; k <= endatom; k++ ) {
-					h_tilde[k - startatom][j - startatom] = hessian[k][j];
-				}
-			}
-
+        void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
+            const unsigned int size = block.Data.dim1();
+            
 			// 3. Diagonalize the block Hessian only, and get eigenvectors
 			TNT::Array1D<double> di( size, 0.0 );
 			TNT::Array2D<double> Qi( size, size, 0.0 );
-			FindEigenvalues( h_tilde, di, Qi );
+			FindEigenvalues( block.Data, di, Qi );
 
 			// sort eigenvalues by absolute magnitude
 			std::vector<EigenvalueColumn> sortedPairs = SortEigenvalues( di );
 
+            for( int j = 0; j < size; j++ ) {
+				eval[block.StartAtom + j] = di[j];
+                
+				// orthogonalized eigenvectors already sorted by eigenvalue
+				for( int k = 0; k < size; k++ ) {
+					evec[block.StartAtom + k][block.StartAtom + j] = Qi[k][j];
+				}
+			}
+            
 			// find geometric dof
-			TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
+			/*TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
 
 			Vec3 pos_center( 0.0, 0.0, 0.0 );
 			double totalmass = 0.0;
 
-			for( int j = startatom; j <= endatom; j += 3 ) {
-				double mass = mParticleMass[ j / 3 ];
+			for( int j = block.StartAtom; j <= block.EndAtom; j += 3 ) {
+				double mass = Mass[ j / 3 ];
 				pos_center += positions[j / 3] * mass;
 				totalmass += mass;
 			}
@@ -802,8 +819,8 @@ namespace OpenMM {
 			// create geometric dof vectors
 			// iterating over rows and filling in values for 6 vectors as we go
 			for( int j = 0; j < size; j += 3 ) {
-				double atom_index = ( startatom + j ) / 3;
-				double mass = mParticleMass[atom_index];
+				double atom_index = ( block.StartAtom + j ) / 3;
+				double mass = Mass[atom_index];
 				double factor = sqrt( mass ) / norm;
 
 				// translational
@@ -932,13 +949,13 @@ namespace OpenMM {
 			// we assume curr_evec <= size
 			for( int j = 0; j < curr_evec; j++ ) {
 				int col = sortedPairs.at( j ).second;
-				eval[startatom + j] = di[col];
+				eval[block.StartAtom + j] = di[col];
 
 				// orthogonalized eigenvectors already sorted by eigenvalue
 				for( int k = 0; k < size; k++ ) {
-					evec[startatom + k][startatom + j] = Qi_gdof[k][j];
+					evec[block.StartAtom + k][block.StartAtom + j] = Qi_gdof[k][j];
 				}
-			}
+			}*/
 		}
 	}
 }

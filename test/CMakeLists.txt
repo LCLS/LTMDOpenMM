@@ -1,18 +1,7 @@
 include_directories( include ../include )
 
-set( TEST_HEADERS "include/ReferenceTest.h" "include/LibraryTest.h" "include/MathTest.h" )
-set( TEST_SOURCES "src/ReferenceTest.cpp" "src/LibraryTest.cpp" "src/MathTest.cpp" )
-set( LIBS "LTMDReference" )
-
-option( BUILD_GPU "Build GPU code" Off )
-if( BUILD_GPU )
-	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
-	if( BUILD_GPU_CUDA )
-		list( APPEND TEST_HEADERS "include/CudaTest.h" )
-		list( APPEND TEST_SOURCES "src/CudaTest.cpp" )
-		list( APPEND LIBS "LTMDCuda" )
-	endif( BUILD_GPU_CUDA )
-endif( BUILD_GPU ) 
+set( TEST_HEADERS "include/AnalysisTest.h" "include/MathTest.h" )
+set( TEST_SOURCES "src/AnalysisTest.cpp" "src/MathTest.cpp" )
 
 # OpenMM
 set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
@@ -36,7 +25,7 @@ list( APPEND LIBS ${CPPUNIT_LIB} )
 
 # Build
 add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} )
-target_link_libraries( LTMDTest "OpenMMLTMD" ${LIBS} )
+target_link_libraries( LTMDTest "OpenMMLTMD" ${LIBS})
 
 # Copy files
 if( CMAKE_GENERATOR MATCHES "Xcode" )

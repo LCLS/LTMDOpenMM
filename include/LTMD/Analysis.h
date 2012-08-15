@@ -42,6 +42,11 @@
 
 namespace OpenMM {
 	namespace LTMD {
+        struct Block{
+            unsigned int StartAtom, EndAtom;
+            TNT::Array2D<double> Data;
+        };
+        
 		typedef TNT::Array1D<double> EigenvalueArray;
 		typedef std::pair<double,int> EigenvalueColumn;
 		
@@ -68,10 +73,10 @@ namespace OpenMM {
 				
 				const TNT::Array2D<double> CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const;
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
-			private:
+
 				void Initialize( Context &context, const Parameters &ltmd );
-				void DiagonalizeBlock( const unsigned int block, const TNT::Array2D<double>& hessian, 
-					const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
+                void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
+				static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
 				unsigned int mParticleCount;
 				std::vector<double> mParticleMass;
