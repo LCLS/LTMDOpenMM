@@ -812,8 +812,6 @@ namespace OpenMM {
                 test++;
 			}
             
-            std::cout << "Total Mass: " << totalmass << " after " << test << " loops" << std::endl;
-            
 			double norm = sqrt( totalmass );
             
 			// actual center
