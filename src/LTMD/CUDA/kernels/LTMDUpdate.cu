@@ -219,28 +219,24 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), scale = minimScale / sqrtInvMass, factor = invMass * invMaxEigen;
 
-		float4 f = force[atom];
-		f.x *= sqrtInvMass;
-		f.y *= sqrtInvMass;
-		f.z *= sqrtInvMass;
-
+		float3 f = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {
 			float4 m = modes[mode * numAtoms + atom];
 			float weight = weightBuffer[mode];
-			f.x -= m.x * weight;
-			f.y -= m.y * weight;
-			f.z -= m.z * weight;
+			f.x += m.x * weight;
+			f.y += m.y * weight;
+			f.z += m.z * weight;
 		}
 
 		f.x *= scale;
 		f.y *= scale;
 		f.z *= scale;
-		posqP[atom] = f;
+		posqP[atom] = make_float4( force[atom].x - f.x, force[atom].y - f.y, force[atom].z - f.z, 0.0f );
 
 		float4 pos = posq[atom];
-		pos.x += factor * f.x;
-		pos.y += factor * f.y;
-		pos.z += factor * f.z;
+		pos.x += factor * posqP[atom].x;
+		pos.y += factor * posqP[atom].y;
+		pos.z += factor * posqP[atom].z;
 		posq[atom] = pos;
 	}
 }
