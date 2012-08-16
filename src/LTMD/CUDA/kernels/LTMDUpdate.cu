@@ -33,11 +33,7 @@
 #include <iostream>
 using namespace std;
 
-#ifdef DOUBLE_PRECISION
-typedef double Real;
-#else
 typedef float Real;
-#endif
 
 __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau, float dt, float kT, float4 *velm, float4 *force,
 									float4 *random, int *randomPosition, int totalRandoms ) {
@@ -53,16 +49,6 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 
 		const Real sqrtInvMass = sqrt( velm[atom].w );
 
-#ifdef DOUBLE_PRECISION
-		double vx = velm[atom].x, vy = velm[atom].y, vz = velm[atom].z, vw = velm[atom].w;
-		double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
-
-		vx = ( vscale * vx ) + ( fscale * fx * vw ) + ( randomNoise.x * sqrtInvMass );
-		vy = ( vscale * vy ) + ( fscale * fy * vw ) + ( randomNoise.y * sqrtInvMass );
-		vz = ( vscale * vz ) + ( fscale * fz * vw ) + ( randomNoise.z * sqrtInvMass );
-
-		velm[atom] = make_float4( vx, vy, vz, vw );
-#else
 		float4 v = velm[atom];
 		float4 f = force[atom];
 
@@ -71,7 +57,6 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 		v.z = ( vscale * v.z ) + ( fscale * f.z * v.w ) + ( randomNoise.z * sqrtInvMass );
 
 		velm[atom] = v;
-#endif
 	}
 	if( threadIdx.x == 0 ) {
 		rpos += paddedNumAtoms;
@@ -91,17 +76,11 @@ __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float4 *velm, fl
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
 			const int modePos = mode * numAtoms + atom;
 			const Real scale = 1.0f / sqrt( velm[atom].w );
-#ifdef DOUBLE_PRECISION
-			const double vx = velm[atom].x, vy = velm[atom].y, vz = velm[atom].z;
-			const double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
 
-			dot += scale * ( vx * mx + vy * my + vz * mz );
-#else
 			float4 v = velm[atom];
 			float4 m = modes[modePos];
 
 			dot += scale * ( v.x * m.x + v.y * m.y + v.z * m.z );
-#endif
 		}
 
 		dotBuffer[threadIdx.x] = dot;
@@ -129,29 +108,6 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real invMass = velm[atom].w, scale = sqrt( invMass );
 
-#ifdef DOUBLE_PRECISION
-		double vx = 0.0f, vy = 0.0f, vz = 0.0f;
-
-		for( int mode = 0; mode < numModes; mode++ ) {
-			const int modePos = mode * numAtoms + atom;
-			const double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
-			const double weight = weightBuffer[mode];
-			vx += mx * weight;
-			vy += my * weight;
-			vz += mz * weight;
-		}
-
-		vx *= scale;
-		vy *= scale;
-		vz *= scale;
-		velm[atom] = make_float4( vx, vy, vz, invMass );
-
-		double px = posq[atom].x, py = posq[atom].y, pz = posq[atom].z, pw = posq[atom].w;
-		px += dt * vx;
-		py += dt * vy;
-		pz += dt * vz;
-		posq[atom] = make_float4( px, py, pz, pw );
-#else
 		float3 v = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {
 			float4 m = modes[mode * numAtoms + atom];
@@ -171,7 +127,6 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 		pos.y += dt * v.y;
 		pos.z += dt * v.z;
 		posq[atom] = pos;
-#endif
 	}
 }
 
@@ -232,17 +187,10 @@ __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int numModes, float4 *
 			const Real scale = sqrt( velm[atom].w );
 			const int modePos = mode * numAtoms + atom;
 
-#ifdef DOUBLE_PRECISION
-			double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
-			double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
-
-			dot += scale * ( fx * mx + fy * my + fz * mz );
-#else
 			float4 f = force[atom];
 			float4 m = modes[modePos];
 	
 			dot += scale * ( f.x * m.x + f.y * m.y + f.z * m.z );
-#endif
 		}
 		dotBuffer[threadIdx.x] = dot;
 
@@ -271,33 +219,6 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), scale = minimScale / sqrtInvMass, factor = invMass * invMaxEigen;
 
-#ifdef DOUBLE_PRECISION
-		double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z, fw = force[atom].w;
-		fx *= sqrtInvMass;
-		fy *= sqrtInvMass;
-		fz *= sqrtInvMass;
-
-		for( int mode = 0; mode < numModes; mode++ ) {
-			const int modePos = mode * numAtoms + atom;
-			const double weight = weightBuffer[mode];
-			const double mx = modes[modePos].x, my = modes[modePos].y, mz = modes[modePos].z;
-
-			fx -= mx * weight;
-			fy -= my * weight;
-			fz -= mz * weight;
-		}
-
-		fx *= scale;
-		fy *= scale;
-		fz *= scale;
-		posqP[atom] = make_float4( fx, fy, fz, fw );
-
-		double px = posq[atom].x, py = posq[atom].y, pz = posq[atom].z, pw = posq[atom].w;
-		px += factor * fx;
-		py += factor * fy;
-		pz += factor * fz;
-		posq[atom] = make_float4( px, py, pz, pw );
-#else
 		float4 f = force[atom];
 		f.x *= sqrtInvMass;
 		f.y *= sqrtInvMass;
@@ -321,7 +242,6 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 		pos.y += factor * f.y;
 		pos.z += factor * f.z;
 		posq[atom] = pos;
-#endif
 	}
 }
 
@@ -341,16 +261,10 @@ __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, float4 *posqP, floa
 	Real slope = 0.0f;
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real invMass = velm[atom].w;
-
-#ifdef DOUBLE_PRECISION
-		const double xx = posqP[atom].x, xy = posqP[atom].y, xz = posqP[atom].z;
-		const double fx = force[atom].x, fy = force[atom].y, fz = force[atom].z;
-		slope -= invMass * ( xx * fx + xy * fy + xz * fz );
-#else
 		const float4 xp = posqP[atom];
 		const float4 f = force[atom];
+
 		slope -= invMass * ( xp.x * f.x + xp.y * f.y + xp.z * f.z );
-#endif
 	}
 	slopeBuffer[threadIdx.x] = slope;
 	__syncthreads();
@@ -403,19 +317,11 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real factor = velm[atom].w * dlambda;
 
-#ifdef DOUBLE_PRECISION
-		double px = posq[atom].x, py = posq[atom].y, pz = posq[atom].z, pw = posq[atom].w;
-		px += factor * posqP[atom].x;
-		py += factor * posqP[atom].y;
-		pz += factor * posqP[atom].z;
-		posq[atom] = make_float4( px, py, pz, pw );
-#else
 		float4 pos = posq[atom];
 		pos.x += factor * posqP[atom].x;
 		pos.y += factor * posqP[atom].y;
 		pos.z += factor * posqP[atom].z;
 		posq[atom] = pos;
-#endif
 	}
 }
 
