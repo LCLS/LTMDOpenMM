@@ -274,6 +274,7 @@ namespace OpenMM {
 				for( int j = 0; j < i; j++ ) {
 					double avg = 0.5f * ( h[i][j] + h[j][i] );
 					h[i][j] = avg;
+                    h[j][i] = avg;
 				}
 			}
             
