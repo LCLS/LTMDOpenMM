@@ -135,19 +135,6 @@ namespace OpenMM {
 			Context &context = contextImpl.getOwner();
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
-			
-			/*********************************************************************/
-			/*                                                                   */
-			/* Block Hessian Code (Cickovski/Sweet)                              */
-			/*                                                                   */
-			/*********************************************************************/
-            
-			// Initial residue data (where in OpenMM?)
-            
-			// For now, since OpenMM input files do not contain residue information
-			// I am assuming that they will always start with the N-terminus, just for testing.
-			// This is true for the villin.xml but may not be true in the future.
-			// need it to parallelize.
             
 			if( !mInitialized ) {
 				Initialize( context, params );
@@ -155,114 +142,121 @@ namespace OpenMM {
 			
 			int n = 3 * mParticleCount;
             
-			// Copy the positions.
-			vector<Vec3> blockPositions;
-			for( unsigned int i = 0; i < mParticleCount; i++ ) {
-				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
-				blockPositions.push_back( atom );
-			}
+            TNT::Array2D<double> h( n, n, 0.0 );
+            std::vector<Vec3> blockPositions( positions );
             
-			blockContext->setPositions( blockPositions );
-			/*********************************************************************/
-            
-#ifdef FIRST_ORDER
-            vector<Vec3> block_start_forces = blockContext->getState( State::Forces ).getForces();
-#endif
-            
-			TNT::Array2D<double> h( n, n, 0.0 );
-			vector<Vec3> initialBlockPositions( blockPositions );
-			for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
-				// Perturb the ith degree of freedom in EACH block
-				// Note: not all blocks will have i degrees, we have to check for this
-				for( unsigned int j = 0; j < blocks.size(); j++ ) {
-					unsigned int dof_to_perturb = 3 * blocks[j] + i;
-					unsigned int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+            for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
+                for( unsigned int j = 0; j < blocks.size(); j++ ) {
+                    unsigned int dof_to_perturb = 3 * blocks[j] + i;
+                    unsigned int atom_to_perturb = dof_to_perturb / 3;
                     
-					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
-						continue;
-					}
-					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
-						continue;
-					}
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
                     
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] - params.blockDelta;
-				}
+                    blockPositions[atom_to_perturb][dof_to_perturb % 3] = positions[atom_to_perturb][dof_to_perturb % 3] - 2.0 * params.blockDelta;
+                }
                 
-				blockContext->setPositions( blockPositions );
-				vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
+                blockContext->setPositions( blockPositions );
+                vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
                 
-#ifndef FIRST_ORDER
-				// Now, do it again...
-				for( int j = 0; j < blocks.size(); j++ ) {
-					int dof_to_perturb = 3 * blocks[j] + i;
-					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+                for( int j = 0; j < blocks.size(); j++ ) {
+                    int dof_to_perturb = 3 * blocks[j] + i;
+                    int atom_to_perturb = dof_to_perturb / 3;
                     
-					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
-						continue;
-					}
-					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
-						continue;
-					}
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
                     
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3] + params.blockDelta;
-				}
+                    blockPositions[atom_to_perturb][dof_to_perturb % 3] = positions[atom_to_perturb][dof_to_perturb % 3] - params.blockDelta;
+                }
                 
-				blockContext->setPositions( blockPositions );
-				vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
-#endif
+                blockContext->setPositions( blockPositions );
+                vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
                 
-				// revert block positions
-				for( int j = 0; j < blocks.size(); j++ ) {
-					int dof_to_perturb = 3 * blocks[j] + i;
-					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+                for( int j = 0; j < blocks.size(); j++ ) {
+                    int dof_to_perturb = 3 * blocks[j] + i;
+                    int atom_to_perturb = dof_to_perturb / 3;
                     
-					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
-						continue;
-					}
-					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
-						continue;
-					}
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
                     
-					blockPositions[atom_to_perturb][dof_to_perturb % 3] = initialBlockPositions[atom_to_perturb][dof_to_perturb % 3];
-                    
-				}
+                    blockPositions[atom_to_perturb][dof_to_perturb % 3] = positions[atom_to_perturb][dof_to_perturb % 3] + params.blockDelta;
+                }
                 
-				for( int j = 0; j < blocks.size(); j++ ) {
-					int dof_to_perturb = 3 * blocks[j] + i;
-					int atom_to_perturb = dof_to_perturb / 3;  // integer trunc
+                blockContext->setPositions( blockPositions );
+                vector<Vec3> forces3 = blockContext->getState( State::Forces ).getForces();
+                
+                for( int j = 0; j < blocks.size(); j++ ) {
+                    int dof_to_perturb = 3 * blocks[j] + i;
+                    int atom_to_perturb = dof_to_perturb / 3;
                     
-					// Cases to not perturb, in this case just skip the block
-					if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
-						continue;
-					}
-					if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
-						continue;
-					}
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
                     
-					int col = dof_to_perturb;
+                    blockPositions[atom_to_perturb][dof_to_perturb % 3] = positions[atom_to_perturb][dof_to_perturb % 3] + 2.0 * params.blockDelta;
+                }
+                
+                blockContext->setPositions( blockPositions );
+                vector<Vec3> forces4 = blockContext->getState( State::Forces ).getForces();
+                
+                // revert block positions
+                for( int j = 0; j < blocks.size(); j++ ) {
+                    int dof_to_perturb = 3 * blocks[j] + i;
+                    int atom_to_perturb = dof_to_perturb / 3;
                     
-					int start_dof = 3 * blocks[j];
-					int end_dof;
-					if( j == blocks.size() - 1 ) {
-						end_dof = 3 * mParticleCount;
-					} else {
-						end_dof = 3 * blocks[j + 1];
-					}
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
                     
-					for( int k = start_dof; k < end_dof; k++ ) {
-#ifdef FIRST_ORDER
-                        double blockscale = 1.0 / ( params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-                        h[k][col] = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
-#else
-						double blockscale = 1.0 / ( 2 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
-#endif
-					}
-				}
-			}
+                    blockPositions[atom_to_perturb][dof_to_perturb % 3] = positions[atom_to_perturb][dof_to_perturb % 3];
+                    
+                }
+                
+                for( int j = 0; j < blocks.size(); j++ ) {
+                    int dof_to_perturb = 3 * blocks[j] + i;
+                    int atom_to_perturb = dof_to_perturb / 3;
+                    
+                    if( j == blocks.size() - 1 && atom_to_perturb >= mParticleCount ) {
+                        continue;
+                    }
+                    if( j != blocks.size() - 1 && atom_to_perturb >= blocks[j + 1] ) {
+                        continue;
+                    }
+                    
+                    int col = dof_to_perturb;
+                    
+                    int start_dof = 3 * blocks[j];
+                    int end_dof;
+                    if( j == blocks.size() - 1 ) {
+                        end_dof = 3 * mParticleCount;
+                    } else {
+                        end_dof = 3 * blocks[j + 1];
+                    }
+                    
+                    for( int k = start_dof; k < end_dof; k++ ) {
+                        double blockscale = 1.0 / ( 12.0 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
+                        h[k][col] = ( -forces1[k / 3][k % 3] + 8.0 * forces2[k / 3][k % 3] - 8.0 * forces3[k / 3][k % 3] + forces4[k / 3][k % 3]) * blockscale;
+                    }
+                }
+            }
             
 			gettimeofday( &tp_hess, NULL );
             
@@ -347,50 +341,51 @@ namespace OpenMM {
             
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
-            
-#ifdef FIRST_ORDER
-            vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
-#endif
-            
-			// Loop over i.
 			for( unsigned int k = 0; k < m; k++ ) {
-				// Perturb positions.
-				int pos = 0;
-                
-				// forward perturbations
+				// backward two perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
-						pos++;
+						tmppos[i][j] = positions[i][j] - 2.0 * eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 					}
 				}
+                
 				context.setPositions( tmppos );
+				vector<Vec3> forces1 = context.getState( State::Forces ).getForces();
                 
-				// Calculate F(xi).
-				vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
-                
-#ifndef FIRST_ORDER
-				// backward perturbations
+                // backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 					}
 				}
-				context.setPositions( tmppos );
                 
-				// Calculate forces
-				vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
-#endif
+				context.setPositions( tmppos );
+				vector<Vec3> forces2 = context.getState( State::Forces ).getForces();
+                
+				// forward perturbations
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
+					for( unsigned int j = 0; j < 3; j++ ) {
+						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+					}
+				}
+                
+				context.setPositions( tmppos );
+				vector<Vec3> forces3 = context.getState( State::Forces ).getForces();
+                
+                // forward two perturbations
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
+					for( unsigned int j = 0; j < 3; j++ ) {
+						tmppos[i][j] = positions[i][j] + 2.0 * eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+					}
+				}
+                
+				context.setPositions( tmppos );
+				vector<Vec3> forces4 = context.getState( State::Forces ).getForces();
                 
 				for( int i = 0; i < n; i++ ) {
-#ifdef FIRST_ORDER
-                    const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 1.0 * eps;
-                    HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
-#else
-					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
-					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
-#endif
-				}
+                    const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 12.0 * eps;
+                    HE[i][k] = -( -forces1[i / 3][i % 3]  + 8.0 * forces2[i / 3][i % 3] - 8.0 * forces3[i / 3][i % 3] + forces4[i / 3][i % 3] ) / scaleFactor;
+                }
                 
 				// restore positions
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
@@ -399,6 +394,7 @@ namespace OpenMM {
 					}
 				}
 			}
+            
             
 			// *****************************************************************
 			// restore unperturbed positions
