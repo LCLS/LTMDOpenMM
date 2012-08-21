@@ -65,9 +65,6 @@ namespace OpenMM {
 				const std::vector<std::vector<Vec3> >& getEigenvectors() const {
 					return eigenvectors;
 				}
-				double getMaxEigenvalue() const {
-					return maxEigenvalue;
-				}
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 				
@@ -88,7 +85,6 @@ namespace OpenMM {
 				std::vector<std::vector<int> > particleBonds;
 				std::vector<std::vector<double> > projection;
 				std::vector<std::vector<Vec3> > eigenvectors;
-				double maxEigenvalue;
 				Context *blockContext;
 				std::vector<int> blocks;
 		};

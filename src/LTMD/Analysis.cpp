@@ -441,7 +441,6 @@ namespace OpenMM {
 					Q[j][i] = q[j][sortedEvalues[i].second];
 				}
 			}
-			maxEigenvalue = sortedEvalues[dS.dim() - 1].first;
             
 			gettimeofday( &tp_q, NULL );
             
