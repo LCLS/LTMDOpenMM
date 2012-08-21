@@ -262,50 +262,51 @@ namespace OpenMM {
             
 			// Make a temp copy of positions.
 			vector<Vec3> tmppos( positions );
-            
-#ifdef FIRST_ORDER
-            vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
-#endif
-            
-			// Loop over i.
-			for( unsigned int k = 0; k < m; k++ ) {
-				// Perturb positions.
-				int pos = 0;
-                
-				// forward perturbations
+			for( unsigned int k = 0; k < m; k++ ) {                
+				// backward two perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
-						pos++;
+						tmppos[i][j] = positions[i][j] - 2.0 * eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 					}
 				}
+                
 				context.setPositions( tmppos );
+				vector<Vec3> forces1 = context.getState( State::Forces ).getForces();
                 
-				// Calculate F(xi).
-				vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
-                
-#ifndef FIRST_ORDER
-				// backward perturbations
+                // backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
 						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
 					}
 				}
+                
 				context.setPositions( tmppos );
+				vector<Vec3> forces2 = context.getState( State::Forces ).getForces();
                 
-				// Calculate forces
-				vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
-#endif
-                
-				for( int i = 0; i < n; i++ ) {
-#ifdef FIRST_ORDER
-                    const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 1.0 * eps;
-                    HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
-#else
-					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
-					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
-#endif
+				// forward perturbations
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
+					for( unsigned int j = 0; j < 3; j++ ) {
+						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+					}
 				}
+                
+				context.setPositions( tmppos );
+				vector<Vec3> forces3 = context.getState( State::Forces ).getForces();
+                
+                // forward two perturbations
+				for( unsigned int i = 0; i < mParticleCount; i++ ) {
+					for( unsigned int j = 0; j < 3; j++ ) {
+						tmppos[i][j] = positions[i][j] + 2.0 * eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+					}
+				}
+                
+				context.setPositions( tmppos );
+				vector<Vec3> forces4 = context.getState( State::Forces ).getForces();
+       
+				for( int i = 0; i < n; i++ ) {
+                    const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 12.0 * eps;
+                    HE[i][k] = -( -forces1[i / 3][i % 3]  + 8.0 * forces2[i / 3][i % 3] - 8.0 * forces3[i / 3][i % 3] + forces4[i / 3][i % 3] ) / scaleFactor;
+                }
                 
 				// restore positions
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
@@ -315,7 +316,6 @@ namespace OpenMM {
 				}
 			}
             
-			// *****************************************************************
 			// restore unperturbed positions
 			context.setPositions( positions );
             
