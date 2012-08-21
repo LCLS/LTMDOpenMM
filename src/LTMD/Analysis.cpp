@@ -141,38 +141,39 @@ namespace OpenMM {
             TNT::Array2D<double> h( n, n, 0.0 );
             std::vector<Vec3> blockPositions( positions );
             
-#ifdef FIRST_ORDER
-            vector<Vec3> forces0 = context.getState( State::Forces ).getForces();
-#endif
-            
             // Set position and calculate forces
             for( unsigned int i = 0; i < n; i++ ){
-                // Perturb backward
-                blockPositions[i/3][i%3] = positions[i/3][i%3] - params.blockDelta;
+                // Perturb two backward
+                blockPositions[i/3][i%3] = positions[i/3][i%3] - 2.0 * params.blockDelta;
                 
                 context.setPositions( blockPositions );
                 vector<Vec3> forces1 = context.getState( State::Forces ).getForces();
-
-#ifndef FIRST_ORDER
-                // Perturb forward
-                blockPositions[i/3][i%3] = positions[i/3][i%3] + params.blockDelta;
+                
+                // Perturb backward
+                blockPositions[i/3][i%3] = positions[i/3][i%3] - params.blockDelta;
 
                 context.setPositions( blockPositions );
                 vector<Vec3> forces2 = context.getState( State::Forces ).getForces();
-#endif
+                
+                // Perturb forward
+                blockPositions[i/3][i%3] = positions[i/3][i%3] + params.blockDelta;
+                
+                context.setPositions( blockPositions );
+                vector<Vec3> forces3 = context.getState( State::Forces ).getForces();
+                
+                // Perturb two forward
+                blockPositions[i/3][i%3] = positions[i/3][i%3] + 2.0 * params.blockDelta;
+                
+                context.setPositions( blockPositions );
+                vector<Vec3> forces4 = context.getState( State::Forces ).getForces();
 
                 // Revert
                 blockPositions[i/3][i%3] = positions[i/3][i%3];
 
                 // Fill matrix
                 for( int j = 0; j < n; j++ ){
-#ifdef FIRST_ORDER
-                    double blockscale = 1.0 / (params.blockDelta * sqrt(mParticleMass[i/3] * mParticleMass[j/3]));
-                    h[j][i] = (forces1[j/3][j%3] - forces0[j/3][j%3]) * blockscale;
-#else
-                    double blockscale = 1.0 / (2 * params.blockDelta * sqrt(mParticleMass[i/3] * mParticleMass[j/3]));
-                    h[j][i] = (forces1[j/3][j%3] - forces2[j/3][j%3]) * blockscale;
-#endif
+                    double blockscale = 1.0 / ( 12.0 * params.blockDelta * sqrt( mParticleMass[i/3] * mParticleMass[j / 3] ) );
+                    h[j][i] = ( -forces1[j / 3][j % 3] + 8.0 * forces2[j / 3][j % 3] - 8.0 * forces3[j / 3][j % 3] + forces4[j / 3][j % 3]) * blockscale;
                 }
             }
 
