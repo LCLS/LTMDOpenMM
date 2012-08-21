@@ -52,19 +52,14 @@ namespace OpenMM {
 		
 		class OPENMM_EXPORT Analysis {
 			public:
-				Analysis() : mParticleCount( 0 ), mLargestBlockSize( -1 ) {
-					mInitialized = false;
-					blockContext = NULL;
-				}
-				~Analysis() {
-					if( blockContext ) {
-						delete blockContext;
-					}
-				}
+				Analysis() : mParticleCount( 0 ) {}
+				~Analysis() {}
+            
 				void computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params );
 				const std::vector<std::vector<Vec3> >& getEigenvectors() const {
 					return eigenvectors;
 				}
+            
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 				
@@ -77,15 +72,8 @@ namespace OpenMM {
                 static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
 				unsigned int mParticleCount;
-				std::vector<double> mParticleMass;
-				
-				int mLargestBlockSize;
-				bool mInitialized;
-				std::vector<std::pair<int, int> > bonds;
-				std::vector<std::vector<int> > particleBonds;
-				std::vector<std::vector<double> > projection;
+				std::vector<double> mParticleMass;           
 				std::vector<std::vector<Vec3> > eigenvectors;
-				Context *blockContext;
 				std::vector<int> blocks;
 		};
 	}

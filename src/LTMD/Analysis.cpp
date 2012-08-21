@@ -133,8 +133,16 @@ namespace OpenMM {
             
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
+            System &system = context.getSystem();
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
+            
+            mParticleCount = context.getState( State::Positions ).getPositions().size();
+			
+			mParticleMass.reserve( mParticleCount );
+			for( unsigned int i = 0; i < mParticleCount; i++ ){
+				mParticleMass.push_back( system.getParticleMass( i ) );
+			}
             
 			int n = 3 * mParticleCount;
             
