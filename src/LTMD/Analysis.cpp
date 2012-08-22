@@ -137,7 +137,7 @@ namespace OpenMM {
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
             
-            mParticleCount = context.getState( State::Positions ).getPositions().size();
+            mParticleCount = positions.size();
 			
 			mParticleMass.reserve( mParticleCount );
 			for( unsigned int i = 0; i < mParticleCount; i++ ){
@@ -174,9 +174,6 @@ namespace OpenMM {
                 
                 context.setPositions( blockPositions );
                 vector<Vec3> forces4 = context.getState( State::Forces ).getForces();
-
-                // Revert
-                blockPositions[i/3][i%3] = positions[i/3][i%3];
 
                 // Fill matrix
                 for( int j = 0; j < n; j++ ){

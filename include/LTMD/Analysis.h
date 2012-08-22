@@ -66,7 +66,6 @@ namespace OpenMM {
 				const TNT::Array2D<double> CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const;
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
 
-				void Initialize( Context &context, const Parameters &ltmd );
                 void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 				static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
                 static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
