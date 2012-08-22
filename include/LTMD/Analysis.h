@@ -52,7 +52,7 @@ namespace OpenMM {
 		
 		class OPENMM_EXPORT Analysis {
 			public:
-				Analysis() : mParticleCount( 0 ) {}
+				Analysis() : mInitialized( false ), mParticleCount( 0 ) {}
 				~Analysis() {}
             
 				void computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params );
@@ -70,10 +70,12 @@ namespace OpenMM {
 				static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
                 static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
 			private:
+                bool mInitialized;
 				unsigned int mParticleCount;
-				std::vector<double> mParticleMass;           
+                std::vector<double> mParticleMass;
+                std::vector<int> blocks;
+            
 				std::vector<std::vector<Vec3> > eigenvectors;
-				std::vector<int> blocks;
 		};
 	}
 }

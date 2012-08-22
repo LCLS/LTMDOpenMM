@@ -137,12 +137,24 @@ namespace OpenMM {
 			State state = context.getState( State::Positions | State::Forces );
 			vector<Vec3> positions = state.getPositions();
             
-            mParticleCount = positions.size();
-			
-			mParticleMass.reserve( mParticleCount );
-			for( unsigned int i = 0; i < mParticleCount; i++ ){
-				mParticleMass.push_back( system.getParticleMass( i ) );
-			}
+            if( !mInitialized ) {
+                mParticleCount = positions.size();
+                
+                mParticleMass.reserve( mParticleCount );
+                for( unsigned int i = 0; i < mParticleCount; i++ ){
+                    mParticleMass.push_back( system.getParticleMass( i ) );
+                }
+                
+                int block_start = 0;
+                for( int i = 0; i < params.residue_sizes.size(); i++ ) {
+                    if( i % params.res_per_block == 0 ) {
+                        blocks.push_back( block_start );
+                    }
+                    block_start += params.residue_sizes[i];
+                }
+             
+                mInitialized = true;
+            }
             
 			int n = 3 * mParticleCount;
             
