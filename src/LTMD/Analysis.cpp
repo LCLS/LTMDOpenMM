@@ -794,7 +794,7 @@ namespace OpenMM {
         
         void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
             // find geometric dof
-            TNT::Array1D<double> values = eval;
+            TNT::Array1D<double> values = eval.copy();
 			TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
             
 			Vec3 pos_center( 0.0, 0.0, 0.0 );
