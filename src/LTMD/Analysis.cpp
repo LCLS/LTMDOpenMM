@@ -768,10 +768,14 @@ namespace OpenMM {
             }
             
             // Diagonalize Blocks
-#pragma omp parallel for
+            #pragma omp parallel for
             for( int i = 0; i < blocks.size(); i++ ) {
                 printf( "Diagonalizing Block: %d\n", i );
                 DiagonalizeBlock( HTilde[i], positions, mParticleMass, eval, evec );
+                GeometricDOF( HTilde[i].Data.dim1(), HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
+            }
+            
+            for( int i = 0; i < blocks.size(); i++ ) {
                 GeometricDOF( HTilde[i].Data.dim1(), HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
             }
         }
