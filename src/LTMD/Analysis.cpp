@@ -910,7 +910,7 @@ namespace OpenMM {
                 
 				// copy original vector to Qi_gdof -- updated in place
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof[l][curr_evec] = evec[l][col];
+					Qi_gdof[l][curr_evec] = evec[start+l][start+col];
 				}
                 
 				// get dot products with previous vectors
@@ -919,7 +919,7 @@ namespace OpenMM {
 					// orthogonalized vectors
 					double dot_prod = 0.0;
 					for( int l = 0; l < size; l++ ) {
-						dot_prod += Qi_gdof[l][k] * evec[l][col];
+						dot_prod += Qi_gdof[l][k] * evec[start+l][start+col];
 					}
                     
 					// subtract from current vector -- update in place
