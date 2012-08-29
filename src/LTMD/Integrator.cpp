@@ -227,8 +227,8 @@ namespace OpenMM {
 		
 		void Integrator::DiagonalizeMinimize() {
 			if( !mParameters.ShouldProtoMolDiagonalize ) {
-        computeProjectionVectors();
-        minimize( mParameters.MaximumMinimizationIterations);
+        		computeProjectionVectors();
+        		//minimize( mParameters.MaximumMinimizationIterations);
 			}
 		}
 
