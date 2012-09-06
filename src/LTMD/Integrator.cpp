@@ -51,7 +51,7 @@ namespace OpenMM {
 			: stepsSinceDiagonalize( 0 ), mParameters( params ), maxEigenvalue( 4.34e5 ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
- 			setStepSize( stepSize );
+			setStepSize( stepSize );
 			setConstraintTolerance( 1e-4 );
 			setMinimumLimit( mParameters.minLimit );
 			setRandomNumberSeed( ( int ) time( 0 ) );
@@ -227,8 +227,7 @@ namespace OpenMM {
 		
 		void Integrator::DiagonalizeMinimize() {
 			if( !mParameters.ShouldProtoMolDiagonalize ) {
-        computeProjectionVectors();
-        minimize( mParameters.MaximumMinimizationIterations);
+				computeProjectionVectors();
 			}
 		}
 
