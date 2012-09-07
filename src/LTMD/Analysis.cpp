@@ -894,7 +894,7 @@ namespace OpenMM {
 			
 			// orthogonalize original eigenvectors against gdof
 			// number of evec that survive orthogonalization
-			int curr_evec = ConservedDegreesOfFreedom;
+			unsigned int curr_evec = ConservedDegreesOfFreedom;
 			for( int j = 0; j < size; j++ ) { // <-- vector we're orthogonalizing
 				// to match ProtoMol we only include size instead of size + cdof vectors
 				// Note: for every vector that is skipped due to a low norm,
@@ -914,7 +914,7 @@ namespace OpenMM {
 				}
 				
 				// get dot products with previous vectors
-				for( int k = 0; k < curr_evec; k++ ) { // <-- vector orthog against
+				for( int k = 0; k <= ConservedDegreesOfFreedom; k++ ) { // <-- vector orthog against
 					// dot product between original vector and previously
 					// orthogonalized vectors
 					double dot_prod = 0.0;

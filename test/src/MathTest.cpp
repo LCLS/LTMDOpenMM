@@ -25,7 +25,7 @@ namespace LTMD {
 			expectedValues[2] =  2.0;
 
 			for( unsigned int i = 0; i < values.dim(); i++ ) {
-				CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedValues[i], values[i], 1e-3 );
+				CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedValues[i], values[i], 1e-2 );
 			}
 
 			TNT::Array2D<double> expectedVectors( 3, 3, 0.0 );
@@ -48,7 +48,7 @@ namespace LTMD {
 			}
 
 			for( unsigned int i = 0; i < values.dim(); i++ ) {
-				CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0, overlap[i], 1e-3 );
+				CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0, overlap[i], 1e-2 );
 			}
 		}
 
