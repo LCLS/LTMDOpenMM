@@ -18,6 +18,7 @@ namespace OpenMM {
 			// 1/10 * ( 1 / MaxEigenvalue )
 			MinimumLambdaValue = 2e-7;
 			
+            DeviceID = -1;
 			ShouldProtoMolDiagonalize = false;
 		}
 	}

@@ -36,6 +36,7 @@ namespace OpenMM {
 
 			double MinimumLambdaValue;
 			
+            int DeviceID;
 			bool ShouldProtoMolDiagonalize;
 			
 			Parameters();

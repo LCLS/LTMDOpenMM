@@ -717,22 +717,36 @@ namespace OpenMM {
 			if( blockContext ) {
 				delete blockContext;
 			}
-			
-			switch( params.BlockDiagonalizePlatform ){
-				case Preference::Reference:{
-					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Reference" ) );
+            
+            std::string sPlatform = "";
+            switch( params.BlockDiagonalizePlatform ){
+				case Preference::Reference:
+					sPlatform = "Reference";
 					break;
-				}
-				case Preference::OpenCL:{
-					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "OpenCL" ) );
+				case Preference::OpenCL:
+					sPlatform = "OpenCL";
 					break;
-				}
-				case Preference::CUDA:{
-					blockContext = new Context( *blockSystem, *integ, Platform::getPlatformByName( "Cuda" ) );
+                case Preference::CUDA:
+                    sPlatform = "Cuda";
 					break;
-				}
 			}
-			
+            
+            OpenMM::Platform& platform = OpenMM::Platform::getPlatformByName( sPlatform );
+            
+            if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ){
+                std::ostringstream stream;
+                stream << params.DeviceID;
+                
+                std::cout << "OpenMM Block Device: " << params.DeviceID << std::endl;
+                
+                if( params.BlockDiagonalizePlatform == 1 ){
+                    platform.setPropertyDefaultValue("OpenCLDeviceIndex", stream.str() );
+                }else{
+                    platform.setPropertyDefaultValue("CudaDevice", stream.str() );
+                }
+            }
+            
+            blockContext = new Context( *blockSystem, *integ, platform );
 			
 			mInitialized = true;
 			
