@@ -928,7 +928,7 @@ namespace OpenMM {
 				}
 				
 				// get dot products with previous vectors
-				for( int k = 0; k <= ConservedDegreesOfFreedom; k++ ) { // <-- vector orthog against
+				for( int k = 0; k < curr_evec; k++ ) { // <-- vector orthog against
 					// dot product between original vector and previously
 					// orthogonalized vectors
 					double dot_prod = 0.0;
