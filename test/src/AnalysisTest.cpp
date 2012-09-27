@@ -93,7 +93,7 @@ namespace LTMD {
 			std::vector<double> mass = Read1D("data/block_masses.txt");
 			
 			// Perform Calculation
-			TNT::Array1D<double> eval( block.Data.dim1(), 0.0 );
+            std::vector<double> eval( block.Data.dim1(), 0.0 );
 			TNT::Array2D<double> evec( block.Data.dim1(), block.Data.dim1(), 0.0 );
 			  
 			OpenMM::LTMD::Analysis::DiagonalizeBlock( block, position, mass, eval, evec );
@@ -107,7 +107,7 @@ namespace LTMD {
 			// Compare Values
 			int max_pos = 0;
 			double max_diff = 0.0;
-			for( int i = 0; i < eval.dim1(); i++ ){
+			for( int i = 0; i < eval.size(); i++ ){
 				double diff = expected_eval[i] - eval[i];
 				if( diff > max_diff ) {
 					max_pos = i;
@@ -132,7 +132,7 @@ namespace LTMD {
 			}
 			
 			// Rewrite for Overlap
-			for( int i = 0; i < eval.dim1(); i++ ){
+			for( int i = 0; i < eval.size(); i++ ){
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			
@@ -187,8 +187,8 @@ namespace LTMD {
 			
 			// Perform Calculation
 			const unsigned int size = end;
-			TNT::Array1D<double> eval( size, 0.0 );
-			for( int i = 0; i < eval.dim1(); i++ ){
+            std::vector<double> eval( size, 0.0 );
+			for( int i = 0; i < eval.size(); i++ ){
 				eval[i] = eval_data[i];
 			}
 			
@@ -223,7 +223,7 @@ namespace LTMD {
 			std::cout << "Testing Values" << std::endl;
 			int max_pos = 0;
 			double max_diff = 0.0;
-			for( int i = 0; i < eval.dim1(); i++ ){
+			for( int i = 0; i < eval.size(); i++ ){
 				double diff = expected_eval[i] - eval[i];
 				if( diff > max_diff ) {
 					max_pos = i;
@@ -280,7 +280,7 @@ namespace LTMD {
 			std::cout << "Max Error: " << max_diff << " : " << expected_evec[ierror][jerror] << ", " << evec[ierror][jerror] << std::endl;
 			
 			// Rewrite for Overlap
-			for( int i = 0; i < eval.dim1(); i++ ){
+			for( int i = 0; i < eval.size(); i++ ){
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			

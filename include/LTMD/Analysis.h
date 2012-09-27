@@ -47,7 +47,7 @@ namespace OpenMM {
             TNT::Array2D<double> Data;
         };
         
-		typedef TNT::Array1D<double> EigenvalueArray;
+		typedef std::vector<double> EigenvalueArray;
 		typedef std::pair<double,int> EigenvalueColumn;
 		
 		class OPENMM_EXPORT Analysis {
@@ -72,9 +72,9 @@ namespace OpenMM {
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
 
 				void Initialize( Context &context, const Parameters &ltmd );
-                void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
-				static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
-                static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec );
+                void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, TNT::Array2D<double>& evec );
+                static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec );
+                static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec );
 			private:
 				unsigned int mParticleCount;
 				std::vector<double> mParticleMass;

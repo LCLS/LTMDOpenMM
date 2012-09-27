@@ -56,8 +56,13 @@ void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<dou
 /**
  * We assume input matrix is square and symmetric.
  */
-void FindEigenvalues( const TNT::Array2D<double>& matrix, TNT::Array1D<double>& values, TNT::Array2D<double>& vectors ) {
+void FindEigenvalues( const TNT::Array2D<double>& matrix, std::vector<double>& values, TNT::Array2D<double>& vectors ) {
 	JAMA::Eigenvalue<double> decomp( matrix );
-	decomp.getRealEigenvalues( values );
+    
+    TNT::Array1D<double> eval( values.size(), 0.0 );
+	decomp.getRealEigenvalues( eval );
+    
 	decomp.getV( vectors );
+    
+    for( size_t i = 0; i < values.size(); i++ ) values[i] = eval[i];
 }

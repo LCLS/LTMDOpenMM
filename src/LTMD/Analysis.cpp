@@ -97,8 +97,8 @@ namespace OpenMM {
 			std::vector<EigenvalueColumn> retVal;
 			
 			// Create Array
-			retVal.reserve( values.dim() );
-			for( unsigned int i = 0; i < values.dim(); i++ ){
+			retVal.reserve( values.size() );
+			for( unsigned int i = 0; i < values.size(); i++ ){
 				retVal.push_back( std::make_pair( std::fabs( values[i] ), i ) );
 			}
 			
@@ -284,7 +284,7 @@ namespace OpenMM {
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
 			
-			TNT::Array1D<double> block_eigval( n, 0.0 );
+            std::vector<double> block_eigval( n, 0.0 );
 			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
 			
 			DiagonalizeBlocks( h, positions, block_eigval, block_eigvec );
@@ -428,7 +428,7 @@ namespace OpenMM {
 			cout << "Time to compute matrix S: " << sMatrixElapsed << "ms" << endl;
 			
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
-			TNT::Array1D<double> dS( m, 0.0 );
+            std::vector<double> dS( m, 0.0 );
 			TNT::Array2D<double> q( m, m, 0.0 );
 			FindEigenvalues( S, dS, q );
 			
@@ -757,7 +757,7 @@ namespace OpenMM {
 #endif
 		}
 		
-		void Analysis::DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ){
+		void Analysis::DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, TNT::Array2D<double>& evec ){
 			std::vector<Block> HTilde( blocks.size() );
 			
 			// Create Blocks
@@ -794,11 +794,11 @@ namespace OpenMM {
 			}
 		}
 		
-		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
+		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec ) {
 			const unsigned int size = block.Data.dim1();
 			
 			// 3. Diagonalize the block Hessian only, and get eigenvectors
-			TNT::Array1D<double> di( size, 0.0 );
+            std::vector<double> di( size, 0.0 );
 			TNT::Array2D<double> Qi( size, size, 0.0 );
 			FindEigenvalues( block.Data, di, Qi );
 			
@@ -810,9 +810,9 @@ namespace OpenMM {
 			}
 		}
 		
-		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, TNT::Array1D<double>& eval, TNT::Array2D<double>& evec ) {
+		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec ) {
 			// find geometric dof
-			TNT::Array1D<double> values( size, 0.0 );
+            std::vector<double> values( size );
 			for( int i = 0; i < size; i++ ){
 				values[i] = eval[start + i];
 			}

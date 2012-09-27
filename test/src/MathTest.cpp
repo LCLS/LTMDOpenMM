@@ -15,16 +15,16 @@ namespace LTMD {
 			a[1][0] = 1.0; a[1][1] = 0.0; a[1][2] = 1.0;
 			a[2][0] = 0.0; a[2][1] = 1.0; a[2][2] = 1.0;
 
-			TNT::Array1D<double> values( 3 );
+            std::vector<double> values( 3 );
 
 			FindEigenvalues( a, values, vectors );
 
-			TNT::Array1D<double> expectedValues( 3 );
+            std::vector<double> expectedValues( 3 );
 			expectedValues[0] = -1.0;
 			expectedValues[1] =  1.0;
 			expectedValues[2] =  2.0;
 
-			for( unsigned int i = 0; i < values.dim(); i++ ) {
+			for( unsigned int i = 0; i < values.size(); i++ ) {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedValues[i], values[i], 1e-2 );
 			}
 
@@ -47,7 +47,7 @@ namespace LTMD {
 				overlap[i] = sum;
 			}
 
-			for( unsigned int i = 0; i < values.dim(); i++ ) {
+			for( unsigned int i = 0; i < values.size(); i++ ) {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0, overlap[i], 1e-2 );
 			}
 		}
