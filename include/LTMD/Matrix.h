@@ -33,12 +33,12 @@ struct Matrix{
 		return *this;
 	}
     
-    double& operator()( const size_t x, const size_t y ){
-        return Data[x * Width + y];
+    double& operator()( const size_t row, const size_t col ){
+        return Data[col * Height + row];
     }
     
-    const double operator()( const size_t x, const size_t y ) const{
-        return Data[x * Width + y];
+    const double operator()( const size_t row, const size_t col ) const{
+        return Data[col * Height + row];
     }
 };
 

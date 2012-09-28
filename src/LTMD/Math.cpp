@@ -13,7 +13,7 @@ extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, d
 void MatrixMultiply( const Matrix& matrixA, const Matrix& matrixB, Matrix& matrixC ) {
 	int m = matrixA.Width, k = matrixA.Height, n = matrixB.Height;
 
-	char transa = 'T', transb = 'T';
+	char transa = 'N', transb = 'N';
 	double alpha = 1.0;
 	double beta = 0.0;
 	int lda = k, ldb = n, ldc = m;
