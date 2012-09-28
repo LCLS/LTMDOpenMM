@@ -700,7 +700,7 @@ namespace OpenMM {
 		}
 		
 		void Analysis::DiagonalizeBlocks( const Matrix& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, Matrix& evec ){
-			std::vector<Block> HTilde;
+			std::vector<Block> HTilde( blocks.size() );
 			
 			// Create Blocks
 			for( int i = 0; i < blocks.size(); i++ ) {
@@ -712,12 +712,18 @@ namespace OpenMM {
 					endatom = 3 * blocks[i + 1] - 1;
 				}
 				
-                Block block( startatom, endatom );
-				
+				HTilde[i].StartAtom = startatom;
+				HTilde[i].EndAtom = endatom;
+				std::cout << i << " " << &HTilde[i] << " " << endatom << " " << startatom << " " << endatom - startatom + 1 << std::endl;
+				Matrix test( endatom - startatom + 1, endatom - startatom + 1 );
+				std::cout << "Test Passed" << std::endl;
+				HTilde[i].Data = test;
+				std::cout << "Initialized Block" << std::endl;
+
 				// Copy data from big hessian
 				for( int j = startatom; j <= endatom; j++ ) {
 					for( int k = startatom; k <= endatom; k++ ) {
-						block.Data(k - startatom,j - startatom) = hessian(k,j);
+						HTilde[i].Data(k - startatom,j - startatom) = hessian(k,j);
 					}
 				}
 			}

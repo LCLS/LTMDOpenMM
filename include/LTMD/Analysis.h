@@ -45,9 +45,9 @@ namespace OpenMM {
         struct Block{
             unsigned int StartAtom, EndAtom;
             Matrix Data;
-            
-            Block( size_t start, size_t end ) : StartAtom( start ), EndAtom( end ), Data( end - start, end - start ){
-            }
+
+			Block() : StartAtom( 0 ), EndAtom( 0 ), Data() {}            
+            Block( size_t start, size_t end ) : StartAtom( start ), EndAtom( end ), Data( end - start + 1, end - start + 1){}
         };
         
 		typedef std::vector<double> EigenvalueArray;
