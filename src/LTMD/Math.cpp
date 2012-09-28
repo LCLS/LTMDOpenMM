@@ -4,65 +4,50 @@
 #include <mkl_blas.h>
 #include <mkl_lapack.h>
 #include <mkl_lapacke.h>
+#else
+extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
 #endif
-
-#include "tnt_array2d_utils.h"
 
 #include <vector>
 
-void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<double>& matrixB, TNT::Array2D<double>& matrixC ) {
+void MatrixMultiply( const Matrix& matrixA, const Matrix& matrixB, Matrix& matrixC ) {
+	int m = matrixA.Width, k = matrixA.Height, n = matrixB.Height;
+
+	char transa = 'T', transb = 'T';
+	double alpha = 1.0;
+	double beta = 0.0;
+	int lda = k, ldb = n, ldc = m;
+
 #ifdef INTEL_MKL
-  std::vector<double> a( matrixA.dim1() * matrixA.dim2() );
-
-  for( int i = 0; i < matrixA.dim1(); i++ ) {
-    for( int j = 0; j < matrixA.dim2(); j++ ) {
-      a[i * matrixA.dim2() + j] = matrixA[i][j];
-    }
-  }
-
-  std::vector<double> b( matrixB.dim1() * matrixB.dim2());
-
-	for( int i = 0; i < matrixB.dim1(); i++ ) {
-    for( int j = 0; j < matrixB.dim2(); j++ ) {
-      b[i * matrixB.dim2() + j] = matrixB[i][j];
-    }
-  }
-
-	const int m = matrixA.dim1();
-	const int k = matrixA.dim2();
-	const int n = matrixB.dim2();
-
-	const char transa = 'T';
-	const char transb = 'T';
-	const double alpha = 1.0;
-	const double beta = 0.0;
-	const int lda = k;
-	const int ldb = n;
-	const int ldc = m;
-	std::vector<double> c( matrixA.dim1() * matrixB.dim2() );
-	
-	dgemm( &transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc );
-
-	for( int i = 0; i < matrixB.dim2(); i++ ) {
-    for( int j = 0; j < matrixA.dim1(); j++ ) {
-      matrixC[j][i] = c[i * matrixA.dim1() + j];
-    }
-  }
+	dgemm( &transa, &transb, &m, &n, &k, &alpha, &matrixA.Data[0], &lda, &matrixB.Data[0], &ldb, &beta, &matrixC.Data[0], &ldc );
 #else
-	matrixC = matmult( matrixA, matrixB );
+    dgemm_( &transa, &transb, &m, &n, &k, &alpha, (double*)&matrixA.Data[0], &lda, (double*)&matrixB.Data[0], &ldb, &beta, &matrixC.Data[0], &ldc );
 #endif
 }
 
 /**
  * We assume input matrix is square and symmetric.
  */
-void FindEigenvalues( const TNT::Array2D<double>& matrix, std::vector<double>& values, TNT::Array2D<double>& vectors ) {
-	JAMA::Eigenvalue<double> decomp( matrix );
+void FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
+    TNT::Array2D<double> mat( matrix.Width, matrix.Height );
+    for( size_t i = 0; i < mat.dim1(); i++ ){
+        for( size_t j = 0; j < mat.dim2(); j++ ){
+            mat[i][j] = matrix( i, j );
+        }
+    }
+    
+	JAMA::Eigenvalue<double> decomp( mat );
     
     TNT::Array1D<double> eval( values.size(), 0.0 );
 	decomp.getRealEigenvalues( eval );
     
-	decomp.getV( vectors );
+    TNT::Array2D<double> evec( vectors.Width, vectors.Height );
+	decomp.getV( evec );
     
-    for( size_t i = 0; i < values.size(); i++ ) values[i] = eval[i];
+    for( size_t i = 0; i < evec.dim1(); i++ ){
+        values[i] = eval[i];
+        for( size_t j = 0; j < evec.dim2(); j++ ){
+            vectors( i, j ) = evec[i][j];
+        }
+    }
 }

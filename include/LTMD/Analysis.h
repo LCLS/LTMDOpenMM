@@ -37,14 +37,17 @@
 #include <vector>
 
 #include "OpenMM.h"
-#include "jama_eig.h"
 #include "LTMD/Parameters.h"
+#include "LTMD/Matrix.h"
 
 namespace OpenMM {
 	namespace LTMD {
         struct Block{
             unsigned int StartAtom, EndAtom;
-            TNT::Array2D<double> Data;
+            Matrix Data;
+            
+            Block( size_t start, size_t end ) : StartAtom( start ), EndAtom( end ), Data( end - start, end - start ){
+            }
         };
         
 		typedef std::vector<double> EigenvalueArray;
@@ -68,13 +71,13 @@ namespace OpenMM {
 				unsigned int blockNumber( int );
 				bool inSameBlock( int, int, int, int );
 				
-				const TNT::Array2D<double> CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const;
+				const Matrix CalculateU( const Matrix& E, const Matrix& Q ) const;
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray& values );
 
 				void Initialize( Context &context, const Parameters &ltmd );
-                void DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, TNT::Array2D<double>& evec );
-                static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec );
-                static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec );
+                void DiagonalizeBlocks( const Matrix& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, Matrix& evec );
+                static void DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec );
+                static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec );
 			private:
 				unsigned int mParticleCount;
 				std::vector<double> mParticleMass;

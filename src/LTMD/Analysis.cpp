@@ -52,12 +52,6 @@ namespace OpenMM {
 	namespace LTMD {
 		const unsigned int ConservedDegreesOfFreedom = 6;
 		
-		// Function Declarations
-		void WriteS(const TNT::Array2D<double>& S);
-		void WriteHessian( const TNT::Array2D<double>& H );
-		void WriteBlockEigs( const TNT::Array2D<double>& H );
-		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes );
-		
 		// Function Implementations
 		unsigned int Analysis::blockNumber( int p ) {
 			unsigned int block = 0;
@@ -108,15 +102,14 @@ namespace OpenMM {
 			return retVal;
 		}
 		
-		const TNT::Array2D<double> Analysis::CalculateU( const TNT::Array2D<double>& E, const TNT::Array2D<double>& Q ) const {
+		const Matrix Analysis::CalculateU( const Matrix& E, const Matrix& Q ) const {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			TNT::Array2D<double> retVal( E.dim1(), Q.dim2(), 0.0 );
-			
+            Matrix retVal( E.Width, Q.Height );
 			MatrixMultiply( E, Q, retVal );
-			
+            
 #ifdef PROFILE_ANALYSIS
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -134,7 +127,7 @@ namespace OpenMM {
 			gettimeofday( &tp_begin, NULL );
 			Context &context = contextImpl.getOwner();
 			State state = context.getState( State::Positions | State::Forces );
-			vector<Vec3> positions = state.getPositions();
+            std::vector<Vec3> positions = state.getPositions();
 			
 			/*********************************************************************/
 			/*                                                                   */
@@ -156,7 +149,7 @@ namespace OpenMM {
 			int n = 3 * mParticleCount;
 			
 			// Copy the positions.
-			vector<Vec3> blockPositions;
+            std::vector<Vec3> blockPositions;
 			for( unsigned int i = 0; i < mParticleCount; i++ ) {
 				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
 				blockPositions.push_back( atom );
@@ -169,8 +162,8 @@ namespace OpenMM {
 			vector<Vec3> block_start_forces = blockContext->getState( State::Forces ).getForces();
 #endif
 			
-			TNT::Array2D<double> h( n, n, 0.0 );
-			vector<Vec3> initialBlockPositions( blockPositions );
+			Matrix h( n, n );
+			std::vector<Vec3> initialBlockPositions( blockPositions );
 			for( unsigned int i = 0; i < mLargestBlockSize; i++ ) {
 				// Perturb the ith degree of freedom in EACH block
 				// Note: not all blocks will have i degrees, we have to check for this
@@ -190,7 +183,7 @@ namespace OpenMM {
 				}
 				
 				blockContext->setPositions( blockPositions );
-				vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
+				std::vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
 				
 #ifndef FIRST_ORDER
 				// Now, do it again...
@@ -210,7 +203,7 @@ namespace OpenMM {
 				}
 				
 				blockContext->setPositions( blockPositions );
-				vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
+				std::vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
 #endif
 				
 				// revert block positions
@@ -255,10 +248,10 @@ namespace OpenMM {
 					for( int k = start_dof; k < end_dof; k++ ) {
 #ifdef FIRST_ORDER
 						double blockscale = 1.0 / ( params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-						h[k][col] = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
+						h(k,col) = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
 #else
 						double blockscale = 1.0 / ( 2 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-						h[k][col] = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
+						h(k,col) = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 #endif
 					}
 				}
@@ -267,32 +260,32 @@ namespace OpenMM {
 			gettimeofday( &tp_hess, NULL );
 			
 			const double hessElapsed = ( tp_hess.tv_sec - tp_begin.tv_sec ) * 1000.0 + ( tp_hess.tv_usec - tp_begin.tv_usec ) / 1000.0;
-			cout << "Time to compute hessian: " << hessElapsed << "ms" << endl;
+			std::cout << "Time to compute hessian: " << hessElapsed << "ms" << std::endl;
 			
 			// Make sure it is exactly symmetric.
 			for( int i = 0; i < n; i++ ) {
 				for( int j = 0; j < i; j++ ) {
-					double avg = 0.5f * ( h[i][j] + h[j][i] );
-					h[i][j] = avg;
-					h[j][i] = avg;
+					double avg = 0.5f * ( h(i,j) + h(j,i) );
+					h(i,j) = avg;
+					h(j,i) = avg;
 				}
 			}
 			
-			WriteHessian( h );
+			//WriteHessian( h );
 			
 			// Diagonalize each block Hessian, get Eigenvectors
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
 			
-            std::vector<double> block_eigval( n, 0.0 );
-			TNT::Array2D<double> block_eigvec( n, n, 0.0 );
+            std::vector<double> block_eigval( n );
+			Matrix block_eigvec( n, n );
 			
 			DiagonalizeBlocks( h, positions, block_eigval, block_eigvec );
 			
 			gettimeofday( &tp_diag, NULL );
 			
 			const double diagElapsed = ( tp_diag.tv_sec - tp_hess.tv_sec ) * 1000.0 + ( tp_diag.tv_usec - tp_hess.tv_usec ) / 1000.0;
-			cout << "Time to diagonalize block hessian: " << diagElapsed << "ms" << endl;
+            std::cout << "Time to diagonalize block hessian: " << diagElapsed << "ms" << std::endl;
 			
 			//***********************************************************
 			// This section here is only to find the cuttoff eigenvalue.
@@ -305,7 +298,7 @@ namespace OpenMM {
 			double cutEigen = sortedEvalues[max_eigs].first;  // This is the cutoff eigenvalue
 			
 			// get cols of all eigenvalues under cutoff
-			vector<int> selectedEigsCols;
+			std::vector<int> selectedEigsCols;
 			for( int i = 0; i < n; i++ ) {
 				if( fabs( block_eigval[i] ) < cutEigen ) {
 					selectedEigsCols.push_back( i );
@@ -321,13 +314,12 @@ namespace OpenMM {
 			// Again, right now I'm only worried about
 			// correctness plus this time will be marginal compared to
 			// diagonalization.
-			TNT::Array2D<double> E( n, m, 0.0 );
-			TNT::Array2D<double> E_transpose( m, n, 0.0 );
+			Matrix E( n, m ), E_transpose( m, n );
 			for( int i = 0; i < m; i++ ) {
 				int eig_col = selectedEigsCols[i];
 				for( int j = 0; j < n; j++ ) {
-					E_transpose[i][j] = block_eigvec[j][eig_col];
-					E[j][i] = block_eigvec[j][eig_col];
+					E_transpose(i,j) = block_eigvec(j,eig_col);
+					E(j,i) = block_eigvec(j,eig_col);
 				}
 			}
 			
@@ -336,17 +328,17 @@ namespace OpenMM {
 			const double eElapsed = ( tp_e.tv_sec - tp_diag.tv_sec ) * 1000.0 + ( tp_e.tv_usec - tp_diag.tv_usec ) / 1000.0;
 			std::cout << "Time to compute E: " << eElapsed << "ms" << std::endl;
 			
-			WriteBlockEigs( E );
+			//WriteBlockEigs( E );
 			
 			//*****************************************************************
 			// Compute S, which is equal to E^T * H * E.
-			TNT::Array2D<double> S( m, m, 0.0 );
-			TNT::Array2D<double> HE(n , m, 0.0);
+			Matrix S( m, m );
+			Matrix HE( n, m );
 			// Compute eps.
 			const double eps = params.sDelta;
 			
 			// Make a temp copy of positions.
-			vector<Vec3> tmppos( positions );
+			std::vector<Vec3> tmppos( positions );
 			
 #ifdef FIRST_ORDER
 			vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
@@ -360,35 +352,35 @@ namespace OpenMM {
 				// forward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] + eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+						tmppos[i][j] = positions[i][j] + eps * E(3 * i + j,k) / sqrt( mParticleMass[i] );
 						pos++;
 					}
 				}
 				context.setPositions( tmppos );
 				
 				// Calculate F(xi).
-				vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
 				
 #ifndef FIRST_ORDER
 				// backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] - eps * E[3 * i + j][k] / sqrt( mParticleMass[i] );
+						tmppos[i][j] = positions[i][j] - eps * E(3 * i + j,k) / sqrt( mParticleMass[i] );
 					}
 				}
 				context.setPositions( tmppos );
 				
 				// Calculate forces
-				vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
 #endif
 				
 				for( int i = 0; i < n; i++ ) {
 #ifdef FIRST_ORDER
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 1.0 * eps;
-					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
+					HE(i,k) = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
 #else
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
-					HE[i][k] = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
+					HE(i,k) = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 #endif
 				}
 				
@@ -407,61 +399,61 @@ namespace OpenMM {
 			gettimeofday( &tp_s, NULL );
 			
 			const double sElapsed = ( tp_s.tv_sec - tp_e.tv_sec ) * 1000.0 + ( tp_s.tv_usec - tp_e.tv_usec ) / 1000.0;
-			cout << "Time to compute S: " << sElapsed << "ms" << endl;
+			std::cout << "Time to compute S: " << sElapsed << "ms" << std::endl;
 			
 			MatrixMultiply( E_transpose, HE, S );
 			
-			WriteS(S);
+			//WriteS(S);
 			
 			// make S symmetric
-			for( unsigned int i = 0; i < S.dim1(); i++ ) {
-				for( unsigned int j = 0; j < S.dim2(); j++ ) {
-					double avg = 0.5f * ( S[i][j] + S[j][i] );
-					S[i][j] = avg;
-					S[j][i] = avg;
+			for( unsigned int i = 0; i < S.Width; i++ ) {
+				for( unsigned int j = 0; j < S.Height; j++ ) {
+					double avg = 0.5f * ( S(i,j) + S(j,i) );
+					S(i,j) = avg;
+					S(j,i) = avg;
 				}
 			}
 			
 			gettimeofday( &tp_s_matrix, NULL );
 			
 			const double sMatrixElapsed = ( tp_s_matrix.tv_sec - tp_s.tv_sec ) * 1000.0 + ( tp_s_matrix.tv_usec - tp_s.tv_usec ) / 1000.0;
-			cout << "Time to compute matrix S: " << sMatrixElapsed << "ms" << endl;
+			std::cout << "Time to compute matrix S: " << sMatrixElapsed << "ms" << std::endl;
 			
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
-            std::vector<double> dS( m, 0.0 );
-			TNT::Array2D<double> q( m, m, 0.0 );
+            std::vector<double> dS( m );
+			Matrix q( m, m );
 			FindEigenvalues( S, dS, q );
 			
 			// Sort by ABSOLUTE VALUE of eigenvalues.
 			sortedEvalues = SortEigenvalues( dS );
 			
-			TNT::Array2D<double> Q( q.dim2(), q.dim1(), 0.0 );
+			Matrix Q( q.Height, q.Width );
 			for( int i = 0; i < sortedEvalues.size(); i++ ){
-				for( int j = 0; j < q.dim2(); j++ ) {
-					Q[j][i] = q[j][sortedEvalues[i].second];
+				for( int j = 0; j < q.Height; j++ ) {
+					Q(j,i) = q(j,sortedEvalues[i].second);
 				}
 			}
 			
 			gettimeofday( &tp_q, NULL );
 			
 			const double qElapsed = ( tp_q.tv_sec - tp_s.tv_sec ) * 1000.0 + ( tp_q.tv_usec - tp_s.tv_usec ) / 1000.0;
-			cout << "Time to compute Q: " << qElapsed << "ms" << endl;
+			std::cout << "Time to compute Q: " << qElapsed << "ms" << std::endl;
 			
-			TNT::Array2D<double> U = CalculateU( E, Q );
+			Matrix U = CalculateU( E, Q );
 			
 			gettimeofday( &tp_u, NULL );
 			
 			const double uElapsed = ( tp_u.tv_sec - tp_q.tv_sec ) * 1000.0 + ( tp_u.tv_usec - tp_q.tv_usec ) / 1000.0;
-			cout << "Time to compute U: " << uElapsed << "ms" << endl;
+			std::cout << "Time to compute U: " << uElapsed << "ms" << std::endl;
 			
 			const unsigned int modes = params.modes;
 			
-			WriteModes( U, modes );
+			//WriteModes( U, modes );
 			
-			eigenvectors.resize( modes, vector<Vec3>( mParticleCount ) );
+			eigenvectors.resize( modes, std::vector<Vec3>( mParticleCount ) );
 			for( unsigned int i = 0; i < modes; i++ ) {
 				for( unsigned int j = 0; j < mParticleCount; j++ ) {
-					eigenvectors[i][j] = Vec3( U[3 * j][i], U[3 * j + 1][i], U[3 * j + 2][i] );
+					eigenvectors[i][j] = Vec3( U(3 * j, i), U(3 * j + 1, i), U(3 * j + 2,i) );
 				}
 			}
 			
@@ -469,57 +461,7 @@ namespace OpenMM {
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
 		}
-		
-		void WriteS(const TNT::Array2D<double>& S)
-		{
-#ifdef VALIDATION
-			std::ofstream file("s.txt");
-			file.precision(10);
-			for( unsigned int i = 0; i < S.dim2(); i++ ) {
-				for( unsigned int j = 0; j < S.dim1(); j++ ) {
-					file << j << " " << i << " " << S[j][i] << std::endl;
-				}
-			}
-#endif
-		}
-		
-		void WriteHessian( const TNT::Array2D<double>& H ) {
-#ifdef VALIDATION
-			std::ofstream file( "block_hessian.txt" );
-			file.precision( 10 );
-			for( unsigned int i = 0; i < H.dim2(); i++ ) {
-				for( unsigned int j = 0; j < H.dim1(); j++ ) {
-					file << j << " " << i << " " << H[j][i] << std::endl;
-				}
-			}
-#endif
-		}
-		
-		
-		void WriteBlockEigs( const TNT::Array2D<double>& matrix ) {
-#ifdef VALIDATION
-			std::ofstream file( "block_eigs.txt" );
-			file.precision( 10 );
-			for( unsigned int i = 0; i < matrix.dim2(); i++ ) {
-				for( unsigned int j = 0; j < matrix.dim1(); j++ ) {
-					file << j << " " << i << " " << matrix[j][i] << std::endl;
-				}
-			}
-#endif
-		}
-		
-		void WriteModes( const TNT::Array2D<double>& U, const unsigned int modes ) {
-#ifdef VALIDATION
-			std::ofstream file( "eigenvectors.txt" );
-			file.precision( 10 );
-			for( unsigned int i = 0; i < modes; i++ ) {
-				for( unsigned int j = 0; j < U.dim1(); j++ ) {
-					file << j << " " << i << " " << U[j][i] << std::endl;
-				}
-			}
-#endif
-		}
-		
+				
 		void Analysis::Initialize( Context &context, const Parameters &params ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
@@ -539,7 +481,7 @@ namespace OpenMM {
 			
 			// Create New System
 			System *blockSystem = new System();
-			cout << "res per block " << params.res_per_block << endl;
+			std::cout << "res per block " << params.res_per_block << std::endl;
 			for( int i = 0; i < mParticleCount; i++ ) {
 				blockSystem->addParticle( mParticleMass[i] );
 			}
@@ -560,8 +502,8 @@ namespace OpenMM {
 			}
 			
 			mLargestBlockSize *= 3; // degrees of freedom in the largest block
-			cout << "blocks " << blocks.size() << endl;
-			cout << blocks[blocks.size() - 1] << endl;
+			std::cout << "blocks " << blocks.size() << std::endl;
+			std::cout << blocks[blocks.size() - 1] << std::endl;
 			
 			// Creating a whole new system called the blockSystem.
 			// This system will only contain bonds, angles, dihedrals, and impropers
@@ -573,10 +515,10 @@ namespace OpenMM {
 			// Copy all atoms into the block system.
 			
 			// Copy the center of mass force.
-			cout << "adding forces..." << endl;
+			std::cout << "adding forces..." << std::endl;
 			for( int i = 0; i < params.forces.size(); i++ ) {
-				string forcename = params.forces[i].name;
-				cout << "Adding force " << forcename << " at index " << params.forces[i].index << endl;
+				std::string forcename = params.forces[i].name;
+				std::cout << "Adding force " << forcename << " at index " << params.forces[i].index << std::endl;
 				if( forcename == "CenterOfMass" ) {
 					blockSystem->addForce( &system.getForce( params.forces[i].index ) );
 				} else if( forcename == "Bond" ) {
@@ -652,19 +594,19 @@ namespace OpenMM {
 					
 					// store exceptions
 					// exceptions[p1][p2] = params
-					map<int, map<int, vector<double> > > exceptions;
+					std::map<int, std::map<int, std::vector<double> > > exceptions;
 					
 					for( int i = 0; i < nbf->getNumExceptions(); i++ ) {
 						int p1, p2;
 						double q, sig, eps;
 						nbf->getExceptionParameters( i, p1, p2, q, sig, eps );
 						if( inSameBlock( p1, p2 ) ) {
-							vector<double> params;
+							std::vector<double> params;
 							params.push_back( q );
 							params.push_back( sig );
 							params.push_back( eps );
 							if( exceptions.count( p1 ) == 0 ) {
-								map<int, vector<double> > pair_exception;
+								std::map<int, std::vector<double> > pair_exception;
 								pair_exception[p2] = params;
 								exceptions[p1] = pair_exception;
 							} else {
@@ -682,12 +624,12 @@ namespace OpenMM {
 							}
 							// we have an exception -- 1-4 modified interactions, etc.
 							if( exceptions.count( i ) == 1 && exceptions[i].count( j ) == 1 ) {
-								vector<double> params = exceptions[i][j];
+								std::vector<double> params = exceptions[i][j];
 								cbf->addBond( i, j, params );
 							}
 							// no exception, normal interaction
 							else {
-								vector<double> params;
+								std::vector<double> params;
 								double q1, q2, eps1, eps2, sigma1, sigma2, q, eps, sigma;
 								
 								nbf->getParticleParameters( i, q1, sigma1, eps1 );
@@ -708,10 +650,10 @@ namespace OpenMM {
 					
 					blockSystem->addForce( cbf );
 				} else {
-					cout << "Unknown Force: " << forcename << endl;
+					std::cout << "Unknown Force: " << forcename << std::endl;
 				}
 			}
-			cout << "done." << endl;
+			std::cout << "done." << std::endl;
 			
 			VerletIntegrator *integ = new VerletIntegrator( 0.000001 );
 			if( blockContext ) {
@@ -757,8 +699,8 @@ namespace OpenMM {
 #endif
 		}
 		
-		void Analysis::DiagonalizeBlocks( const TNT::Array2D<double>& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, TNT::Array2D<double>& evec ){
-			std::vector<Block> HTilde( blocks.size() );
+		void Analysis::DiagonalizeBlocks( const Matrix& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, Matrix& evec ){
+			std::vector<Block> HTilde;
 			
 			// Create Blocks
 			for( int i = 0; i < blocks.size(); i++ ) {
@@ -770,19 +712,14 @@ namespace OpenMM {
 					endatom = 3 * blocks[i + 1] - 1;
 				}
 				
-				const int size = endatom - startatom + 1;
+                Block block( startatom, endatom );
 				
 				// Copy data from big hessian
-				TNT::Array2D<double> h_tilde( size, size, 0.0 );
 				for( int j = startatom; j <= endatom; j++ ) {
 					for( int k = startatom; k <= endatom; k++ ) {
-						h_tilde[k - startatom][j - startatom] = hessian[k][j];
+						block.Data(k - startatom,j - startatom) = hessian(k,j);
 					}
 				}
-				
-				HTilde[i].StartAtom = startatom;
-				HTilde[i].EndAtom = endatom;
-				HTilde[i].Data = h_tilde;
 			}
 			
 			// Diagonalize Blocks
@@ -790,34 +727,34 @@ namespace OpenMM {
 			for( int i = 0; i < blocks.size(); i++ ) {
 				printf( "Diagonalizing Block: %d\n", i );
 				DiagonalizeBlock( HTilde[i], positions, mParticleMass, eval, evec );
-				GeometricDOF( HTilde[i].Data.dim1(), HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
+				GeometricDOF( HTilde[i].Data.Width, HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
 			}
 		}
 		
-		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec ) {
-			const unsigned int size = block.Data.dim1();
+		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec ) {
+			const unsigned int size = block.Data.Width;
 			
 			// 3. Diagonalize the block Hessian only, and get eigenvectors
-            std::vector<double> di( size, 0.0 );
-			TNT::Array2D<double> Qi( size, size, 0.0 );
+            std::vector<double> di( size );
+			Matrix Qi( size, size );
 			FindEigenvalues( block.Data, di, Qi );
 			
 			for( int j = 0; j < size; j++ ) {
 				eval[block.StartAtom + j] = di[j];
 				for( int k = 0; k < size; k++ ) {
-					evec[block.StartAtom + k][block.StartAtom + j] = Qi[k][j];
+					evec(block.StartAtom + k,block.StartAtom + j) = Qi(k,j);
 				}
 			}
 		}
 		
-		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, TNT::Array2D<double>& evec ) {
+		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec ) {
 			// find geometric dof
             std::vector<double> values( size );
 			for( int i = 0; i < size; i++ ){
 				values[i] = eval[start + i];
 			}
 
-			TNT::Array2D<double> Qi_gdof( size, size, 0.0 );
+			Matrix Qi_gdof( size, size );
 			
 			Vec3 pos_center( 0.0, 0.0, 0.0 );
 			double totalmass = 0.0;
@@ -843,9 +780,9 @@ namespace OpenMM {
 				double factor = sqrt( mass ) / norm;
 				
 				// translational
-				Qi_gdof[j][0]   = factor;
-				Qi_gdof[j + 1][1] = factor;
-				Qi_gdof[j + 2][2] = factor;
+				Qi_gdof(j,0)   = factor;
+				Qi_gdof(j + 1,1) = factor;
+				Qi_gdof(j + 2,2) = factor;
 				
 				// rotational
 				// cross product of rotation axis and vector to center of molecule
@@ -854,28 +791,28 @@ namespace OpenMM {
 				// z-axis (b3=1) ia2-ja1
 				Vec3 diff = positions[atom_index] - pos_center;
 				// x
-				Qi_gdof[j + 1][3] =  diff[2] * factor;
-				Qi_gdof[j + 2][3] = -diff[1] * factor;
+				Qi_gdof(j + 1,3) =  diff[2] * factor;
+				Qi_gdof(j + 2,3) = -diff[1] * factor;
 				
 				// y
-				Qi_gdof[j][4]   = -diff[2] * factor;
-				Qi_gdof[j + 2][4] =  diff[0] * factor;
+				Qi_gdof(j,4)   = -diff[2] * factor;
+				Qi_gdof(j + 2,4) =  diff[0] * factor;
 				
 				// z
-				Qi_gdof[j][5]   =  diff[1] * factor;
-				Qi_gdof[j + 1][5] = -diff[0] * factor;
+				Qi_gdof(j,5)   =  diff[1] * factor;
+				Qi_gdof(j + 1,5) = -diff[0] * factor;
 			}
 			
 			// normalize first rotational vector
 			double rotnorm = 0.0;
 			for( int j = 0; j < size; j++ ) {
-				rotnorm += Qi_gdof[j][3] * Qi_gdof[j][3];
+				rotnorm += Qi_gdof(j,3) * Qi_gdof(j,3);
 			}
 			
 			rotnorm = 1.0 / sqrt( rotnorm );
 			
 			for( int j = 0; j < size; j++ ) {
-				Qi_gdof[j][3] = Qi_gdof[j][3] * rotnorm;
+				Qi_gdof(j,3) = Qi_gdof(j,3) * rotnorm;
 			}
 			
 			// orthogonalize rotational vectors 2 and 3
@@ -883,23 +820,23 @@ namespace OpenMM {
 				for( int k = 3; k < j; k++ ) { // <-- vectors we're orthognalizing against
 					double dot_prod = 0.0;
 					for( int l = 0; l < size; l++ ) {
-						dot_prod += Qi_gdof[l][k] * Qi_gdof[l][j];
+						dot_prod += Qi_gdof(l,k) * Qi_gdof(l,j);
 					}
 					for( int l = 0; l < size; l++ ) {
-						Qi_gdof[l][j] = Qi_gdof[l][j] - Qi_gdof[l][k] * dot_prod;
+						Qi_gdof(l,j) = Qi_gdof(l,j) - Qi_gdof(l,k) * dot_prod;
 					}
 				}
 				
 				// normalize residual vector
 				double rotnorm = 0.0;
 				for( int l = 0; l < size; l++ ) {
-					rotnorm += Qi_gdof[l][j] * Qi_gdof[l][j];
+					rotnorm += Qi_gdof(l,j) * Qi_gdof(l,j);
 				}
 				
 				rotnorm = 1.0 / sqrt( rotnorm );
 				
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof[l][j] = Qi_gdof[l][j] * rotnorm;
+					Qi_gdof(l,j) = Qi_gdof(l,j) * rotnorm;
 				}
 			}
 			
@@ -924,7 +861,7 @@ namespace OpenMM {
 				
 				// copy original vector to Qi_gdof -- updated in place
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof[l][curr_evec] = evec[start+l][start+col];
+					Qi_gdof(l,curr_evec) = evec(start+l,start+col);
 				}
 				
 				// get dot products with previous vectors
@@ -933,19 +870,19 @@ namespace OpenMM {
 					// orthogonalized vectors
 					double dot_prod = 0.0;
 					for( int l = 0; l < size; l++ ) {
-						dot_prod += Qi_gdof[l][k] * evec[start+l][start+col];
+						dot_prod += Qi_gdof(l,k) * evec(start+l,start+col);
 					}
 					
 					// subtract from current vector -- update in place
 					for( int l = 0; l < size; l++ ) {
-						Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] - Qi_gdof[l][k] * dot_prod;
+						Qi_gdof(l,curr_evec) = Qi_gdof(l,curr_evec) - Qi_gdof(l,k) * dot_prod;
 					}
 				}
 				
 				//normalize residual vector
 				double norm = 0.0;
 				for( int l = 0; l < size; l++ ) {
-					norm += Qi_gdof[l][curr_evec] * Qi_gdof[l][curr_evec];
+					norm += Qi_gdof(l,curr_evec) * Qi_gdof(l,curr_evec);
 				}
 				
 				// if norm less than 1/20th of original
@@ -959,7 +896,7 @@ namespace OpenMM {
 				// scale vector
 				norm = sqrt( norm );
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof[l][curr_evec] = Qi_gdof[l][curr_evec] / norm;
+					Qi_gdof(l,curr_evec) = Qi_gdof(l,curr_evec) / norm;
 				}
 				
 				curr_evec++;
@@ -975,7 +912,7 @@ namespace OpenMM {
 				
 				// orthogonalized eigenvectors already sorted by eigenvalue
 				for( int k = 0; k < size; k++ ) {
-					evec[start + k][start + j] = Qi_gdof[k][j];
+					evec(start + k,start + j) = Qi_gdof(k,j);
 				}
 			}
 		}

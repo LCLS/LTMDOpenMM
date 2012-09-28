@@ -2,9 +2,11 @@
 #define OPENMM_LTMD_MATH_H_
 
 #include <vector>
+#include "LTMD/Matrix.h"
+
 #include "jama_eig.h"
 
-void MatrixMultiply( const TNT::Array2D<double>& a, const TNT::Array2D<double>& b, TNT::Array2D<double>& c );
-void FindEigenvalues( const TNT::Array2D<double>& matrix, std::vector<double>& values, TNT::Array2D<double>& vectors );
+void MatrixMultiply( const Matrix& a, const Matrix& b, Matrix& c );
+void FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors );
 
 #endif // OPENMM_LTMD_MATH_H_

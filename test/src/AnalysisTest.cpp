@@ -50,27 +50,23 @@ namespace LTMD {
 		void Test::BlockDiagonalize() {
 			std::cout << "Block Diagonalization" << std::endl;
 			
-			OpenMM::LTMD::Block block;
+			
 			
 			// Read Block Data
 			std::ifstream sBlock("data/block.txt");
-			if( sBlock.good() ){
-				unsigned int width, height;
-				sBlock >> width >> height;
-				
-				TNT::Array2D<double> data( width, height, 0.0 );
-				
-				for( int i = 0; i < width; i++ ){
-					for( int j = 0; j < height; j++ ){
-						sBlock >> data[i][j];
-					}
-				}
-				
-				block.Data = data;
-				block.StartAtom = 0;
-				block.EndAtom = width/3;
-			}
-			sBlock.close();
+            unsigned int width, height;
+            sBlock >> width >> height;
+            
+            OpenMM::LTMD::Block block( width, height );
+            
+            for( int i = 0; i < width; i++ ){
+                for( int j = 0; j < height; j++ ){
+                    sBlock >> block.Data(i,j);
+                }
+            }
+
+            block.StartAtom = 0;
+            block.EndAtom = width/3;
 			
 			// Read Positions
 			std::vector<OpenMM::Vec3> position;
@@ -93,8 +89,8 @@ namespace LTMD {
 			std::vector<double> mass = Read1D("data/block_masses.txt");
 			
 			// Perform Calculation
-            std::vector<double> eval( block.Data.dim1(), 0.0 );
-			TNT::Array2D<double> evec( block.Data.dim1(), block.Data.dim1(), 0.0 );
+            std::vector<double> eval( block.Data.Width );
+			Matrix evec( block.Data.Width, block.Data.Height );
 			  
 			OpenMM::LTMD::Analysis::DiagonalizeBlock( block, position, mass, eval, evec );
 			
@@ -119,9 +115,9 @@ namespace LTMD {
 			max_diff = 0.0;
 			max_pos = 0;
 			int max_pos_y = 0;
-			for( int i = 0; i < evec.dim1(); i++ ){
-				for( int j = 0; j < evec.dim2(); j++ ){
-					double diff = std::abs(expected_evec[i][j] - evec[i][j]);
+			for( int i = 0; i < evec.Width; i++ ){
+				for( int j = 0; j < evec.Height; j++ ){
+					double diff = std::abs(expected_evec[i][j] - evec(i,j));
 					
 					if( diff > max_diff ) {
 						max_pos = i;
@@ -136,9 +132,9 @@ namespace LTMD {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			
-			for( int i = 0; i < evec.dim1(); i++ ){
-				for( int j = 0; j < evec.dim2(); j++ ){
-					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec[i][j]), 1e-3 );
+			for( int i = 0; i < evec.Width; i++ ){
+				for( int j = 0; j < evec.Height; j++ ){
+					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec(i,j)), 1e-3 );
 				}
 			}
 		}
@@ -192,10 +188,10 @@ namespace LTMD {
 				eval[i] = eval_data[i];
 			}
 			
-			TNT::Array2D<double> evec( size, size, 0.0 );
-			for( int i = 0; i < evec.dim1(); i++ ){
-				for( int j = 0; j < evec.dim2(); j++ ){
-					evec[i][j] = evec_data[i][j];
+			Matrix evec( size, size );
+			for( int i = 0; i < evec.Width; i++ ){
+				for( int j = 0; j < evec.Height; j++ ){
+					evec(i,j) = evec_data[i][j];
 				}
 			}
 			
@@ -204,9 +200,9 @@ namespace LTMD {
 			// Write Vectors
 			std::ofstream sv("vectors.txt");
 			if( sv.good() ){
-				for( int i = 0; i < evec.dim1(); i++ ){
-					for( int j = 0; j < evec.dim2(); j++ ){
-						sv << evec[i][j] << " ";
+				for( int i = 0; i < evec.Width; i++ ){
+					for( int j = 0; j < evec.Height; j++ ){
+						sv << evec(i,j) << " ";
 					}
 					sv << std::endl;
 				}
@@ -238,13 +234,13 @@ namespace LTMD {
 			max_diff = 0.0;
 			int ierror, jerror;
 			
-			for( int j = 0; j < evec.dim2(); j++ ){
+			for( int j = 0; j < evec.Height; j++ ){
 				double max_j_diffp = 0.0, max_j_diffm = 0.0;
 				int im = 0, ip = 0, jm = 0, jp = 0;
 				
-				for( int i = 0; i < evec.dim1(); i++ ){
-					double diff = std::abs(expected_evec[i][j] - evec[i][j]);
-					double diffp = std::abs(expected_evec[i][j] + evec[i][j]);
+				for( int i = 0; i < evec.Width; i++ ){
+					double diff = std::abs(expected_evec[i][j] - evec(i,j));
+					double diffp = std::abs(expected_evec[i][j] + evec(i,j));
 					
 					if( diff > max_j_diffm ) {
 						im=i;
@@ -277,16 +273,16 @@ namespace LTMD {
 			}
 		
 			std::cout << "IJ: " << ierror << ", " << jerror << std::endl;
-			std::cout << "Max Error: " << max_diff << " : " << expected_evec[ierror][jerror] << ", " << evec[ierror][jerror] << std::endl;
+			std::cout << "Max Error: " << max_diff << " : " << expected_evec[ierror][jerror] << ", " << evec(ierror,jerror) << std::endl;
 			
 			// Rewrite for Overlap
 			for( int i = 0; i < eval.size(); i++ ){
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			
-			for( int i = 0; i < evec.dim1(); i++ ){
-				for( int j = 0; j < evec.dim2(); j++ ){
-					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec[i][j]), 1e-3 );
+			for( int i = 0; i < evec.Width; i++ ){
+				for( int j = 0; j < evec.Height; j++ ){
+					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec(i,j)), 1e-3 );
 				}
 			}
 		}
