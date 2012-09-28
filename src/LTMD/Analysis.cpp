@@ -714,11 +714,7 @@ namespace OpenMM {
 				
 				HTilde[i].StartAtom = startatom;
 				HTilde[i].EndAtom = endatom;
-				std::cout << i << " " << &HTilde[i] << " " << endatom << " " << startatom << " " << endatom - startatom + 1 << std::endl;
-				Matrix test( endatom - startatom + 1, endatom - startatom + 1 );
-				std::cout << "Test Passed" << std::endl;
-				HTilde[i].Data = test;
-				std::cout << "Initialized Block" << std::endl;
+				HTilde[i].Data = Matrix( endatom - startatom + 1, endatom - startatom + 1 );
 
 				// Copy data from big hessian
 				for( int j = startatom; j <= endatom; j++ ) {

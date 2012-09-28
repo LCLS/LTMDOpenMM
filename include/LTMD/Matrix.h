@@ -24,7 +24,10 @@ struct Matrix{
 		if( this != &other ){
 			Width = other.Width;
 			Height = other.Height;
-			std::copy( other.Data.begin(), other.Data.end(), Data.begin() );
+            Data.resize( Width * Height );
+            for( size_t i = 0; i < Data.size(); i++ ){
+                Data[i] = other.Data[i];
+            }
 		}
 
 		return *this;
