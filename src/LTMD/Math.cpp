@@ -6,6 +6,7 @@
 #include <mkl_lapacke.h>
 #else
 extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
+extern "C" void dsyev_(char*, char*, int*, double*, int*, double*, double*, int*, int*);
 #endif
 
 #include <vector>
@@ -34,26 +35,24 @@ void MatrixMultiply( const Matrix& matrixA, const bool transposeA, const Matrix&
 /**
  * We assume input matrix is square and symmetric.
  */
+
+/*
+ double* work;
+double w[N];
+dsyev( "Vectors", "Upper", &n, a, &lda, w, &wkopt, &lwork, &info );
+ 
+dsyev( "Vectors", "Upper", &n, a, &lda, w, work, &lwork, &info );
+ */
 void FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
-    TNT::Array2D<double> mat( matrix.Width, matrix.Height );
-    for( size_t i = 0; i < mat.dim1(); i++ ){
-        for( size_t j = 0; j < mat.dim2(); j++ ){
-            mat[i][j] = matrix( i, j );
-        }
-    }
+    vectors = matrix;
+    int n = matrix.Width, lda = matrix.Width, lwork = -1, info = 0;
     
-	JAMA::Eigenvalue<double> decomp( mat );
+    double wkopt = 0;
+    dsyev_("V", "U", &n, (double*)&vectors.Data[0], &lda, &values[0], &wkopt, &lwork, &info);
     
-    TNT::Array1D<double> eval( values.size(), 0.0 );
-	decomp.getRealEigenvalues( eval );
-    
-    TNT::Array2D<double> evec( vectors.Width, vectors.Height );
-	decomp.getV( evec );
-    
-    for( size_t i = 0; i < evec.dim1(); i++ ){
-        values[i] = eval[i];
-        for( size_t j = 0; j < evec.dim2(); j++ ){
-            vectors( i, j ) = evec[i][j];
-        }
+    if(info == 0){
+        lwork = (int)wkopt;
+        double *wrkSp = new double[lwork];
+        dsyev_("V", "U", &n, (double*)&vectors.Data[0], &lda, &values[0], wrkSp, &lwork, &info);
     }
 }
