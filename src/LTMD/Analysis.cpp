@@ -108,7 +108,7 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
             Matrix retVal( E.Width, Q.Height );
-			MatrixMultiply( E, Q, retVal );
+			MatrixMultiply( E, false, Q, false, retVal );
             
 #ifdef PROFILE_ANALYSIS
 			gettimeofday( &end, 0 );
@@ -314,11 +314,10 @@ namespace OpenMM {
 			// Again, right now I'm only worried about
 			// correctness plus this time will be marginal compared to
 			// diagonalization.
-			Matrix E( n, m ), E_transpose( m, n );
+			Matrix E( n, m );
 			for( int i = 0; i < m; i++ ) {
 				int eig_col = selectedEigsCols[i];
 				for( int j = 0; j < n; j++ ) {
-					E_transpose(i,j) = block_eigvec(j,eig_col);
 					E(j,i) = block_eigvec(j,eig_col);
 				}
 			}
@@ -401,7 +400,7 @@ namespace OpenMM {
 			const double sElapsed = ( tp_s.tv_sec - tp_e.tv_sec ) * 1000.0 + ( tp_s.tv_usec - tp_e.tv_usec ) / 1000.0;
 			std::cout << "Time to compute S: " << sElapsed << "ms" << std::endl;
 			
-			MatrixMultiply( E_transpose, HE, S );
+			MatrixMultiply( E, true, HE, false, S );
 			
 			//WriteS(S);
 			

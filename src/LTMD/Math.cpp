@@ -10,13 +10,19 @@ extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, d
 
 #include <vector>
 
-void MatrixMultiply( const Matrix& matrixA, const Matrix& matrixB, Matrix& matrixC ) {
-	int m = matrixA.Width, k = matrixA.Height, n = matrixB.Height;
-
-	char transa = 'N', transb = 'N';
-	double alpha = 1.0;
-	double beta = 0.0;
-	int lda = k, ldb = n, ldc = m;
+void MatrixMultiply( const Matrix& matrixA, const bool transposeA, const Matrix& matrixB, const bool transposeB, Matrix& matrixC ) {
+    char transa = transposeA ? 'T' : 'N';
+    char transb = transposeB ? 'T' : 'N';
+    
+	int m = transposeA ? matrixA.Height : matrixA.Width;
+    int n = transposeB ? matrixB.Width : matrixB.Height;
+    int k = transposeA ? matrixA.Width : matrixA.Height;
+    
+	double alpha = 1.0, beta = 0.0;
+    
+	int lda = transposeA ? k : m;
+    int ldb = transposeB ? n : k;
+    int ldc = m;
 
 #ifdef INTEL_MKL
 	dgemm( &transa, &transb, &m, &n, &k, &alpha, &matrixA.Data[0], &lda, &matrixB.Data[0], &ldb, &beta, &matrixC.Data[0], &ldc );
