@@ -107,7 +107,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-            Matrix retVal( E.Width, Q.Height );
+            Matrix retVal( E.Rows, Q.Columns );
 			MatrixMultiply( E, false, Q, false, retVal );
             
 #ifdef PROFILE_ANALYSIS
@@ -405,8 +405,8 @@ namespace OpenMM {
 			//WriteS(S);
 			
 			// make S symmetric
-			for( unsigned int i = 0; i < S.Width; i++ ) {
-				for( unsigned int j = 0; j < S.Height; j++ ) {
+			for( unsigned int i = 0; i < S.Rows; i++ ) {
+				for( unsigned int j = 0; j < S.Columns; j++ ) {
 					double avg = 0.5f * ( S(i,j) + S(j,i) );
 					S(i,j) = avg;
 					S(j,i) = avg;
@@ -426,9 +426,9 @@ namespace OpenMM {
 			// Sort by ABSOLUTE VALUE of eigenvalues.
 			sortedEvalues = SortEigenvalues( dS );
 			
-			Matrix Q( q.Height, q.Width );
+			Matrix Q( q.Columns, q.Rows );
 			for( int i = 0; i < sortedEvalues.size(); i++ ){
-				for( int j = 0; j < q.Height; j++ ) {
+				for( int j = 0; j < q.Columns; j++ ) {
 					Q(j,i) = q(j,sortedEvalues[i].second);
 				}
 			}
@@ -728,12 +728,12 @@ namespace OpenMM {
 			for( int i = 0; i < blocks.size(); i++ ) {
 				printf( "Diagonalizing Block: %d\n", i );
 				DiagonalizeBlock( HTilde[i], positions, mParticleMass, eval, evec );
-				GeometricDOF( HTilde[i].Data.Width, HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
+				GeometricDOF( HTilde[i].Data.Rows, HTilde[i].StartAtom, HTilde[i].EndAtom, positions, mParticleMass, eval, evec );
 			}
 		}
 		
 		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec ) {
-			const unsigned int size = block.Data.Width;
+			const unsigned int size = block.Data.Rows;
 			
 			// 3. Diagonalize the block Hessian only, and get eigenvectors
             std::vector<double> di( size );

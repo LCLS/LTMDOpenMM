@@ -15,9 +15,9 @@ void MatrixMultiply( const Matrix& matrixA, const bool transposeA, const Matrix&
     char transa = transposeA ? 'T' : 'N';
     char transb = transposeB ? 'T' : 'N';
     
-	int m = transposeA ? matrixA.Height : matrixA.Width;
-    int n = transposeB ? matrixB.Width : matrixB.Height;
-    int k = transposeA ? matrixA.Width : matrixA.Height;
+	int m = transposeA ? matrixA.Columns : matrixA.Rows;
+    int n = transposeB ? matrixB.Rows : matrixB.Columns;
+    int k = transposeA ? matrixA.Rows : matrixA.Columns;
     
 	double alpha = 1.0, beta = 0.0;
     
@@ -45,7 +45,7 @@ dsyev( "Vectors", "Upper", &n, a, &lda, w, work, &lwork, &info );
  */
 void FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
     vectors = matrix;
-    int n = matrix.Width, lda = matrix.Width, lwork = -1, info = 0;
+    int n = matrix.Rows, lda = matrix.Rows, lwork = -1, info = 0;
     
     double wkopt = 0;
     dsyev_("V", "U", &n, (double*)&vectors.Data[0], &lda, &values[0], &wkopt, &lwork, &info);

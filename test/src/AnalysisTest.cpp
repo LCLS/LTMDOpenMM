@@ -89,8 +89,8 @@ namespace LTMD {
 			std::vector<double> mass = Read1D("data/block_masses.txt");
 			
 			// Perform Calculation
-            std::vector<double> eval( block.Data.Width );
-			Matrix evec( block.Data.Width, block.Data.Height );
+            std::vector<double> eval( block.Data.Rows );
+			Matrix evec( block.Data.Rows, block.Data.Columns );
 			  
 			OpenMM::LTMD::Analysis::DiagonalizeBlock( block, position, mass, eval, evec );
 			
@@ -115,8 +115,8 @@ namespace LTMD {
 			max_diff = 0.0;
 			max_pos = 0;
 			int max_pos_y = 0;
-			for( int i = 0; i < evec.Width; i++ ){
-				for( int j = 0; j < evec.Height; j++ ){
+			for( int i = 0; i < evec.Rows; i++ ){
+				for( int j = 0; j < evec.Columns; j++ ){
 					double diff = std::abs(expected_evec[i][j] - evec(i,j));
 					
 					if( diff > max_diff ) {
@@ -132,8 +132,8 @@ namespace LTMD {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			
-			for( int i = 0; i < evec.Width; i++ ){
-				for( int j = 0; j < evec.Height; j++ ){
+			for( int i = 0; i < evec.Rows; i++ ){
+				for( int j = 0; j < evec.Columns; j++ ){
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec(i,j)), 1e-3 );
 				}
 			}*/
@@ -189,8 +189,8 @@ namespace LTMD {
 			}
 			
 			Matrix evec( size, size );
-			for( int i = 0; i < evec.Width; i++ ){
-				for( int j = 0; j < evec.Height; j++ ){
+			for( int i = 0; i < evec.Rows; i++ ){
+				for( int j = 0; j < evec.Columns; j++ ){
 					evec(i,j) = evec_data[i][j];
 				}
 			}
@@ -200,8 +200,8 @@ namespace LTMD {
 			// Write Vectors
 			std::ofstream sv("vectors.txt");
 			if( sv.good() ){
-				for( int i = 0; i < evec.Width; i++ ){
-					for( int j = 0; j < evec.Height; j++ ){
+				for( int i = 0; i < evec.Rows; i++ ){
+					for( int j = 0; j < evec.Columns; j++ ){
 						sv << evec(i,j) << " ";
 					}
 					sv << std::endl;
@@ -234,11 +234,11 @@ namespace LTMD {
 			max_diff = 0.0;
 			int ierror, jerror;
 			
-			for( int j = 0; j < evec.Height; j++ ){
+			for( int j = 0; j < evec.Columns; j++ ){
 				double max_j_diffp = 0.0, max_j_diffm = 0.0;
 				int im = 0, ip = 0, jm = 0, jp = 0;
 				
-				for( int i = 0; i < evec.Width; i++ ){
+				for( int i = 0; i < evec.Rows; i++ ){
 					double diff = std::abs(expected_evec[i][j] - evec(i,j));
 					double diffp = std::abs(expected_evec[i][j] + evec(i,j));
 					
@@ -280,8 +280,8 @@ namespace LTMD {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expected_eval[i], eval[i], 1e-3 );
 			}
 			
-			for( int i = 0; i < evec.Width; i++ ){
-				for( int j = 0; j < evec.Height; j++ ){
+			for( int i = 0; i < evec.Rows; i++ ){
+				for( int j = 0; j < evec.Columns; j++ ){
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( std::abs(expected_evec[i][j]), std::abs(evec(i,j)), 1e-3 );
 				}
 			}

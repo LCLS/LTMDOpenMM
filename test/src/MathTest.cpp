@@ -59,12 +59,12 @@ namespace LTMD {
             
 			std::vector<double> overlap( 5, 0.0f );
             
-            for( size_t i = 0; i < vectors.Width; i++ ) {
+            for( size_t i = 0; i < vectors.Rows; i++ ) {
                 std::cout << i << std::endl;
                 
 				double sum = 0.0;
-				for( size_t j = 0; j < vectors.Width; j++ ) {
-					for( size_t k = 0; k < vectors.Height; k++ ) {
+				for( size_t j = 0; j < vectors.Rows; j++ ) {
+					for( size_t k = 0; k < vectors.Columns; k++ ) {
 						double dot = vectors(k,i) * expected(k,j);
 						sum += ( dot * dot );
 					}
@@ -97,8 +97,8 @@ namespace LTMD {
 			expected(0, 0) =  42.0; expected(0, 1) =  45.0;
 			expected(1, 0) = 150.0; expected(1, 1) = 162.0;
             
-			for( unsigned int i = 0; i < c.Width; i++ ) {
-				for( unsigned int j = 0; j < c.Height; j++ ) {
+			for( unsigned int i = 0; i < c.Rows; i++ ) {
+				for( unsigned int j = 0; j < c.Columns; j++ ) {
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( expected(i, j), c(i, j), 1e-3 );
 				}
 			}
@@ -121,8 +121,8 @@ namespace LTMD {
 			expected(0, 0) = 68.0; expected(0, 1) =  94.0;
 			expected(1, 0) = 99.0; expected(1, 1) = 138.0;
             
-            for( unsigned int i = 0; i < c.Width; i++ ) {
-				for( unsigned int j = 0; j < c.Height; j++ ) {
+            for( unsigned int i = 0; i < c.Rows; i++ ) {
+				for( unsigned int j = 0; j < c.Columns; j++ ) {
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( expected(i, j), c(i, j), 1e-3 );
 				}
 			}
@@ -146,8 +146,8 @@ namespace LTMD {
 			expected(0, 0) =  84.0; expected(0, 1) =  90.0;
 			expected(1, 0) = 120.0; expected(1, 1) = 129.0;
             
-			for( unsigned int i = 0; i < c.Width; i++ ) {
-				for( unsigned int j = 0; j < c.Height; j++ ) {
+			for( unsigned int i = 0; i < c.Rows; i++ ) {
+				for( unsigned int j = 0; j < c.Columns; j++ ) {
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( expected(i, j), c(i, j), 1e-3 );
 				}
 			}
@@ -170,8 +170,8 @@ namespace LTMD {
 			expected(0, 0) =  34.0; expected(0, 1) =  47.0;
 			expected(1, 0) = 127.0; expected(1, 1) = 179.0;
             
-            for( unsigned int i = 0; i < c.Width; i++ ) {
-				for( unsigned int j = 0; j < c.Height; j++ ) {
+            for( unsigned int i = 0; i < c.Rows; i++ ) {
+				for( unsigned int j = 0; j < c.Columns; j++ ) {
 					CPPUNIT_ASSERT_DOUBLES_EQUAL( expected(i, j), c(i, j), 1e-3 );
 				}
 			}

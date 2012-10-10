@@ -7,10 +7,10 @@
 #include <algorithm>
 
 struct Matrix{
-    size_t Width, Height;
+    size_t Rows, Columns;
     std::vector<double> Data;
 
-    Matrix( const size_t width = 0, const size_t height = 0 );
+    Matrix( const size_t rows = 0, const size_t Columns = 0 );
     ~Matrix();
 
 	Matrix& operator=( const Matrix& other );
