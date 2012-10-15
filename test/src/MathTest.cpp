@@ -11,21 +11,21 @@ namespace LTMD {
 		void Test::EigenvalueTest() {
 			Matrix a( 5, 5 ), vectors( 5, 5 );
             
-			a(0,0) =  1.96; a(1,0) = 0.00; a(2,0) = 0.00; a(3,0) = 0.00; a(4,0) = 0.00;
-			a(0,1) = -6.49; a(1,1) = 3.80; a(2,1) = 0.00; a(3,1) = 0.00; a(4,1) = 0.00;
-			a(0,2) = -0.47; a(1,2) = -6.39; a(2,2) = 4.17; a(3,2) = 0.00; a(4,2) = 0.00;
-            a(0,3) = -7.20; a(1,3) = 1.50; a(2,3) = -1.51; a(3,3) = 5.70; a(4,3) = 0.00;
-            a(0,4) = -0.65; a(1,4) = -6.34; a(2,4) = 2.67; a(3,4) = 1.80; a(4,4) = -7.10;
+			a(0,0) =  1.96; a(1,0) =  0.00; a(2,0) =  0.00; a(3,0) =  0.00; a(4,0) =  0.00;
+			a(0,1) = -6.49; a(1,1) =  3.80; a(2,1) =  0.00; a(3,1) =  0.00; a(4,1) =  0.00;
+			a(0,2) = -0.47; a(1,2) = -6.39; a(2,2) =  4.17; a(3,2) =  0.00; a(4,2) =  0.00;
+            a(0,3) = -7.20; a(1,3) =  1.50; a(2,3) = -1.51; a(3,3) =  5.70; a(4,3) =  0.00;
+            a(0,4) = -0.65; a(1,4) = -6.34; a(2,4) =  2.67; a(3,4) =  1.80; a(4,4) = -7.10;
 
             std::vector<double> values( 5 );
 			FindEigenvalues( a, values, vectors );
 
             std::vector<double> expectedValues( 5 );
-			expectedValues[0] = -11.07;
-			expectedValues[1] = -6.23;
-			expectedValues[2] = 0.86;
-            expectedValues[3] = 8.87;
-			expectedValues[4] = 16.09;
+			expectedValues[0] = -11.0656;
+			expectedValues[1] = -06.2287;
+			expectedValues[2] =  00.8640;
+			expectedValues[3] =  08.8655;
+			expectedValues[4] =  16.0948;
             
 			for( unsigned int i = 0; i < values.size(); i++ ) {
 				CPPUNIT_ASSERT_DOUBLES_EQUAL( expectedValues[i], values[i], 1e-2 );
@@ -44,24 +44,17 @@ namespace LTMD {
             std::vector<double> values( 5 );
 			FindEigenvalues( a, values, vectors );
             
-            vectors.Print();
-            
             Matrix expected( 5, 5 );
-            
-            expected(0,0) = -0.30; expected(0,1) = -0.61; expected(0,2) =  0.40; expected(0,3) = -0.37; expected(0,4) =  0.49;
-			expected(1,0) = -0.51; expected(1,1) = -0.29; expected(1,2) = -0.41; expected(1,3) = -0.36; expected(1,4) = -0.61;
-			expected(2,0) = -0.08; expected(2,1) = -0.38; expected(2,2) = -0.66; expected(2,3) =  0.50; expected(2,4) =  0.40;
-            expected(3,0) =  0.00; expected(3,1) = -0.45; expected(3,2) =  0.46; expected(3,3) =  0.62; expected(3,4) = -0.46;
-            expected(4,0) = -0.80; expected(4,1) = -6.34; expected(4,2) =  0.17; expected(4,3) =  0.31; expected(4,4) =  0.16;
-            
-            std::cout << std::endl;
-            expected.Print();
+
+            expected(0,0) = -0.2981; expected(0,1) = -0.6075; expected(0,2) =  0.4026; expected(0,3) = -0.3745; expected(0,4) =  0.4896;
+            expected(1,0) = -0.5078; expected(1,1) = -0.2880; expected(1,2) = -0.4066; expected(1,3) = -0.3572; expected(1,4) = -0.6053;
+            expected(2,0) = -0.0816; expected(2,1) = -0.3843; expected(2,2) = -0.6600; expected(2,3) =  0.5008; expected(2,4) =  0.3991;
+            expected(3,0) = -0.0036; expected(3,1) = -0.4467; expected(3,2) =  0.4553; expected(3,3) =  0.6204; expected(3,4) = -0.4564;
+            expected(4,0) = -0.8041; expected(4,1) =  0.4480; expected(4,2) =  0.1725; expected(4,3) =  0.3108; expected(4,4) =  0.1622;
             
 			std::vector<double> overlap( 5, 0.0f );
             
             for( size_t i = 0; i < vectors.Rows; i++ ) {
-                std::cout << i << std::endl;
-                
 				double sum = 0.0;
 				for( size_t j = 0; j < vectors.Rows; j++ ) {
 					for( size_t k = 0; k < vectors.Columns; k++ ) {
@@ -70,13 +63,10 @@ namespace LTMD {
 					}
 				}
 				overlap[i] = sum;
-                
-                std::cout << sum << std::endl;
 			}
             
 			for( unsigned int i = 0; i < overlap.size(); i++ ) {
-                std::cout << overlap[i] << std::endl;
-                //CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0f, overlap[i], 1e-2 );
+                CPPUNIT_ASSERT_DOUBLES_EQUAL( 1.0f, overlap[i], 1e-2 );
 			}
 		}
 

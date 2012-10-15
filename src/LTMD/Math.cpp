@@ -6,7 +6,10 @@
 #include <mkl_lapacke.h>
 #else
 extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void dsyev_(char*, char*, int*, double*, int*, double*, double*, int*, int*);
+
+extern "C" double dlamch_(char*);
+extern "C" void dsyevr_(char*, char*, char*, int*, double*, int*, double*, double*, int*, int*, double*, int*, double*, double*, int*, int*, double*, int*, int*, int*, int*);
+
 #endif
 
 #include <vector>
@@ -32,27 +35,30 @@ void MatrixMultiply( const Matrix& matrixA, const bool transposeA, const Matrix&
 #endif
 }
 
-/**
- * We assume input matrix is square and symmetric.
- */
+bool FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
+    Matrix temp = matrix;
+    vectors = matrix;
+    
+    int m = 0, n = matrix.Rows, lda = n, ldz = n;
+    
+    int lwork = 26*n, liwork = 10*n;
+    std::vector<int> isuppz(2*n);
+    std::vector<int> iwork(10*n);
+    std::vector<double> wrkSp(26*n);
+    
+    int il = 1, iu = 1;
+    double vl = 1.0, vu = 1.0;    
+    
+    int info = 0;
+    
+    double abstol = dlamch_("s");
+    dsyevr_("V", "A", "U", &n, &temp.Data[0], &lda, &vl, &vu, &il, &iu, &abstol, &m, &values[0], &vectors.Data[0], &ldz, &isuppz[0], &wrkSp[0], &lwork, &iwork[0], &liwork, &info);
+    
+    return (info==0);
+}
 
 /*
- double* work;
-double w[N];
-dsyev( "Vectors", "Upper", &n, a, &lda, w, &wkopt, &lwork, &info );
- 
-dsyev( "Vectors", "Upper", &n, a, &lda, w, work, &lwork, &info );
- */
-void FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
-    vectors = matrix;
-    int n = matrix.Rows, lda = matrix.Rows, lwork = -1, info = 0;
     
-    double wkopt = 0;
-    dsyev_("V", "U", &n, (double*)&vectors.Data[0], &lda, &values[0], &wkopt, &lwork, &info);
-    
-    if(info == 0){
-        lwork = (int)wkopt;
-        double *wrkSp = new double[lwork];
-        dsyev_("V", "U", &n, (double*)&vectors.Data[0], &lda, &values[0], wrkSp, &lwork, &info);
-    }
-}
+
+    return info;
+*/
