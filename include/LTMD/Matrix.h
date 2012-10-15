@@ -18,7 +18,7 @@ struct Matrix{
     void Print() const;
     
     double& operator()( const size_t row, const size_t col );
-    const double operator()( const size_t row, const size_t col ) const;
+    double operator()( const size_t row, const size_t col ) const;
 };
 
 #endif //LTMD_MATRIX_H_

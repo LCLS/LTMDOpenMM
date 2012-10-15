@@ -40,7 +40,7 @@ double& Matrix::operator()( const size_t row, const size_t col ){
     return Data[col * Rows + row];
 }
 
-const double Matrix::operator()( const size_t row, const size_t col ) const{
+double Matrix::operator()( const size_t row, const size_t col ) const{
     assert( row < Rows && col < Columns );
     return Data[col * Rows + row];
 }
