@@ -278,6 +278,7 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	for( int block = threadIdx.x; block < gridDim.x; block += blockDim.x ) {
 		slopeBuffer[block] = blockSlope[block];
 	}
+
 	__syncthreads();
 
 	// Compute the scaling coefficient.
@@ -291,8 +292,8 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 		Real a = ( ( ( lastPE - currentPE ) / oldLambda + slope ) / oldLambda );
 
 		if( a != 0.0f ) {
-			const Real b = -slope;
-			lambda = b / ( 2.0f * a ) + oldLambda;
+			const Real b = slope - 2.0f * a * oldLambda;
+			lambda = -b / ( 2.0f * a );
 		} else {
 			lambda = 0.5f * oldLambda;
 		}
@@ -302,14 +303,15 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 		}
 
 		slopeBuffer[0] = lambda - oldLambda;
-		slopeBuffer[1] = lambda;
+
+		// Store variables for retrival
+		lambdaval[0] = lambda;
 	}
+
 	__syncthreads();
-	const Real dlambda = slopeBuffer[0];
-
-	lambdaval[0] = slopeBuffer[1];
-
+	
 	// Remove previous position update (-oldLambda) and add new move (lambda).
+	const Real dlambda = slopeBuffer[0];
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real factor = velm[atom].w * dlambda;
 
