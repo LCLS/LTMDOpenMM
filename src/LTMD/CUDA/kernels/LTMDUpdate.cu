@@ -150,31 +150,25 @@ void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDASt
 	}
 }
 
-__global__ void kRejectMinimizationStep_kernel( int numAtoms, float4 *posq, float4 *oldPosq, float *minimizerScale ) {
+__global__ void kRejectMinimizationStep_kernel( int numAtoms, float4 *posq, float4 *oldPosq ) {
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		posq[atom] = oldPosq[atom];
-	}
-	if( threadIdx.x == 0 && blockIdx.x == 0 ) {
-		minimizerScale[0] *= 0.25f;
 	}
 }
 
 void kNMLRejectMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale ) {
-	kRejectMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq, minimizerScale._pDevData );
+	kRejectMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	LAUNCHERROR( "kRejectMinimizationStep" );
 }
 
-__global__ void kAcceptMinimizationStep_kernel( int numAtoms, float4 *posq, float4 *oldPosq, float *minimizerScale ) {
+__global__ void kAcceptMinimizationStep_kernel( int numAtoms, float4 *posq, float4 *oldPosq ) {
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		oldPosq[atom] = posq[atom];
-	}
-	if( threadIdx.x == 0 && blockIdx.x == 0 ) {
-		minimizerScale[0] = 1.0f;
 	}
 }
 
 void kNMLAcceptMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale ) {
-	kAcceptMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq, minimizerScale._pDevData );
+	kAcceptMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	LAUNCHERROR( "kAcceptMinimizationStep" );
 }
 
@@ -205,7 +199,7 @@ __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int numModes, float4 *
 	}
 }
 
-__global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float4 *force, float4 *modes, float *modeWeights, float *minimizerScale ) {
+__global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float4 *force, float4 *modes, float *modeWeights ) {
 	// Load the weights into shared memory.
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
@@ -214,10 +208,8 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 	__syncthreads();
 
 	// Compute the projected forces and update the atom positions.
-	const Real minimScale = minimizerScale[0];
-
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
-		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), scale = minimScale / sqrtInvMass, factor = invMass * invMaxEigen;
+		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), factor = invMass * invMaxEigen;
 
 		float3 f = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {
@@ -228,9 +220,9 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 			f.z += m.z * weight;
 		}
 
-		f.x *= scale;
-		f.y *= scale;
-		f.z *= scale;
+		f.x *= sqrtInvMass;
+		f.y *= sqrtInvMass;
+		f.z *= sqrtInvMass;
 		posqP[atom] = make_float4( force[atom].x - f.x, force[atom].y - f.y, force[atom].z - f.z, 0.0f );
 
 		float4 pos = posq[atom];
@@ -241,12 +233,12 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 	}
 }
 
-void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float>& minimizerScale ) {
+void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights ) {
 	kNMLLinearMinimize1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> ( gpu->natoms,
 			numModes, gpu->sim.pVelm4, gpu->sim.pForce4, modes._pDevData, modeWeights._pDevData );
 	LAUNCHERROR( "kNMLLinearMinimize1" );
 	kNMLLinearMinimize2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, numModes *sizeof( float ) >>> ( gpu->natoms, numModes,
-			1.0f / maxEigenvalue, gpu->sim.pPosq, gpu->sim.pPosqP, gpu->sim.pVelm4, gpu->sim.pForce4, modes._pDevData, modeWeights._pDevData, minimizerScale._pDevData );
+			1.0f / maxEigenvalue, gpu->sim.pPosq, gpu->sim.pPosqP, gpu->sim.pVelm4, gpu->sim.pForce4, modes._pDevData, modeWeights._pDevData );
 	LAUNCHERROR( "kNMLLinearMinimize2" );
 }
 
