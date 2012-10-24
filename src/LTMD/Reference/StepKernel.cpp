@@ -189,23 +189,25 @@ namespace OpenMM {
 				//solve for minimum for quadratic fit using two PE vales and the slope with /lambda=0
 				//for 'newSlope' use PE=a(\lambda_e-\lambda)^2+b(\lambda_e-\lambda)+c, \lambda_e is 1/maxEig.
 				const double a = ( ( ( mPreviousEnergy - energy ) / oldLambda + newSlope ) / oldLambda );
-				const double b = -newSlope;
 				
 				//calculate \lambda at minimum of quadratic fit
 				if( a != 0.0 ) {
-					lambda = b / ( 2 * a ) + oldLambda;
+					const Real b = newSlope - 2.0 * a * oldLambda;
+					lambda = -b / ( 2.0 * a );
 				} else {
-					lambda = oldLambda / 2.0;
+					lambda = 0.5 * oldLambda;
 				}
 				
 				//test if lambda negative, if so just use smaller lambda
 				if( lambda <= 0.0 ) {
-					lambda = oldLambda / 2.0;
+					lambda = 0.5 * oldLambda;
 				}
+
+				const double dlambda = lambda - oldLambda;
 				
 				//Remove previous position update (-oldLambda) and add new move (lambda)
 				for( unsigned int i = 0; i < mParticles; i++ ) {
-					const double factor = mInverseMasses[i] * ( lambda - oldLambda );
+					const double factor = mInverseMasses[i] * dlambda;
 					
 					coordinates[i][0] += factor * mXPrime[i][0];
 					coordinates[i][1] += factor * mXPrime[i][1];
