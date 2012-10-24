@@ -278,9 +278,8 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
-			lambda = std::abs( lambda );
 #ifdef KERNEL_VALIDATION
-			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / ( 1 / 5e5 ) ) << std::endl;
+			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / maxEigenvalue ) << std::endl;
 #endif
 			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR
