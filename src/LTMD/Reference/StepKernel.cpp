@@ -192,7 +192,7 @@ namespace OpenMM {
 				
 				//calculate \lambda at minimum of quadratic fit
 				if( a != 0.0 ) {
-					const Real b = newSlope - 2.0 * a * oldLambda;
+					const double b = newSlope - 2.0 * a * oldLambda;
 					lambda = -b / ( 2.0 * a );
 				} else {
 					lambda = 0.5 * oldLambda;
