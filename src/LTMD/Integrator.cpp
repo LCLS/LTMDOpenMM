@@ -146,7 +146,7 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-            return (( simple + quadratic ) < upperbound);
+			return (( simple + quadratic ) < upperbound);
 		}
 		
 		bool Integrator::minimize( const unsigned int upperbound, const unsigned int lowerbound ){
@@ -154,8 +154,8 @@ namespace OpenMM {
 			Minimize( upperbound, simple, quadratic );
 			
 			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
-            
-            return (( simple + quadratic ) < lowerbound);
+			
+			return (( simple + quadratic ) < lowerbound);
 		}
 		
 		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
@@ -178,8 +178,12 @@ namespace OpenMM {
 				if( currentPE > initialPE ) {
 					quadraticSteps++;
 					
-                    double lambda = 0.0;
-                    currentPE = QuadraticMinimize( currentPE, lambda );
+					double lambda = 0.0;
+					currentPE = QuadraticMinimize( currentPE, lambda );
+					if( currentPE > initialPE ){
+						std::cout << "Quadratic Minimization Failed. Forcing Rediagonalization" << std::endl;
+						computeProjectionVectors();
+					}
 				}
 				
 				//break if satisfies end condition
