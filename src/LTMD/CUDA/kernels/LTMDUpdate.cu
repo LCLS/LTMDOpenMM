@@ -167,7 +167,7 @@ __global__ void kAcceptMinimizationStep_kernel( int numAtoms, float4 *posq, floa
 	}
 }
 
-void kNMLAcceptMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale ) {
+void kNMLAcceptMinimizationStep( gpuContext gpu ) {
 	kAcceptMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	LAUNCHERROR( "kAcceptMinimizationStep" );
 }
