@@ -136,7 +136,6 @@ source_group( "src\\LTMD\\Reference" FILES ${LTMD_REFERENCE_SOURCES} )
 add_library( LTMDReference SHARED ${LTMD_REFERENCE_HEADERS} ${LTMD_REFERENCE_SOURCES})
 set_target_properties( LTMDReference PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_REFERENCE_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
 target_link_libraries( LTMDReference OpenMMLTMD )
-message( "${LIBS}" )
 
 option( BUILD_GPU "Build GPU code" Off )
 if( BUILD_GPU )
