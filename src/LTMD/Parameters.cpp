@@ -9,7 +9,7 @@ namespace OpenMM {
 			rediagFreq = 1000;
 			minLimit = 0.41804;
 			ShouldForceRediagOnMinFail = false;
-			ShouldForceRediagOnQuadratic = true;
+			ShouldForceRediagOnQuadratic = false;
 			BlockDiagonalizePlatform = Preference::OpenCL;
 			
 			MaximumMinimizationCutoff = 2;

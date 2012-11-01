@@ -4,65 +4,61 @@
 #include <mkl_blas.h>
 #include <mkl_lapack.h>
 #include <mkl_lapacke.h>
-#endif
+#else
+extern "C" void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
 
-#include "tnt_array2d_utils.h"
+extern "C" double dlamch_(char*);
+extern "C" void dsyevr_(char*, char*, char*, int*, double*, int*, double*, double*, int*, int*, double*, int*, double*, double*, int*, int*, double*, int*, int*, int*, int*);
+
+#endif
 
 #include <vector>
 
-void MatrixMultiply( const TNT::Array2D<double>& matrixA, const TNT::Array2D<double>& matrixB, TNT::Array2D<double>& matrixC ) {
+void MatrixMultiply( const Matrix& matrixA, const bool transposeA, const Matrix& matrixB, const bool transposeB, Matrix& matrixC ) {
+    char transa = transposeA ? 'T' : 'N';
+    char transb = transposeB ? 'T' : 'N';
+    
+	int m = transposeA ? matrixA.Columns : matrixA.Rows;
+    int n = transposeB ? matrixB.Rows : matrixB.Columns;
+    int k = transposeA ? matrixA.Rows : matrixA.Columns;
+    
+	double alpha = 1.0, beta = 0.0;
+    
+	int lda = transposeA ? k : m;
+    int ldb = transposeB ? n : k;
+    int ldc = m;
+
 #ifdef INTEL_MKL
-  std::vector<double> a( matrixA.dim1() * matrixA.dim2() );
-
-  for( int i = 0; i < matrixA.dim1(); i++ ) {
-    for( int j = 0; j < matrixA.dim2(); j++ ) {
-      a[i * matrixA.dim2() + j] = matrixA[i][j];
-    }
-  }
-
-  std::vector<double> b( matrixB.dim1() * matrixB.dim2());
-
-	for( int i = 0; i < matrixB.dim1(); i++ ) {
-    for( int j = 0; j < matrixB.dim2(); j++ ) {
-      b[i * matrixB.dim2() + j] = matrixB[i][j];
-    }
-  }
-
-	const int m = matrixA.dim1();
-	const int k = matrixA.dim2();
-	const int n = matrixB.dim2();
-
-	const char transa = 'T';
-	const char transb = 'T';
-	const double alpha = 1.0;
-	const double beta = 0.0;
-	const int lda = k;
-	const int ldb = n;
-	const int ldc = m;
-	std::vector<double> c( matrixA.dim1() * matrixB.dim2() );
-	
-	dgemm( &transa, &transb, &m, &n, &k, &alpha, &a[0], &lda, &b[0], &ldb, &beta, &c[0], &ldc );
-
-	for( int i = 0; i < matrixB.dim2(); i++ ) {
-    for( int j = 0; j < matrixA.dim1(); j++ ) {
-      matrixC[j][i] = c[i * matrixA.dim1() + j];
-    }
-  }
+	dgemm( &transa, &transb, &m, &n, &k, &alpha, &matrixA.Data[0], &lda, &matrixB.Data[0], &ldb, &beta, &matrixC.Data[0], &ldc );
 #else
-	matrixC = matmult( matrixA, matrixB );
+    dgemm_( &transa, &transb, &m, &n, &k, &alpha, (double*)&matrixA.Data[0], &lda, (double*)&matrixB.Data[0], &ldb, &beta, &matrixC.Data[0], &ldc );
 #endif
 }
 
-/**
- * We assume input matrix is square and symmetric.
- */
-void FindEigenvalues( const TNT::Array2D<double>& matrix, std::vector<double>& values, TNT::Array2D<double>& vectors ) {
-	JAMA::Eigenvalue<double> decomp( matrix );
+bool FindEigenvalues( const Matrix& matrix, std::vector<double>& values, Matrix& vectors ) {
+    Matrix temp = matrix;
+    vectors = matrix;
     
-    TNT::Array1D<double> eval( values.size(), 0.0 );
-	decomp.getRealEigenvalues( eval );
+    int m = 0, n = matrix.Rows, lda = n, ldz = n;
     
-	decomp.getV( vectors );
+    int lwork = 26*n, liwork = 10*n;
+    std::vector<int> isuppz(2*n);
+    std::vector<int> iwork(10*n);
+    std::vector<double> wrkSp(26*n);
     
-    for( size_t i = 0; i < values.size(); i++ ) values[i] = eval[i];
+    int il = 1, iu = 1;
+    double vl = 1.0, vu = 1.0;    
+    
+    int info = 0;
+    
+    double abstol = dlamch_("s");
+    dsyevr_("V", "A", "U", &n, &temp.Data[0], &lda, &vl, &vu, &il, &iu, &abstol, &m, &values[0], &vectors.Data[0], &ldz, &isuppz[0], &wrkSp[0], &lwork, &iwork[0], &liwork, &info);
+    
+    return (info==0);
 }
+
+/*
+    
+
+    return info;
+*/

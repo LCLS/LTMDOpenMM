@@ -146,14 +146,7 @@ namespace OpenMM {
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
 			
-			if( mParameters.ShouldForceRediagOnQuadratic && quadratic != 0 ){
-				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
-				return false;
-			}else{
-				const unsigned int total = simple + quadratic;
-				
-				return ( total < upperbound );
-			}
+			return (( simple + quadratic ) < upperbound);
 		}
 		
 		bool Integrator::minimize( const unsigned int upperbound, const unsigned int lowerbound ){
@@ -162,14 +155,7 @@ namespace OpenMM {
 			
 			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
 			
-			if( mParameters.ShouldForceRediagOnQuadratic && quadratic != 0 ){
-				std::cout << "Quadratic Minimization: Rediagonalizing" << std::endl;
-				return false;
-			}else{
-				const unsigned int total = simple + quadratic;
-				
-				return ( total < lowerbound );
-			}
+			return (( simple + quadratic ) < lowerbound);
 		}
 		
 		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
@@ -192,13 +178,11 @@ namespace OpenMM {
 				if( currentPE > initialPE ) {
 					quadraticSteps++;
 					
-					if( !mParameters.ShouldForceRediagOnQuadratic ){
-						double lambda = 0.0;
-						currentPE = QuadraticMinimize( currentPE, lambda );
-					}else{
-						RevertStep();
-						context->calcForcesAndEnergy( true, false );
-						break;
+					double lambda = 0.0;
+					currentPE = QuadraticMinimize( currentPE, lambda );
+					if( currentPE > initialPE ){
+						std::cout << "Quadratic Minimization Failed. Forcing Rediagonalization" << std::endl;
+						computeProjectionVectors();
 					}
 				}
 				
@@ -294,9 +278,8 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
-			lambda = std::abs( lambda );
 #ifdef KERNEL_VALIDATION
-			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / ( 1 / 5e5 ) ) << std::endl;
+			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / maxEigenvalue ) << std::endl;
 #endif
 			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR
