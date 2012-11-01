@@ -79,7 +79,7 @@ namespace OpenMM {
 		void Integrator::step( int steps ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
-			
+
 			mSimpleMinimizations = 0;
 			mQuadraticMinimizations = 0;
 
@@ -89,29 +89,29 @@ namespace OpenMM {
 
 			// Update Time
 			context->setTime( context->getTime() + getStepSize() * mLastCompleted );
-			
+
 			// Print Minimizations
 			const unsigned int total = mSimpleMinimizations + mQuadraticMinimizations;
-			
+
 			const double averageSimple = (double)mSimpleMinimizations / (double)mLastCompleted;
 			const double averageQuadratic = (double)mQuadraticMinimizations / (double)mLastCompleted;
 			const double averageTotal = (double)total / (double)mLastCompleted;
-			
-			std::cout << "[OpenMM::Minimize] " << total << " total minimizations( " 
-						<< mSimpleMinimizations << " simple, " << mQuadraticMinimizations << " quadratic ). " 
-						<< averageTotal << " per-step minimizations( " << averageSimple << " simple, " 
+
+			std::cout << "[OpenMM::Minimize] " << total << " total minimizations( "
+						<< mSimpleMinimizations << " simple, " << mQuadraticMinimizations << " quadratic ). "
+						<< averageTotal << " per-step minimizations( " << averageSimple << " simple, "
 						<< averageQuadratic << " quadratic ). Steps: " << mLastCompleted << std::endl;
 
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[Integrator] Total dynamics: " << elapsed << "ms" << std::endl;
 		}
-		
+
 		unsigned int Integrator::CompletedSteps() const {
 			return mLastCompleted;
 		}
 
-		/* Save before integration for DiagonalizeMinimize and add test to make 
+		/* Save before integration for DiagonalizeMinimize and add test to make
 			sure its not done twice */
 		bool Integrator::DoStep() {
 			context->updateContextState();
@@ -141,74 +141,79 @@ namespace OpenMM {
 
 			return true;
 		}
-		
-		bool Integrator::minimize( const unsigned int upperbound ){ 
+
+		bool Integrator::minimize( const unsigned int upperbound ){
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
-			
+
 			return (( simple + quadratic ) < upperbound);
 		}
-		
+
 		bool Integrator::minimize( const unsigned int upperbound, const unsigned int lowerbound ){
 			unsigned int simple = 0, quadratic = 0;
 			Minimize( upperbound, simple, quadratic );
-			
+
 			std::cout << "Minimizations: " << simple << " " << quadratic << " Bound: " << lowerbound << std::endl;
-			
+
 			return (( simple + quadratic ) < lowerbound);
 		}
-		
+
 		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
 			const double eigStore = maxEigenvalue;
-			
+
 			if( !mParameters.ShouldProtoMolDiagonalize && eigenvectors.size() == 0 ) computeProjectionVectors();
-			
+
 			SaveStep();
-			
+
 			double initialPE = context->calcForcesAndEnergy( true, true );
-			
+
 			simpleSteps = 0;
 			quadraticSteps = 0;
-			
+
 			for( unsigned int i = 0; i < max; i++ ){
 				eigVecChanged = false;
-				
+
 				simpleSteps++;
 				double currentPE = LinearMinimize( initialPE );
-				if( currentPE > initialPE ) {
+				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
 					quadraticSteps++;
-					
+
 					double lambda = 0.0;
 					currentPE = QuadraticMinimize( currentPE, lambda );
 					if( currentPE > initialPE ){
-						std::cout << "Quadratic Minimization Failed. Forcing Rediagonalization" << std::endl;
+						std::cout << "Quadratic Minimization Failed Energy Test. Forcing Rediagonalization" << std::endl;
 						computeProjectionVectors();
+					}else{
+						if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
+							std::cout << "Quadratic Minimization Failed Lambda Test. Forcing Rediagonalization" << std::endl;
+							computeProjectionVectors();
+						}
 					}
 				}
-				
+
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
 					break;
 				}
-				
+
 				if( diff > 0.0 ) {
 					SaveStep();
 					initialPE = currentPE;
 				} else {
 					RevertStep();
 					context->calcForcesAndEnergy( true, false );
-					
+
 					maxEigenvalue *= 2;
 				}
 			}
-			
+
 			mSimpleMinimizations += simpleSteps;
 			mQuadraticMinimizations += quadraticSteps;
-			
+
 			maxEigenvalue = eigStore;
 		}
-		
+
 		void Integrator::DiagonalizeMinimize() {
 			if( !mParameters.ShouldProtoMolDiagonalize ) {
 				computeProjectionVectors();
