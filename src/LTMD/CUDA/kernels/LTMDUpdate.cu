@@ -156,7 +156,7 @@ __global__ void kRejectMinimizationStep_kernel( int numAtoms, float4 *posq, floa
 	}
 }
 
-void kNMLRejectMinimizationStep( gpuContext gpu, CUDAStream<float>& minimizerScale ) {
+void kNMLRejectMinimizationStep( gpuContext gpu ) {
 	kRejectMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	LAUNCHERROR( "kRejectMinimizationStep" );
 }
@@ -183,7 +183,7 @@ __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int numModes, float4 *
 
 			float4 f = force[atom];
 			float4 m = modes[modePos];
-	
+
 			dot += scale * ( f.x * m.x + f.y * m.y + f.z * m.z );
 		}
 		dotBuffer[threadIdx.x] = dot;
@@ -301,7 +301,7 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	}
 
 	__syncthreads();
-	
+
 	// Remove previous position update (-oldLambda) and add new move (lambda).
 	const Real dlambda = slopeBuffer[0];
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
