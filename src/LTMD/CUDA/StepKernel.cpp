@@ -67,6 +67,9 @@ namespace OpenMM {
 
 				data.gpu->seed = ( unsigned long ) integrator.getRandomNumberSeed();
 				gpuInitializeRandoms( data.gpu );
+
+				// Generate a first set of randoms
+				kGenerateRandoms( data.gpu );
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
@@ -103,7 +106,6 @@ namespace OpenMM {
 						}
 						modes->Upload();
 					}
-					kGenerateRandoms( data.gpu );
 				}
 			}
 
@@ -125,6 +127,7 @@ namespace OpenMM {
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
 				data.time += integrator.getStepSize();
 				data.stepCount++;
+				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue() );
 			}
 
 			void StepKernel::AcceptStep( OpenMM::ContextImpl &context ) {
