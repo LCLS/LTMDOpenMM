@@ -183,10 +183,12 @@ namespace OpenMM {
 					if( currentPE > initialPE ){
 						std::cout << "Quadratic Minimization Failed Energy Test. Forcing Rediagonalization" << std::endl;
 						computeProjectionVectors();
+						break;
 					}else{
 						if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
 							std::cout << "Quadratic Minimization Failed Lambda Test. Forcing Rediagonalization" << std::endl;
 							computeProjectionVectors();
+							break;
 						}
 					}
 				}
