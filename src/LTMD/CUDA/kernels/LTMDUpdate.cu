@@ -171,11 +171,8 @@ __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numMod
 
 			posqP[atom] = randomNoise;
 
-			const int modePos = mode * numAtoms + atom;
-			const Real scale = sqrt( velm[atom].w );
-
-			float4 m = modes[modePos];
-			dot += scale * ( randomNoise.x * m.x + randomNoise.y * m.y + randomNoise.z * m.z );
+			float4 m = modes[mode * numAtoms + atom];
+			dot += randomNoise.x * m.x + randomNoise.y * m.y + randomNoise.z * m.z;
 		}
 
 		dotBuffer[threadIdx.x] = dot;
