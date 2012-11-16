@@ -76,6 +76,10 @@ namespace OpenMM {
 			return names;
 		}
 
+		void Integrator::SetProjectionChanged( bool value ){
+			eigVecChanged = value;
+		}
+
 		void Integrator::step( int steps ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -116,16 +120,14 @@ namespace OpenMM {
 		bool Integrator::DoStep() {
 			context->updateContextState();
 
-			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
+			if( eigenvectors.size() == 0 ) {
 				DiagonalizeMinimize();
 			}
-
-			stepsSinceDiagonalize++;
 
 			context->calcForcesAndEnergy( true, false );
 
 			IntegrateStep();
-			eigVecChanged = false;
+			SetProjectionChanged( false );
 
 			if( !minimize( mParameters.MaximumMinimizationIterations ) ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
@@ -136,6 +138,11 @@ namespace OpenMM {
 					}
 				}
 			}
+
+			if( stepsSinceDiagonalize != 1 || stepsSinceDiagonalize % mParameters.rediagFreq == 1 ) {
+				DiagonalizeMinimize();
+			}
+			stepsSinceDiagonalize++;
 
 			TimeAndCounterStep();
 
@@ -171,7 +178,7 @@ namespace OpenMM {
 			quadraticSteps = 0;
 
 			for( unsigned int i = 0; i < max; i++ ){
-				eigVecChanged = false;
+				SetProjectionChanged( false );
 
 				simpleSteps++;
 				double currentPE = LinearMinimize( initialPE );

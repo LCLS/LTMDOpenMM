@@ -66,7 +66,7 @@ namespace OpenMM {
 				private:
 					unsigned int mParticles;
 					OpenMM::CudaPlatform::PlatformData &data;
-					CUDAStream<float4>* modes;
+					CUDAStream<float4> *modes, *NoiseValues;
 					CUDAStream<float>* modeWeights;
 					CUDAStream<float>* minimizerScale;
 					CUDAStream<float>* MinimizeLambda;

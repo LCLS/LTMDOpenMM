@@ -36,12 +36,12 @@
 
 
 extern void kGenerateRandoms( gpuContext gpu );
-void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );
+void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float4>& noiseValues );
 void kNMLRejectMinimizationStep( gpuContext gpu );
 void kNMLAcceptMinimizationStep( gpuContext gpu );
 void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );
 void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer, CUDAStream<float>& lambdaval );
-void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue );
+void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue, CUDAStream<float4>& noiseValues );
 
 namespace OpenMM {
 	namespace LTMD {
@@ -65,6 +65,13 @@ namespace OpenMM {
 				OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator );
 
 				mParticles = system.getNumParticles();
+			    NoiseValues = new CUDAStream<float4>( 1, mParticles, "NoiseValues" );
+
+				for( size_t i = 0; i < mParticles; i++ ){
+					(*NoiseValues)[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+				}
+				NoiseValues->Upload();
+
 
 				data.gpu->seed = ( unsigned long ) integrator.getRandomNumberSeed();
 				gpuInitializeRandoms( data.gpu );
@@ -122,13 +129,13 @@ namespace OpenMM {
 				data.gpu->sim.T = ( float ) integrator.getTemperature();
 				data.gpu->sim.kT = ( float )( BOLTZ * integrator.getTemperature() );
 
-				kNMLUpdate( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights );
+				kNMLUpdate( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, *NoiseValues );
 			}
 
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
 				data.time += integrator.getStepSize();
 				data.stepCount++;
-				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue() );
+				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues );
 			}
 
 			void StepKernel::AcceptStep( OpenMM::ContextImpl &context ) {

@@ -104,9 +104,11 @@ namespace OpenMM {
 					return eigenvectors;
 				}
 
+				void SetProjectionChanged( bool value );
+
 				void setProjectionVectors( const std::vector<std::vector<OpenMM::Vec3> >& vectors ) {
 					eigenvectors = vectors;
-					eigVecChanged = true;
+					SetProjectionChanged( true );
 					stepsSinceDiagonalize = 0;
 				}
 
