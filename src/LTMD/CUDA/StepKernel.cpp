@@ -120,6 +120,9 @@ namespace OpenMM {
 			void StepKernel::Integrate( OpenMM::ContextImpl &context, const Integrator &integrator ) {
 				ProjectionVectors( integrator );
 
+				// Add noise for step
+				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues );
+
 				// Calculate Constants
 				data.gpu->sim.deltaT = integrator.getStepSize();
 				data.gpu->sim.oneOverDeltaT = 1.0f / data.gpu->sim.deltaT;
@@ -129,13 +132,13 @@ namespace OpenMM {
 				data.gpu->sim.T = ( float ) integrator.getTemperature();
 				data.gpu->sim.kT = ( float )( BOLTZ * integrator.getTemperature() );
 
+				// Do Step
 				kNMLUpdate( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, *NoiseValues );
 			}
 
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
 				data.time += integrator.getStepSize();
 				data.stepCount++;
-				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues );
 			}
 
 			void StepKernel::AcceptStep( OpenMM::ContextImpl &context ) {

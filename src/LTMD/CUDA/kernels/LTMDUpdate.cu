@@ -36,7 +36,7 @@ using namespace std;
 typedef float Real;
 
 __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau, float dt, float kT, float4 *posq, float4 *posqP, float4 *velm, float4 *force,
-									float4 *random, int *randomPosition, int totalRandoms, float4 *noiseVal ) {
+									float4 *random, int *randomPosition, int totalRandoms ) {
 	// Update the velocity.
 	const Real vscale = exp( -dt / tau );
 	const Real fscale = ( 1.0f - vscale ) * tau;
@@ -57,12 +57,6 @@ __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau,
 		v.z = ( vscale * v.z ) + ( fscale * f.z * v.w ) + ( randomNoise.z * sqrtInvMass );
 
 		velm[atom] = v;
-
-		float4 pos = posq[atom];
-		pos.x -= noiseVal[atom].x;
-		pos.y -= noiseVal[atom].y;
-		pos.z -= noiseVal[atom].z;
-		posq[atom] = pos;
 	}
 
 	if( threadIdx.x == 0 ) {
@@ -103,7 +97,7 @@ __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float4 *velm, fl
 	}
 }
 
-__global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes, float *modeWeights ) {
+__global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes, float *modeWeights, float4 *noiseVal ) {
 	// Load the weights into shared memory.
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
@@ -130,9 +124,17 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 		velm[atom] = make_float4( v.x, v.y, v.z, invMass );
 
 		float4 pos = posq[atom];
+
+		// Add Step
 		pos.x += dt * v.x;
 		pos.y += dt * v.y;
 		pos.z += dt * v.z;
+
+		// Remove Noise
+		pos.x -= noiseVal[atom].x;
+		pos.y -= noiseVal[atom].y;
+		pos.z -= noiseVal[atom].z;
+
 		posq[atom] = pos;
 	}
 }
@@ -140,13 +142,13 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 extern void kGenerateRandoms( gpuContext gpu );
 void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float4>& noiseVal ) {
 	kNMLUpdate1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.paddedNumberOfAtoms,
-		    gpu->sim.tau, gpu->sim.deltaT, gpu->sim.kT, gpu->sim.pPosq, noiseVal._pDevData, gpu->sim.pVelm4, gpu->sim.pForce4, gpu->sim.pRandom4, gpu->sim.pRandomPosition, gpu->sim.randoms, noiseVal._pDevData );
+		    gpu->sim.tau, gpu->sim.deltaT, gpu->sim.kT, gpu->sim.pPosq, noiseVal._pDevData, gpu->sim.pVelm4, gpu->sim.pForce4, gpu->sim.pRandom4, gpu->sim.pRandomPosition, gpu->sim.randoms );
 	LAUNCHERROR( "kNMLUpdate1" );
 	kNMLUpdate2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> ( gpu->natoms,
 			numModes, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData );
 	LAUNCHERROR( "kNMLUpdate2" );
 	kNMLUpdate3_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, numModes *sizeof( float ) >>> ( gpu->natoms, numModes,
-			gpu->sim.deltaT, gpu->sim.pPosq, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData );
+			gpu->sim.deltaT, gpu->sim.pPosq, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData, noiseVal._pDevData );
 	LAUNCHERROR( "kNMLUpdate3" );
 
 	// Update randoms if necessary

@@ -120,9 +120,10 @@ namespace OpenMM {
 		bool Integrator::DoStep() {
 			context->updateContextState();
 
-			if( eigenvectors.size() == 0 ) {
+			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
 			}
+			stepsSinceDiagonalize++;
 
 			context->calcForcesAndEnergy( true, false );
 
@@ -139,10 +140,7 @@ namespace OpenMM {
 				}
 			}
 
-			if( stepsSinceDiagonalize != 1 || stepsSinceDiagonalize % mParameters.rediagFreq == 1 ) {
-				DiagonalizeMinimize();
-			}
-			stepsSinceDiagonalize++;
+
 
 			TimeAndCounterStep();
 
