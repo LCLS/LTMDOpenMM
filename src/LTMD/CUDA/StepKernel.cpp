@@ -121,7 +121,7 @@ namespace OpenMM {
 				ProjectionVectors( integrator );
 
 				// Add noise for step
-				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues );
+				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues, integrator.getStepSize() );
 
 				// Calculate Constants
 				data.gpu->sim.deltaT = integrator.getStepSize();

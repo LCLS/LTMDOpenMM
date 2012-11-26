@@ -159,9 +159,10 @@ void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDASt
 	}
 }
 
-__global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue ) {
+__global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue, float stepSize ) {
 	extern __shared__ float dotBuffer[];
-	const Real noisescale = sqrt( 2 * kT * 1.0 / maxEigenvalue );
+	const Real val = stepSize / 0.002;
+	const Real noisescale = sqrt( 2 * kT * val / maxEigenvalue );
 
 	int rpos = randomPosition[blockIdx.x];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
@@ -217,10 +218,13 @@ __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, fl
 			r.z += m.z * weight;
 		}
 
-		r.x *= sqrtInvMass;
+		/*r.x *= sqrtInvMass;
 		r.y *= sqrtInvMass;
-		r.z *= sqrtInvMass;
+		r.z *= sqrtInvMass;*/
 		noiseVal[atom] = make_float4( noiseVal[atom].x - r.x, noiseVal[atom].y - r.y, noiseVal[atom].z - r.z, 0.0f );
+		noiseVal[atom].x *= sqrtInvMass;
+		noiseVal[atom].y *= sqrtInvMass;
+		noiseVal[atom].z *= sqrtInvMass;
 
 		float4 pos = posq[atom];
 		pos.x += noiseVal[atom].x;
@@ -230,9 +234,9 @@ __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, fl
 	}
 }
 
-void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue, CUDAStream<float4>& noiseVal ) {
+void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue, CUDAStream<float4>& noiseVal, float stepSize ) {
 	kFastNoise1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> (
-		gpu->natoms, gpu->sim.paddedNumberOfAtoms, numModes, gpu->sim.kT, gpu->sim.pPosqP, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData, gpu->sim.pRandom4, gpu->sim.pRandomPosition, gpu->sim.randoms, maxEigenvalue
+		gpu->natoms, gpu->sim.paddedNumberOfAtoms, numModes, gpu->sim.kT, gpu->sim.pPosqP, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData, gpu->sim.pRandom4, gpu->sim.pRandomPosition, gpu->sim.randoms, maxEigenvalue, stepSize
 	);
 	LAUNCHERROR( "kFastNoise1" );
 	kFastNoise2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, numModes *sizeof( float ) >>> (
