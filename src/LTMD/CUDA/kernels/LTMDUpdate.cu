@@ -162,7 +162,7 @@ void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDASt
 __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue, float stepSize ) {
 	extern __shared__ float dotBuffer[];
 	const Real val = stepSize / 0.002;
-	const Real noisescale = sqrt( 2 * kT * val / maxEigenvalue );
+	const Real noisescale = sqrt( 2 * kT * 1.0f / maxEigenvalue );
 
 	int rpos = randomPosition[blockIdx.x];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
