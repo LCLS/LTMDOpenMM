@@ -139,6 +139,11 @@ target_link_libraries( LTMDReference OpenMMLTMD )
 
 option( BUILD_GPU "Build GPU code" Off )
 if( BUILD_GPU )
+	option( BUILD_FAST_NOISE "Build Fast Noise code" On )
+	if( BUILD_FAST_NOISE )
+		add_definitions( "-DFAST_NOISE" )
+	endif( BUILD_FAST_NOISE )
+
 	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
 	if( BUILD_GPU_CUDA )
 		find_package( CUDA REQUIRED )

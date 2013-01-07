@@ -76,6 +76,10 @@ namespace OpenMM {
 			return names;
 		}
 
+		void Integrator::SetProjectionChanged( bool value ){
+			eigVecChanged = value;
+		}
+
 		void Integrator::step( int steps ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -119,13 +123,12 @@ namespace OpenMM {
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
 			}
-
 			stepsSinceDiagonalize++;
 
 			context->calcForcesAndEnergy( true, false );
 
 			IntegrateStep();
-			eigVecChanged = false;
+			SetProjectionChanged( false );
 
 			if( !minimize( mParameters.MaximumMinimizationIterations ) ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
@@ -136,6 +139,8 @@ namespace OpenMM {
 					}
 				}
 			}
+
+
 
 			TimeAndCounterStep();
 
@@ -171,7 +176,7 @@ namespace OpenMM {
 			quadraticSteps = 0;
 
 			for( unsigned int i = 0; i < max; i++ ){
-				eigVecChanged = false;
+				SetProjectionChanged( false );
 
 				simpleSteps++;
 				double currentPE = LinearMinimize( initialPE );
@@ -181,12 +186,12 @@ namespace OpenMM {
 					double lambda = 0.0;
 					currentPE = QuadraticMinimize( currentPE, lambda );
 					if( currentPE > initialPE ){
-						std::cout << "Quadratic Minimization Failed Energy Test. Forcing Rediagonalization" << std::endl;
+						std::cout << "Quadratic Minimization Failed Energy Test [" << currentPE << ", " << initialPE << "] - Forcing Rediagonalization" << std::endl;
 						computeProjectionVectors();
 						break;
 					}else{
 						if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
-							std::cout << "Quadratic Minimization Failed Lambda Test. Forcing Rediagonalization" << std::endl;
+							std::cout << "Quadratic Minimization Failed Lambda Test [" << lambda << ", " << 1.0 / maxEigenvalue << "] - Forcing Rediagonalization" << std::endl;
 							computeProjectionVectors();
 							break;
 						}
