@@ -130,10 +130,12 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 		pos.y += dt * v.y;
 		pos.z += dt * v.z;
 
+#ifdef FAST_NOISE
 		// Remove Noise
 		pos.x -= noiseVal[atom].x;
 		pos.y -= noiseVal[atom].y;
 		pos.z -= noiseVal[atom].z;
+#endif
 
 		posq[atom] = pos;
 	}
@@ -159,6 +161,7 @@ void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDASt
 	}
 }
 
+#ifdef FAST_NOISE
 __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue, float stepSize ) {
 	extern __shared__ float dotBuffer[];
 	const Real val = stepSize / 0.002;
@@ -251,6 +254,7 @@ void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDASt
 		gpu->iterations = 0;
 	}
 }
+#endif 
 
 __global__ void kRejectMinimizationStep_kernel( int numAtoms, float4 *posq, float4 *oldPosq ) {
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {

@@ -120,8 +120,10 @@ namespace OpenMM {
 			void StepKernel::Integrate( OpenMM::ContextImpl &context, const Integrator &integrator ) {
 				ProjectionVectors( integrator );
 
+#ifdef FAST_NOISE
 				// Add noise for step
 				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues, integrator.getStepSize() );
+#endif
 
 				// Calculate Constants
 				data.gpu->sim.deltaT = integrator.getStepSize();
