@@ -30,7 +30,10 @@
 #include "LTMD/StepKernel.h"
 
 #include "CudaPlatform.h"
-#include "kernels/gputypes.h"
+//#include "kernels/gputypes.h"
+#include "CudaArray.h"
+#include "CudaContext.h"
+#include "CudaIntegrationUtilities.h"
 
 static const float KILO                     =    1e3;                      // Thousand
 static const float BOLTZMANN                =    1.380658e-23f;            // (J/K)
@@ -55,23 +58,37 @@ namespace OpenMM {
 
 					void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator );
 					void UpdateTime(  const Integrator &integrator );
-					
+					void setOldPositions( );
 					void AcceptStep( OpenMM::ContextImpl &context );
 					void RejectStep( OpenMM::ContextImpl &context );
 					
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
-				private:
+				
+virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) { 
+	return context.calcKineticEnergy();
+    //return ((CudaContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
+}
+
+
+         			private:
 					void ProjectionVectors( const Integrator &integrator );
 				private:
 					unsigned int mParticles;
 					OpenMM::CudaPlatform::PlatformData &data;
-					CUDAStream<float4> *modes, *NoiseValues;
-					CUDAStream<float>* modeWeights;
-					CUDAStream<float>* minimizerScale;
-					CUDAStream<float>* MinimizeLambda;
+					CudaArray *modes, *NoiseValues;
+					CudaArray* modeWeights;
+					CudaArray* minimizerScale;
+					CudaArray* MinimizeLambda;
+					CudaArray* oldpos;
+					//CUDAStream<float4> *modes, *NoiseValues;
+					//CUDAStream<float>* modeWeights;
+					//CUDAStream<float>* minimizerScale;
+					//CUDAStream<float>* MinimizeLambda;
 					double lastPE;
 					double prevTemp, prevFriction, prevStepSize;
+					int iterations;
+					int kIterations;
 			};
 		}
 	}

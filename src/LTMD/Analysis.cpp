@@ -666,7 +666,8 @@ namespace OpenMM {
 					sPlatform = "OpenCL";
 					break;
                 case Preference::CUDA:
-                    sPlatform = "Cuda";
+                    //sPlatform = "Cuda";
+                    sPlatform = "CUDA";
 					break;
 			}
 

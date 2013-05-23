@@ -37,6 +37,7 @@
 
 #include "ReferencePlatform.h"
 #include "SimTKUtilities/RealVec.h"
+//#include "ReferenceContext.h"
 
 namespace OpenMM {
 	namespace LTMD {
@@ -67,6 +68,13 @@ namespace OpenMM {
 
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
+
+virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) {
+	return context.calcKineticEnergy();
+    //return ((ReferenceContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
+}
+
+
 				private:
 					void Project( const Integrator &integrator, const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool compliment );
 				private:

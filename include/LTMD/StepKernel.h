@@ -36,6 +36,7 @@
 #include "openmm/KernelImpl.h"
 #include "openmm/System.h"
 #include "LTMD/Integrator.h"
+#include "openmm/internal/ContextImpl.h"
 
 namespace OpenMM {
 	namespace LTMD {
@@ -60,6 +61,9 @@ namespace OpenMM {
 				virtual void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator ) = 0;
 				virtual void UpdateTime(  const Integrator &integrator ) = 0;
 				
+virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) = 0;
+
+				virtual void setOldPositions( ) { }
 				virtual void AcceptStep( OpenMM::ContextImpl &context ) = 0;
 				virtual void RejectStep( OpenMM::ContextImpl &context ) = 0;
 				

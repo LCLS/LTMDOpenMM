@@ -37,8 +37,9 @@
 #include "openmm/internal/windowsExport.h"
 
 #include <iostream>
-
+#include <vector>
 #include "LTMD/Parameters.h"
+#include "LTMD/StepKernel.h"
 
 namespace OpenMM {
 	namespace LTMD {
@@ -115,7 +116,11 @@ namespace OpenMM {
 				double getMaxEigenvalue() const {
 					return maxEigenvalue;
 				}
-
+                                double computeKineticEnergy();
+				//double computeKineticEnergy() {
+//dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );	
+				//	return kernel.getAs<OpenMM::LTMD::StepKernel>().computeKineticEnergy(*context, *this);
+				//}
 				/**
 				 * Get the random number seed.  See setRandomNumberSeed() for details.
 				 */
@@ -165,6 +170,7 @@ namespace OpenMM {
 				void SaveStep();
 				void RevertStep();
 			private:
+				//std::vector<Vec3> oldPos; // TMC this won't work in CPU memory with GPU kernels...
 				unsigned int mSimpleMinimizations, mQuadraticMinimizations;
 				unsigned int mLastCompleted;
 				void computeProjectionVectors();
