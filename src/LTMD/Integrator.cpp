@@ -73,8 +73,11 @@ namespace OpenMM {
 			}
 			cout << "C: " << StepKernel::Name() << endl;
 			kernel = context->getPlatform().createKernel( StepKernel::Name(), contextRef );
-			cout << "D: " << kernel.getImpl() << endl;
-			(dynamic_cast<StepKernel &>( kernel.getImpl() )).initialize( contextRef.getSystem(), *this );
+			cout << "D: " << endl;
+			cout << "DD" << endl;
+			cout << kernel.getImpl().getName() << endl;
+			((StepKernel &)( kernel.getImpl() )).initialize( contextRef.getSystem(), *this );
+			//(dynamic_cast<StepKernel &>( kernel.getImpl() )).initialize( contextRef.getSystem(), *this );
 			cout << "E" << endl;
 		}
 
