@@ -37,6 +37,9 @@
 
 #include "LTMD/Integrator.h"
 
+#include <iostream>
+using namespace std;
+
 using namespace OpenMM;
 
 extern void kGenerateRandoms( CudaContext* gpu );
@@ -81,31 +84,39 @@ namespace OpenMM {
 			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
 				// TMC This is done automatically when you setup a context now.
 				//OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator ); // TMC not sure how to replace
-
+                                data.contexts[0]->initialize();
 				mParticles = system.getNumParticles();
+				cout << "Initialize A" << endl;
 			    //NoiseValues = new CUDAStream<float4>( 1, mParticles, "NoiseValues" );
-			    NoiseValues = new CudaArray( *(data.contexts[0]), 1, mParticles*sizeof(float4), "NoiseValues" );
+			    NoiseValues = new CudaArray( *(data.contexts[0]), mParticles, sizeof(float4), "NoiseValues" );
+				cout << "Initialize B" << endl;
 				/*for( size_t i = 0; i < mParticles; i++ ){
 					(*NoiseValues)[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
 				}*/
-				std::vector<float4> tmp;
+				std::vector<float4> tmp(mParticles);
+				cout << "Initialize C" << endl;
 				for (size_t i = 0; i < mParticles; i++) {
 				    tmp[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
                                 }
+				cout << "Initialize D" << endl;
 				NoiseValues->upload(tmp);
+				cout << "Initialize E" << endl;
 
 				// From what I see this is no longer there, TMC
 				// I could be wrong...
 				//data.contexts[0]->seed = ( unsigned long ) integrator.getRandomNumberSeed();
 				int seed = ( unsigned long ) integrator.getRandomNumberSeed();
+				cout << "Initialize F" << endl;
 
 				//gpuInitializeRandoms( data.gpu );
 				//gpuInitializeRandoms( data.contexts[0] ); // Not sure about this, TMC
 				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(seed);				
+				cout << "Initialize G" << endl;
 
 				// Generate a first set of randoms
 				// TMC - I believe it is all done at one time
 				data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(mParticles);
+				cout << "Initialize H" << endl;
 				//kGenerateRandoms( data.gpu );
 				//kGenerateRandoms( data.contexts[0] );
 			}
