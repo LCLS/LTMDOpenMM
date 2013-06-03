@@ -123,7 +123,8 @@ namespace OpenMM {
 		}
 
 				double Integrator::computeKineticEnergy() {
-					return kernel.getAs<StepKernel>().computeKineticEnergy(*context, *this);
+			return ((StepKernel &)( kernel.getImpl() )).computeKineticEnergy( *context, *this );
+				//	return kernel.getAs<OpenMM::LTMD::StepKernel>().computeKineticEnergy(*context, *this);
 				}
 		unsigned int Integrator::CompletedSteps() const {
 			return mLastCompleted;
@@ -138,8 +139,9 @@ namespace OpenMM {
 				DiagonalizeMinimize();
 			}
 			stepsSinceDiagonalize++;
-
+			std::cout << "CALCULATING FORCES..." << std::endl;
 			context->calcForcesAndEnergy( true, false );
+			std::cout << "DONE CALCULATING FORCES..." << std::endl;
 
 			IntegrateStep();
 			SetProjectionChanged( false );
@@ -184,8 +186,10 @@ namespace OpenMM {
 
 			SaveStep();
 
+			std::cout << "B CALCULATING FORCES..." << std::endl;
 			double initialPE = context->calcForcesAndEnergy( true, true );
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).setOldPositions();
+			std::cout << "B CALCULATING FORCES..." << std::endl;
+			((StepKernel &)( kernel.getImpl() )).setOldPositions();
 
 			//context->getPositions(oldPos); // I need to get old positions here 
 			simpleSteps = 0;
@@ -225,7 +229,9 @@ namespace OpenMM {
 					initialPE = currentPE;
 				} else {
 					RevertStep();
+			//std::cout << "C CALCULATING FORCES..." << std::endl;
 					context->calcForcesAndEnergy( true, false );
+			//std::cout << "C CALCULATING FORCES..." << std::endl;
 
 					maxEigenvalue *= 2;
 				}
@@ -264,7 +270,8 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).Integrate( *context, *this );
+			((StepKernel &)( kernel.getImpl() )).Integrate( *context, *this );
+			//dynamic_cast<StepKernel &>( kernel.getImpl() ).Integrate( *context, *this );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -277,7 +284,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );
+			((StepKernel &)( kernel.getImpl() )).UpdateTime( *this );
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -290,8 +297,11 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
+			//std::cout << "LIN MIN" << std::endl;
+			((StepKernel &)( kernel.getImpl() )).LinearMinimize( *context, *this, energy );
+			//std::cout << "D CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
+			//std::cout << "D CALCULATING FORCES..." << std::endl;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -305,11 +315,13 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			lambda = dynamic_cast<StepKernel &>( kernel.getImpl() ).QuadraticMinimize( *context, *this, energy );
+			lambda = ((StepKernel &)( kernel.getImpl() )).QuadraticMinimize( *context, *this, energy );
 #ifdef KERNEL_VALIDATION
 			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / maxEigenvalue ) << std::endl;
 #endif
+			std::cout << "E CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
+			std::cout << "E CALCULATING FORCES..." << std::endl;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -324,7 +336,7 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).AcceptStep( *context/*, oldPos*/ ); // must pass here
+			((StepKernel &)( kernel.getImpl() )).AcceptStep( *context/*, oldPos*/ ); // must pass here
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -337,7 +349,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).RejectStep( *context/*, oldPos*/ ); // must pass here
+			((StepKernel &)( kernel.getImpl() )).RejectStep( *context/*, oldPos*/ ); // must pass here
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;

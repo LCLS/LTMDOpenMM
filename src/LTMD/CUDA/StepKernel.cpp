@@ -46,7 +46,7 @@ extern void kGenerateRandoms( CudaContext* gpu );
 void kNMLUpdate( CudaContext* gpu, float deltaT, float tau, float kT, int numModes, int& iterations, CudaArray& modes, CudaArray& modeWeights, CudaArray& noiseValues );
 void kNMLRejectMinimizationStep( CudaContext* gpu, CudaArray& oldpos );
 void kNMLAcceptMinimizationStep( CudaContext* gpu, CudaArray& oldpos );
-void kNMLLinearMinimize( CudaContext* gpu, int numModes, float maxEigenvalue, CudaArray& modes, CudaArray& modeWeights );
+void kNMLLinearMinimize( CudaContext* gpu, int numModes, float maxEigenvalue, CudaArray& oldpos, CudaArray& modes, CudaArray& modeWeights );
 void kNMLQuadraticMinimize( CudaContext* gpu, float maxEigenvalue, float currentPE, float lastPE, CudaArray& slopeBuffer, CudaArray& lambdaval );
 void kFastNoise( CudaContext* gpu, int numModes, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseValues, float stepSize );
 
@@ -123,16 +123,21 @@ namespace OpenMM {
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
 				//check if projection vectors changed
+				//printf("PROJ VEC A\n");
 				bool modesChanged = integrator.getProjVecChanged();
+				//printf("PROJ VEC B\n");
 
 				//projection vectors changed or never allocated
 				if( modesChanged || modes == NULL ) {
+				printf("PROJ VEC C\n");
 					int numModes = integrator.getNumProjectionVectors();
+				//printf("PROJ VEC A\n");
 
 					//valid vectors?
 					if( numModes == 0 ) {
 						throw OpenMMException( "Projection vector size is zero." );
 					}
+				printf("PROJ VEC D\n");
 
 					//if( modes != NULL && modes->_length != numModes * mParticles ) {
 					if( modes != NULL && modes->getSize() != numModes * mParticles ) {
@@ -141,6 +146,7 @@ namespace OpenMM {
 						modes = NULL;
 						modeWeights = NULL;
 					}
+				printf("PROJ VEC E\n");
 					if( modes == NULL ) {
 						/*modes = new CUDAStream<float4>( numModes * mParticles, 1, "NormalModes" );
 						modeWeights = new CUDAStream<float>( numModes > data.gpu->sim.blocks ? numModes : data.gpu->sim.blocks, 1, "NormalModeWeights" );*/
@@ -149,19 +155,27 @@ namespace OpenMM {
 						oldpos = new CudaArray( *(data.contexts[0]), mParticles, sizeof(float4), "OldPositions" );
 						modesChanged = true;
 					}
+				printf("PROJ VEC F\n");
 					if( modesChanged ) {
+				printf("PROJ VEC F1\n");
 						int index = 0;
+				printf("PROJ VEC F2\n");
 						const std::vector<std::vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
-				                std::vector<float4> tmp;
+				printf("PROJ VEC F3\n");
+				                std::vector<float4> tmp(numModes*mParticles);;
+				printf("PROJ VEC F4: %d %d %d \n", modeVectors.size(), numModes, mParticles);
 						for( int i = 0; i < numModes; i++ ){
 							for( int j = 0; j < mParticles; j++ ) {
 								tmp[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
 								//( *modes )[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
 							}
 						}
+				printf("PROJ VEC F5\n");
 						//modes->Upload();
 						modes->upload(tmp);
+				printf("PROJ VEC F6\n");
 					}
+				printf("PROJ VEC G\n");
 				}
 			}
 
@@ -221,7 +235,7 @@ namespace OpenMM {
 				ProjectionVectors( integrator );
 
 				lastPE = energy;
-				kNMLLinearMinimize( data.contexts[0], integrator.getNumProjectionVectors(), integrator.getMaxEigenvalue(), *modes, *modeWeights );
+				kNMLLinearMinimize( data.contexts[0], integrator.getNumProjectionVectors(), integrator.getMaxEigenvalue(), *oldpos, *modes, *modeWeights );
 			}
 
 			double StepKernel::QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) {
