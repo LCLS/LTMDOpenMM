@@ -45,8 +45,20 @@
 #include "LTMD/Integrator.h"
 #include "LTMD/StepKernel.h"
 
+#include "CudaLTMDKernelSources.h"
+#include "CudaIntegrationUtilities.h"
+#include "CudaContext.h"
+#include "CudaArray.h"
+#include <stdio.h>
+#include <cuda.h>
+#include <vector_functions.h>
+#include <cstdlib>
+#include <string>
+#include <iostream>
+
 using std::cout;
 using std::endl;
+#include <stdio.h>
 
 namespace OpenMM {
 	namespace LTMD {
@@ -139,9 +151,11 @@ namespace OpenMM {
 				DiagonalizeMinimize();
 			}
 			stepsSinceDiagonalize++;
-			std::cout << "CALCULATING FORCES..." << std::endl;
+			//std::cout << "Z CALCULATING FORCES..." << std::endl;
+			context->updateContextState();
 			context->calcForcesAndEnergy( true, false );
-			std::cout << "DONE CALCULATING FORCES..." << std::endl;
+			//cout << "PLATFORM: " << context->getPlatform().getName() << endl;
+			//std::cout << "Z DONE CALCULATING FORCES..." << std::endl;
 
 			IntegrateStep();
 			SetProjectionChanged( false );
@@ -186,9 +200,9 @@ namespace OpenMM {
 
 			SaveStep();
 
-			std::cout << "B CALCULATING FORCES..." << std::endl;
+			//std::cout << "B CALCULATING FORCES..." << std::endl;
 			double initialPE = context->calcForcesAndEnergy( true, true );
-			std::cout << "B CALCULATING FORCES..." << std::endl;
+			//std::cout << "B CALCULATING FORCES..." << std::endl;
 			((StepKernel &)( kernel.getImpl() )).setOldPositions();
 
 			//context->getPositions(oldPos); // I need to get old positions here 
@@ -319,9 +333,9 @@ namespace OpenMM {
 #ifdef KERNEL_VALIDATION
 			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / maxEigenvalue ) << std::endl;
 #endif
-			std::cout << "E CALCULATING FORCES..." << std::endl;
+			//std::cout << "E CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
-			std::cout << "E CALCULATING FORCES..." << std::endl;
+			//std::cout << "E CALCULATING FORCES..." << std::endl;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
