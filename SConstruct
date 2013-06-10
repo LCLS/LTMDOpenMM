@@ -85,4 +85,4 @@ if cuda:
 	#cuda_kernels = Glob( 'src/LTMD/CUDA/kernels/*.cu' )
 	cuda_kernels = Glob( 'src/LTMD/CUDA/kernels/*.cpp' )
 	env.Tool( 'cuda' )
-	env.SharedLibrary( 'LTMDCuda', cuda_sources + cuda_kernels, LIBS = ['OpenMM','OpenMMCuda','OpenMMLTMD'] )
+	env.SharedLibrary( 'LTMDCuda', cuda_sources + cuda_kernels, LIBS = ['OpenMM','OpenMMCUDA','OpenMMLTMD'] )
