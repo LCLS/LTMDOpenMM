@@ -104,6 +104,7 @@ if( OPENMM_SOURCE_DIR )
 	# CUDA
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/src/" )
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/include/" )
+	include_directories( "${OPENMM_SOURCE_DIR}/libraries/lepton/include" )
 endif()
 
 find_library( OPENMM_LIB "OpenMM" HINT ${OPENMM_DIR}/lib )
@@ -149,13 +150,13 @@ if( BUILD_GPU )
 		find_package( CUDA REQUIRED )
 		find_library( OPENMM_CUDA_LIB "OpenMMCuda" HINT "${OPENMM_DIR}/lib/plugins/")
 
-		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h )
+		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h  )
 		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
 
 		file( GLOB LTMD_CUDA_SOURCES src/LTMD/CUDA/*.cpp )
 		source_group( "src\\LTMD\\CUDA" FILES ${LTMD_CUDA_SOURCES} )
 
-		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cu )
+		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cpp )
 		source_group( "Kernels\\LTMD" FILES ${LTMD_CUDA_KERNELS} )
 		
 		# Fast Math
