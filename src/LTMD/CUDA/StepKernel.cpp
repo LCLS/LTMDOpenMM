@@ -84,32 +84,25 @@ namespace OpenMM {
 				MinimizeLambda = new CudaArray( *(data.contexts[0]), 1, sizeof(float), "MinimizeLambda" );
 				//data.contexts[0]->getPlatformData().initializeContexts(system);
 				mParticles = data.contexts[0]->getNumAtoms();
-				cout << "Initialize A" << endl;
 			    //NoiseValues = new CUDAStream<float4>( 1, mParticles, "NoiseValues" );
 			    NoiseValues = new CudaArray( *(data.contexts[0]), mParticles, sizeof(float4), "NoiseValues" );
-				cout << "Initialize B" << endl;
 				/*for( size_t i = 0; i < mParticles; i++ ){
 					(*NoiseValues)[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
 				}*/
 				std::vector<float4> tmp(mParticles);
-				cout << "Initialize C" << endl;
 				for (size_t i = 0; i < mParticles; i++) {
 				    tmp[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
                                 }
-				cout << "Initialize D" << endl;
 				NoiseValues->upload(tmp);
-				cout << "Initialize E" << endl;
 
 				// From what I see this is no longer there, TMC
 				// I could be wrong...
 				//data.contexts[0]->seed = ( unsigned long ) integrator.getRandomNumberSeed();
 				int seed = ( unsigned long ) integrator.getRandomNumberSeed();
-				cout << "Initialize F" << endl;
 
 				//gpuInitializeRandoms( data.gpu );
 				//gpuInitializeRandoms( data.contexts[0] ); // Not sure about this, TMC
 				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(seed);				
-				cout << "Initialize G" << endl;
 
 				// Generate a first set of randoms
 				// TMC - I believe it is all done at one time
@@ -120,7 +113,6 @@ namespace OpenMM {
             printf("RANDOM BEFORE %d: %f %f %f %f\n", i, v[i].w, v[i].x, v[i].y, v[i].z);
         }*/
 				randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
-				cout << "Initialize H" << endl;
         /*data.contexts[0]->getIntegrationUtilities().getRandom().getDevicePointer();
         data.contexts[0]->getVelm().download(v);
         for (i = 0; i < mParticles; i++) {
@@ -203,32 +195,7 @@ namespace OpenMM {
 
 #ifdef FAST_NOISE
 				// Add noise for step
-				// void kFastNoise( CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CUDAArray& modeWeights, float maxEigenvalue, CUDAArray& noiseVal, float stepSize )
-				float mw[modeWeights->getSize()];
-				int paddedatoms = data.contexts[0]->getPaddedNumAtoms();
-				modeWeights->download(mw);
-				printf("BEFORE ");
-				for (int i = 0; i < 12; i++)
-				   printf("%f ", mw[i]);
-				printf("\n");
-				printf("NOISESCALE: %f", sqrt(2*BOLTZ*integrator.getTemperature()*1.0f/integrator.getMaxEigenvalue()));
-				float4 noise[mParticles];
-				data.contexts[0]->getPosq().download(noise);
-				printf("POS BEFORE: ");
-				for (int i = 0; i < paddedatoms; i++)
-				   printf("%f %f %f", noise[i].x, noise[i].y, noise[i].z);
-				printf("\n");
 				kFastNoise(&fastmodule, data.contexts[0], integrator.getNumProjectionVectors(), (float) (BOLTZ * integrator.getTemperature()), iterations, *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues, *randomIndex, *pPosqP, integrator.getStepSize() );
-				modeWeights->download(mw);
-				printf("AFTER ");
-				for (int i = 0; i < 12; i++)
-				   printf("%f ", mw[i]);
-				printf("\n");
-				data.contexts[0]->getPosq().download(noise);
-				printf("POS AFTER: ");
-				for (int i = 0; i < paddedatoms; i++)
-				   printf("%f %f %f", noise[i].x, noise[i].y, noise[i].z);
-				printf("\n");
 #endif
 
 				// Calculate Constants
