@@ -104,41 +104,21 @@ namespace OpenMM {
 				//gpuInitializeRandoms( data.contexts[0] ); // Not sure about this, TMC
 				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(seed);				
 
-				// Generate a first set of randoms
-				// TMC - I believe it is all done at one time
-				//float4* v = new float4[mParticles]; int i;
-        /*data.contexts[0]->getIntegrationUtilities().getRandom().getDevicePointer();
-        data.contexts[0]->getVelm().download(v);
-        for (i = 0; i < mParticles; i++) {
-            printf("RANDOM BEFORE %d: %f %f %f %f\n", i, v[i].w, v[i].x, v[i].y, v[i].z);
-        }*/
 				randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
-        /*data.contexts[0]->getIntegrationUtilities().getRandom().getDevicePointer();
-        data.contexts[0]->getVelm().download(v);
-        for (i = 0; i < mParticles; i++) {
-            printf("RANDOM AFTER %d: %f %f %f %f\n", i, v[i].w, v[i].x, v[i].y, v[i].z);
-        }*/
-				//kGenerateRandoms( data.gpu );
-				//kGenerateRandoms( data.contexts[0] );
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
 				//check if projection vectors changed
-				//printf("PROJ VEC A\n");
 				bool modesChanged = integrator.getProjVecChanged();
-				//printf("PROJ VEC B\n");
 
 				//projection vectors changed or never allocated
 				if( modesChanged || modes == NULL ) {
-				//printf("PROJ VEC C\n");
 					int numModes = integrator.getNumProjectionVectors();
-				//printf("PROJ VEC A\n");
 
 					//valid vectors?
 					if( numModes == 0 ) {
 						throw OpenMMException( "Projection vector size is zero." );
 					}
-				//printf("PROJ VEC D\n");
 
 					//if( modes != NULL && modes->_length != numModes * mParticles ) {
 					if( modes != NULL && modes->getSize() != numModes * mParticles ) {
@@ -147,7 +127,6 @@ namespace OpenMM {
 						modes = NULL;
 						modeWeights = NULL;
 					}
-				//printf("PROJ VEC E\n");
 					if( modes == NULL ) {
 						/*modes = new CUDAStream<float4>( numModes * mParticles, 1, "NormalModes" );
 						modeWeights = new CUDAStream<float>( numModes > data.gpu->sim.blocks ? numModes : data.gpu->sim.blocks, 1, "NormalModeWeights" );*/
@@ -162,27 +141,17 @@ namespace OpenMM {
 				randomIndex->upload(tmp2);
 						modesChanged = true;
 					}
-				//printf("PROJ VEC F\n");
 					if( modesChanged ) {
-				//printf("PROJ VEC F1\n");
 						int index = 0;
-				//printf("PROJ VEC F2\n");
 						const std::vector<std::vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
-				//printf("PROJ VEC F3\n");
 				                std::vector<float4> tmp(numModes*mParticles);;
-				//printf("PROJ VEC F4: %d %d %d \n", modeVectors.size(), numModes, mParticles);
 						for( int i = 0; i < numModes; i++ ){
 							for( int j = 0; j < mParticles; j++ ) {
 								tmp[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
-								//( *modes )[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
 							}
 						}
-				//printf("PROJ VEC F5\n");
-						//modes->Upload();
 						modes->upload(tmp);
-				//printf("PROJ VEC F6\n");
 					}
-				//printf("PROJ VEC G\n");
 				}
 			}
 
@@ -199,13 +168,8 @@ namespace OpenMM {
 #endif
 
 				// Calculate Constants
-				//data.gpu->sim.deltaT = integrator.getStepSize();
-				//data.gpu->sim.oneOverDeltaT = 1.0f / data.gpu->sim.deltaT;
 
 				const double friction = integrator.getFriction();
-				//data.gpu->sim.tau = friction == 0.0f ? 0.0f : 1.0f / friction;
-				//data.gpu->sim.T = ( float ) integrator.getTemperature();
-				//data.gpu->sim.kT = ( float )( BOLTZ * integrator.getTemperature() );
 
         			iterations++;
 				// TMC This parameter was set by default to 20 in the old OpenMm
@@ -221,13 +185,6 @@ namespace OpenMM {
                				iterations = 0;
         			}
         context.updateContextState();        
-        /*long long v[576*3];
-	int i;
-        data.contexts[0]->getForce().download(v);
-        for (i = 0; i < 576*3; i++) {
-            printf("FORCE BEFORE FUNCTIONA CALL %d: %f\n", i, (double)v[i]/(double)0x100000000);
-        }*/
-	//delete v;
 				// Do Step
 				kNMLUpdate(&updatemodule,
 					data.contexts[0], 
@@ -247,7 +204,6 @@ namespace OpenMM {
 				        randomIndex->upload(tmp2);
                				iterations = 0;
         			}
-				//kNMLUpdate( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, *NoiseValues );
 			}
 
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
