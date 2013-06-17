@@ -145,7 +145,6 @@ namespace OpenMM {
 		/* Save before integration for DiagonalizeMinimize and add test to make
 			sure its not done twice */
 		bool Integrator::DoStep() {
-			std::cout << "DOING STEP.." << std::endl;
 			context->updateContextState();
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
@@ -207,9 +206,7 @@ namespace OpenMM {
 			for( unsigned int i = 0; i < max; i++ ){
 				SetProjectionChanged( false );
 				simpleSteps++;
-				//printf("LINEAR MINIMIZE\n");
 				double currentPE = LinearMinimize( initialPE );
-				//printf("DONE LINEAR MINIMIZE\n");
 				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
 					quadraticSteps++;
 
@@ -229,7 +226,6 @@ namespace OpenMM {
 				}
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
-				printf("INITIAL: %f  CURRENT: %f\n", initialPE, currentPE);
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
 					break;
 				}
