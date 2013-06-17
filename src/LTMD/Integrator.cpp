@@ -45,10 +45,10 @@
 #include "LTMD/Integrator.h"
 #include "LTMD/StepKernel.h"
 
-#include "CudaLTMDKernelSources.h"
+/*#include "CudaLTMDKernelSources.h"
 #include "CudaIntegrationUtilities.h"
 #include "CudaContext.h"
-#include "CudaArray.h"
+#include "CudaArray.h"*/
 #include <stdio.h>
 #include <cuda.h>
 #include <vector_functions.h>
@@ -145,8 +145,8 @@ namespace OpenMM {
 		/* Save before integration for DiagonalizeMinimize and add test to make
 			sure its not done twice */
 		bool Integrator::DoStep() {
+			std::cout << "DOING STEP.." << std::endl;
 			context->updateContextState();
-
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
 			}
@@ -156,10 +156,8 @@ namespace OpenMM {
 			context->calcForcesAndEnergy( true, false );
 			//cout << "PLATFORM: " << context->getPlatform().getName() << endl;
 			//std::cout << "Z DONE CALCULATING FORCES..." << std::endl;
-
 			IntegrateStep();
 			SetProjectionChanged( false );
-
 			if( !minimize( mParameters.MaximumMinimizationIterations ) ){
 				if( mParameters.ShouldForceRediagOnMinFail ) {
 					if( mParameters.ShouldProtoMolDiagonalize ) {
@@ -170,10 +168,8 @@ namespace OpenMM {
 				}
 			}
 
-
-
+			//((StepKernel &)( kernel.getImpl() )).updateState( *context );
 			TimeAndCounterStep();
-
 			return true;
 		}
 
@@ -195,7 +191,6 @@ namespace OpenMM {
 
 		void Integrator::Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps ) {
 			const double eigStore = maxEigenvalue;
-
 			if( !mParameters.ShouldProtoMolDiagonalize && eigenvectors.size() == 0 ) computeProjectionVectors();
 
 			SaveStep();
@@ -211,9 +206,10 @@ namespace OpenMM {
 
 			for( unsigned int i = 0; i < max; i++ ){
 				SetProjectionChanged( false );
-
 				simpleSteps++;
+				//printf("LINEAR MINIMIZE\n");
 				double currentPE = LinearMinimize( initialPE );
+				//printf("DONE LINEAR MINIMIZE\n");
 				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
 					quadraticSteps++;
 
@@ -231,13 +227,12 @@ namespace OpenMM {
 						}
 					}
 				}
-
 				//break if satisfies end condition
 				const double diff = initialPE - currentPE;
+				printf("INITIAL: %f  CURRENT: %f\n", initialPE, currentPE);
 				if( diff < getMinimumLimit() && diff >= 0.0 ) {
 					break;
 				}
-
 				if( diff > 0.0 ) {
 					SaveStep();
 					initialPE = currentPE;
@@ -311,7 +306,6 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			//std::cout << "LIN MIN" << std::endl;
 			((StepKernel &)( kernel.getImpl() )).LinearMinimize( *context, *this, energy );
 			//std::cout << "D CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
@@ -349,7 +343,6 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			
 			((StepKernel &)( kernel.getImpl() )).AcceptStep( *context/*, oldPos*/ ); // must pass here
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );

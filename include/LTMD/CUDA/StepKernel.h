@@ -64,7 +64,7 @@ namespace OpenMM {
 					
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
-				
+		void updateState (OpenMM::ContextImpl &context );		
 virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) {
         
 	//return context.calcKineticEnergy();
@@ -81,9 +81,11 @@ virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrat
 					OpenMM::CudaPlatform::PlatformData &data;
 					CudaArray *modes, *NoiseValues;
 					CudaArray* modeWeights;
+					CudaArray* randomIndex;
 					CudaArray* minimizerScale;
 					CudaArray* MinimizeLambda;
 					CudaArray* oldpos;
+					CudaArray* pPosqP;
 					//CUDAStream<float4> *modes, *NoiseValues;
 					//CUDAStream<float>* modeWeights;
 					//CUDAStream<float>* minimizerScale;
@@ -92,6 +94,12 @@ virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrat
 					double prevTemp, prevFriction, prevStepSize;
 					int iterations;
 					int kIterations;
+					int randomPos;
+					CUmodule minmodule;
+					CUmodule linmodule;
+					CUmodule quadmodule;
+					CUmodule fastmodule;
+					CUmodule updatemodule;
 			};
 		}
 	}

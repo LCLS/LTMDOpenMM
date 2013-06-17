@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
+#include <random>
 using namespace std;
 using namespace OpenMM;
 //#define LAUNCHERROR(s) \
@@ -180,7 +181,7 @@ __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4
 
 
 // CPU code
-void kNMLUpdate( CudaContext* cu, float deltaT, float tau, float kT, int numModes, int& iterations, CudaArray& modes, CudaArray& modeWeights, CudaArray& noiseVal ) {
+void kNMLUpdate(CUmodule* module, CudaContext* cu, float deltaT, float tau, float kT, int numModes, int& iterations, CudaArray& modes, CudaArray& modeWeights, CudaArray& noiseVal, CudaArray& randomIndex ) {
 	// TMC not sure at the moment about random data, and cannot find kGEnerateRandom()
 	// Still need to figure that part ou	
 	// gpu->sim.pRandom4
@@ -190,10 +191,11 @@ void kNMLUpdate( CudaContext* cu, float deltaT, float tau, float kT, int numMode
 	int paddednumatoms = cu->getPaddedNumAtoms();
 	printf("Calling NMLUpdate with these values: %f %f %f\n", deltaT, tau, kT);
 	void* update1Args[] = {&atoms, &paddednumatoms, &tau, &deltaT, &kT, 
-                            &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &cu->getIntegrationUtilities().getPosDelta().getDevicePointer(), &atoms }; // # of random numbers equal to the number of atoms? TMC
-        CUmodule module = cu->createModule(CudaLTMDKernelSources::NMLupdates);
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::NMLupdates);
+                 //           &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomPos, &atoms }; // # of random numbers equal to the number of atoms? TMC
+                            &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &atoms }; // # of random numbers equal to the number of atoms? TMC
 	CUfunction update1Kernel, update2Kernel, update3Kernel;
-        update1Kernel = cu->getKernel(module, "kNMLUpdate1_kernel");
+        update1Kernel = cu->getKernel(*module, "kNMLUpdate1_kernel");
 	// TMC nan gets generated when this kernel is included...check
 	int i = 0;
 	//float4* v = new float4[paddednumatoms];
@@ -201,7 +203,7 @@ void kNMLUpdate( CudaContext* cu, float deltaT, float tau, float kT, int numMode
 	//for (i = 0; i < atoms; i++) {
         //    printf("FORCE BEFORE %d: %f %f %f %f\n", i, v[i].w, v[i].x, v[i].y, v[i].z);
         //}
-	cu->executeKernel(update1Kernel, update1Args, cu->TileSize, cu->ThreadBlockSize);
+	cu->executeKernel(update1Kernel, update1Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize);
 	// TMC Velocities are way off after this
         //cu->getForce().download(v);
 	/*for (i = 0; i < atoms; i++) {
@@ -212,24 +214,24 @@ void kNMLUpdate( CudaContext* cu, float deltaT, float tau, float kT, int numMode
 
 
         void* update2Args[] = {&atoms, &numModes, &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
-	update2Kernel = cu->getKernel(module, "kNMLUpdate2_kernel");
-	cu->executeKernel(update2Kernel, update2Args, cu->TileSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+	update2Kernel = cu->getKernel(*module, "kNMLUpdate2_kernel");
+	cu->executeKernel(update2Kernel, update2Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float)); 
 	//LAUNCHERROR( "kNMLUpdate2" );
 	
         void* update3Args[] = {&atoms, &numModes, &deltaT, &cu->getPosq().getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer(), &noiseVal.getDevicePointer()};
-	update3Kernel = cu->getKernel(module, "kNMLUpdate3_kernel");
-	cu->executeKernel(update3Kernel, update3Args, cu->TileSize, cu->ThreadBlockSize, cu->ThreadBlockSize*numModes*sizeof(float));
+	update3Kernel = cu->getKernel(*module, "kNMLUpdate3_kernel");
+	cu->executeKernel(update3Kernel, update3Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, numModes*sizeof(float)); 
 	//LAUNCHERROR( "kNMLUpdate3" );
 
 	// Update randoms if necessary
 	// Again, assuming 20 for randomIterations because it was set to that in the construct and never changed by our integrator
-	int randomIterations = 20;
-	iterations++;
-	if( iterations == randomIterations ) {
+	//int randomIterations = 20;
+	//iterations++;
+	//if( iterations == randomIterations ) {
 		//kGenerateRandoms( gpu );
-		cu->getIntegrationUtilities().prepareRandomNumbers( paddednumatoms   ); // 
-		iterations = 0;
-	}
+	//	cu->getIntegrationUtilities().prepareRandomNumbers( paddednumatoms   ); // 
+	//	iterations = 0;
+	//}
 }
 
 #ifdef FAST_NOISE
@@ -309,22 +311,88 @@ __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, fl
 }
 */
 
-void kFastNoise( CudaContext* cu, int numModes, CUDAArray& modes, CUDAArray& modeWeights, float maxEigenvalue, CUDAArray& noiseVal, float stepSize ) {
+float rand_gauss (void) {
+  float v1,v2,s;
+
+    do {
+        v1 = 2.0 * ((float) rand()/RAND_MAX) - 1;
+	    v2 = 2.0 * ((float) rand()/RAND_MAX) - 1;
+
+	        s = v1*v1 + v2*v2;
+		  } while ( s >= 1.0 );
+
+		    if (s == 0.0)
+		        return 0.0;
+			  else
+			      return (v1*sqrt(-2.0 * log(s) / s));
+			      }
+
+void kFastNoise(CUmodule* module, CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseVal, CudaArray& randomIndex, CudaArray& oldpos, float stepSize ) {
+	int atoms = cu->getNumAtoms();
+	int paddednumatoms = cu->getPaddedNumAtoms();
+	/*int rsize = cu->getIntegrationUtilities().getRandom().getSize();
+	std::vector<float4> rands(rsize);
+	for (int i = 0 ; i < rsize; i++) {
+		rands[i].w = rand_gauss();;
+		rands[i].x = rand_gauss();;
+		rands[i].y = rand_gauss();;
+		rands[i].z = rand_gauss();;
+	}
+	cu->getIntegrationUtilities().getRandom().upload(rands);*/
+	void* fastnoise1Args[] = {&atoms, &paddednumatoms, &numModes, &kT, &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer(),&cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &paddednumatoms, &maxEigenvalue, &stepSize};
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::fastnoises);
+	CUfunction fastnoise1Kernel, fastnoise2Kernel;
+	
+	//"extern \"C\" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes,\n"
+	//"                                       float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue, float stepSize ) {\n"
+
+	
+	fastnoise1Kernel = cu->getKernel(*module, "kFastNoise1_kernel");
+	//cu->executeKernel(fastnoise1Kernel, fastnoise1Args, 16, 4, 16);
+	cu->executeKernel(fastnoise1Kernel, fastnoise1Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+
+        void* fastnoise2Args[] = {&atoms, &numModes, &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
+
+//"extern \"C\" __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights ) {\n"
+        fastnoise2Kernel = cu->getKernel(*module, "kFastNoise2_kernel");
+	cu->executeKernel(fastnoise2Kernel, fastnoise2Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, numModes*sizeof(float));
+	//cu->executeKernel(fastnoise2Kernel, fastnoise2Args, 16, 4, 48);
+
+
+	/*void* linmin1Args[] = {&atoms, &numModes, &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
+        CUmodule module = cu->createModule(CudaLTMDKernelSources::linearMinimizers);
+	CUfunction linmin1Kernel, linmin2Kernel;
+        linmin1Kernel = cu->getKernel(module, "kFastNoise1_kernel");
+	cu->executeKernel(linmin1Kernel, linmin1Args, cu->TileSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+	
+
 	kFastNoise1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> (
 		gpu->natoms, gpu->sim.paddedNumberOfAtoms, numModes, gpu->sim.kT, gpu->sim.pPosqP, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData, gpu->sim.pRandom4, gpu->sim.pRandomPosition, gpu->sim.randoms, maxEigenvalue, stepSize
-	);
+	);*/
+
 	//LAUNCHERROR( "kFastNoise1" );
-	kFastNoise2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, numModes *sizeof( float ) >>> (
-		gpu->natoms, numModes, gpu->sim.pPosq, noiseVal._pDevData, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData
-	);
+	//kFastNoise2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, numModes *sizeof( float ) >>> (
+//		gpu->natoms, numModes, gpu->sim.pPosq, noiseVal._pDevData, gpu->sim.pVelm4, modes._pDevData, modeWeights._pDevData
+//	);
 	//LAUNCHERROR( "kFastNoise2" );
 
+// Update randoms if necessary
+// Again, assuming 20 for randomIterations because it was set to that in the construct and never changed by our integrator
+//int randomIterations = 20;
+//iterations++;
+//if( iterations == randomIterations ) {
+                                                 //kGenerateRandoms( gpu );
+//                                                                 cu->getIntegrationUtilities().prepareRandomNumbers( paddednumatoms   ); // 
+//                                                                                 iterations = 0;
+//                                                                                         }
+
+
 	// Update randoms if necessary
-	gpu->iterations++;
+	/*gpu->iterations++;
 	if( gpu->iterations == gpu->sim.randomIterations ) {
 		kGenerateRandoms( gpu );
 		gpu->iterations = 0;
-	}
+	}*/
 }
 #endif 
 /*
@@ -334,13 +402,13 @@ __global__ void kRejectMinimizationStep_kernel( int numAtoms, float4 *posq, floa
 	}
 }*/
 
-void kNMLRejectMinimizationStep( CudaContext* cu, CudaArray& oldpos ) {
-        CUmodule module = cu->createModule(CudaLTMDKernelSources::minimizationSteps);
-	CUfunction rejectKernel = cu->getKernel(module, "kRejectMinimizationStep_kernel");
+void kNMLRejectMinimizationStep(CUmodule* module, CudaContext* cu, CudaArray& oldpos ) {
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::minimizationSteps);
+	CUfunction rejectKernel = cu->getKernel(*module, "kRejectMinimizationStep_kernel");
 	// TMC not sure how to get old positions
 	int atoms = cu->getNumAtoms();
 	void* rejectArgs[] = {&atoms, &cu->getPosq().getDevicePointer(), &oldpos.getDevicePointer() };
-	cu->executeKernel(rejectKernel, rejectArgs, cu->TileSize, cu->ThreadBlockSize);
+	cu->executeKernel(rejectKernel, rejectArgs, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize);
 	//kRejectMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	//LAUNCHERROR( "kRejectMinimizationStep" );
 }
@@ -351,13 +419,13 @@ __global__ void kAcceptMinimizationStep_kernel( int numAtoms, float4 *posq, floa
 	}
 }*/
 
-void kNMLAcceptMinimizationStep( CudaContext* cu, CudaArray& oldpos ) {
-        CUmodule module = cu->createModule(CudaLTMDKernelSources::minimizationSteps);
-	CUfunction acceptKernel = cu->getKernel(module, "kAcceptMinimizationStep_kernel");
+void kNMLAcceptMinimizationStep(CUmodule* module, CudaContext* cu, CudaArray& oldpos ) {
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::minimizationSteps); // This statement takes a very long time.  WHY??  -TMC
+	CUfunction acceptKernel = cu->getKernel(*module, "kAcceptMinimizationStep_kernel");
 	// TMC not sure how to get old positions
 	int atoms = cu->getNumAtoms();
 	void* acceptArgs[] = {&atoms, &cu->getPosq().getDevicePointer(), &oldpos.getDevicePointer() };
-	cu->executeKernel(acceptKernel, acceptArgs, cu->TileSize, cu->ThreadBlockSize);
+	cu->executeKernel(acceptKernel, acceptArgs, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize);
 	//kAcceptMinimizationStep_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block >>> ( gpu->natoms, gpu->sim.pPosq, gpu->sim.pOldPosq );
 	//LAUNCHERROR( "kAcceptMinimizationStep" );
 }
@@ -423,19 +491,25 @@ __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int numModes, float in
 	}
 }*/
 
-void kNMLLinearMinimize( CudaContext* cu, int numModes, float maxEigenvalue, CudaArray& oldpos, CudaArray& modes, CudaArray& modeWeights ) {
+void kNMLLinearMinimize(CUmodule* module, CudaContext* cu, int numModes, float maxEigenvalue, CudaArray& oldpos, CudaArray& modes, CudaArray& modeWeights ) {
              //printf("K LIN MIN\n");
 	int atoms = cu->getNumAtoms();
-	void* linmin1Args[] = {&atoms, &numModes, &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
-        CUmodule module = cu->createModule(CudaLTMDKernelSources::linearMinimizers);
+	int paddedatoms = cu->getPaddedNumAtoms();
+	void* linmin1Args[] = {&atoms, &paddedatoms, &numModes, &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::linearMinimizers);
 	CUfunction linmin1Kernel, linmin2Kernel;
-        linmin1Kernel = cu->getKernel(module, "kNMLLinearMinimize1_kernel");
-	cu->executeKernel(linmin1Kernel, linmin1Args, cu->TileSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
-	
-	linmin2Kernel = cu->getKernel(module, "kNMLLinearMinimize2_kernel");
+        linmin1Kernel = cu->getKernel(*module, "kNMLLinearMinimize1_kernel");
+	//int blocks = cu->TileSize;
+	//int threads_per_block = (atoms + blocks - 1) / blocks; 
+	//printf("ONE CALLING WITH: %d %d %d", cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+	cu->executeKernel(linmin1Kernel, linmin1Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+	//cu->executeKernel(linmin1Kernel, linmin1Args, atoms);//16, 4, 16);
+	linmin2Kernel = cu->getKernel(*module, "kNMLLinearMinimize2_kernel");
 	float oneoverEig = 1.0f/maxEigenvalue;
-	void* linmin2Args[] = {&atoms, &numModes, &oneoverEig, &cu->getPosq().getDevicePointer(), &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()}; 
-        cu->executeKernel(linmin2Kernel, linmin2Args, cu->TileSize, cu->ThreadBlockSize, numModes*sizeof(float));
+	void* linmin2Args[] = {&atoms, &paddedatoms, &numModes, &oneoverEig, &cu->getPosq().getDevicePointer(), &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()}; 
+	//printf("TWO CALLING WITH: %d %d %d", cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, numModes*sizeof(float));
+        cu->executeKernel(linmin2Kernel, linmin2Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, numModes*sizeof(float));
+        //cu->executeKernel(linmin2Kernel, linmin2Args, atoms);//16, 4, 48);
 
 }
 
@@ -513,26 +587,27 @@ __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, fl
 	}
 }*/
 
-void kNMLQuadraticMinimize( CudaContext* cu, float maxEigenvalue, float currentPE, float lastPE, CudaArray& slopeBuffer, CudaArray& lambdaval ) {
+void kNMLQuadraticMinimize(CUmodule* module, CudaContext* cu, float maxEigenvalue, float currentPE, float lastPE, CudaArray& oldpos, CudaArray& slopeBuffer, CudaArray& lambdaval ) {
 	int atoms = cu->getNumAtoms();
-	void* quadmin1Args[] = {&atoms, 
-				&cu->getPosq().getDevicePointer(), 
+	int paddedatoms = cu->getPaddedNumAtoms();
+	void* quadmin1Args[] = {&atoms, &paddedatoms, 
+				&oldpos.getDevicePointer(), 
 				&cu->getVelm().getDevicePointer(), 
 				&cu->getForce().getDevicePointer(), 
 				&slopeBuffer.getDevicePointer()};
-        CUmodule module = cu->createModule(CudaLTMDKernelSources::quadraticMinimizers);
+        //CUmodule module = cu->createModule(CudaLTMDKernelSources::quadraticMinimizers);
 	CUfunction quadmin1Kernel, quadmin2Kernel;
-        quadmin1Kernel = cu->getKernel(module, "kNMLQuadraticMInimize1_kernel");
-	cu->executeKernel(quadmin1Kernel, quadmin1Args, cu->TileSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float));
+        quadmin1Kernel = cu->getKernel(*module, "kNMLQuadraticMinimize1_kernel");
+	cu->executeKernel(quadmin1Kernel, quadmin1Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->ThreadBlockSize*sizeof(float)); 
 	//kNMLQuadraticMinimize1_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.update_threads_per_block *sizeof( float ) >>> ( gpu->natoms,
 	//		gpu->sim.pPosqP, gpu->sim.pVelm4, gpu->sim.pForce4, slopeBuffer._pDevData );
 	//LAUNCHERROR( "kNMLQuadraticMinimize1" );
 
 	float oneoverEig = 1.0f/maxEigenvalue;
 	// TMC not sure about pPosqP
-	void* quadmin2Args[] = {&atoms, &currentPE, &lastPE, &oneoverEig, &cu->getPosq().getDevicePointer(), &cu->getVelm().getDevicePointer(), &slopeBuffer.getDevicePointer(), &lambdaval.getDevicePointer()}; 
-        quadmin2Kernel = cu->getKernel(module, "kNMLQuadraticMInimize2_kernel");
-        cu->executeKernel(quadmin2Kernel, quadmin2Args, cu->TileSize, cu->ThreadBlockSize, cu->TileSize*sizeof(float));
+	void* quadmin2Args[] = {&atoms, &currentPE, &lastPE, &oneoverEig, &cu->getPosq().getDevicePointer(), &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &slopeBuffer.getDevicePointer(), &lambdaval.getDevicePointer()}; 
+        quadmin2Kernel = cu->getKernel(*module, "kNMLQuadraticMinimize2_kernel");
+        cu->executeKernel(quadmin2Kernel, quadmin2Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, cu->getNumThreadBlocks()*cu->ThreadBlockSize*sizeof(float)); 
 	
 	//kNMLQuadraticMinimize2_kernel <<< gpu->sim.blocks, gpu->sim.update_threads_per_block, gpu->sim.blocks *sizeof( float ) >>> ( gpu->natoms, currentPE,
 	//		lastPE, 1.0f / maxEigenvalue, gpu->sim.pPosq, gpu->sim.pPosqP, gpu->sim.pVelm4, slopeBuffer._pDevData, lambdaval._pDevData );
