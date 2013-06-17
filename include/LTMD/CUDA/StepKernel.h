@@ -64,7 +64,6 @@ namespace OpenMM {
 					
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
-		void updateState (OpenMM::ContextImpl &context );		
 virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) {
         
 	//return context.calcKineticEnergy();

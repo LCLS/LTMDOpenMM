@@ -48,17 +48,8 @@ void kNMLRejectMinimizationStep(CUmodule* module, CudaContext* gpu, CudaArray& o
 void kNMLAcceptMinimizationStep(CUmodule* module, CudaContext* gpu, CudaArray& oldpos );
 void kNMLLinearMinimize(CUmodule* module, CudaContext* gpu, int numModes, float maxEigenvalue, CudaArray& oldpos, CudaArray& modes, CudaArray& modeWeights );
 void kNMLQuadraticMinimize(CUmodule* module, CudaContext* gpu, float maxEigenvalue, float currentPE, float lastPE, CudaArray& oldpos, CudaArray& slopeBuffer, CudaArray& lambdaval );
-//void kFastNoise( CudaContext* gpu, int numModes, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseValues, float stepSize );
 void kFastNoise(CUmodule* module, CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseVal, CudaArray& randomIndex, CudaArray& oldpos, float stepSize );
 
-/*extern void kGenerateRandoms( gpuContext gpu );
-void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float4>& noiseValues );
-void kNMLRejectMinimizationStep( gpuContext gpu );
-void kNMLAcceptMinimizationStep( gpuContext gpu );
-void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );
-void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer, CUDAStream<float>& lambdaval );
-void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue, CUDAStream<float4>& noiseValues, float stepSize );
-*/
 
 namespace OpenMM {
 	namespace LTMD {
@@ -325,30 +316,6 @@ namespace OpenMM {
 				return tmp[0];
 			}
 
-			void StepKernel::updateState (OpenMM::ContextImpl &context ) {
-				printf("UPDATING STATE....\n");
-				int paddedatoms = data.contexts[0]->getPaddedNumAtoms();
-				float4* p = new float4[paddedatoms];
-				//float4* v = new float4[paddedatoms];
-				data.contexts[0]->getPosq().download(p);
-				//data.contexts[0]->getVelm().download(v);
-
-				std::vector<Vec3> positions(paddedatoms);
-				positions[0][0] = positions[0][1] = positions[0][2] = positions[1][0] = 0.0;
-				//std::vector<Vec3> velocities(paddedatoms);
-				for (int i = 1; i < paddedatoms; i++)
-				{
-				   if (i > 1) positions[i][0] = p[i].x;
-				   positions[i][1] = p[i].y;
-				   positions[i][2] = p[i].z;
-				   //velocities[i][0] = v[i].x;
-				   //velocities[i][1] = v[i].y;
-				   //velocities[i][2] = v[i].z;
-				}
-
-				context.setPositions(positions);
-			//	context.setVelocities(velocities);
-			}
 		}
 	}
 }
