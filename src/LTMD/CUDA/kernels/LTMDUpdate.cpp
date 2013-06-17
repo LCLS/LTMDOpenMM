@@ -35,7 +35,6 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include <random>
 using namespace std;
 using namespace OpenMM;
 //#define LAUNCHERROR(s) \
@@ -311,21 +310,6 @@ __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, fl
 }
 */
 
-float rand_gauss (void) {
-  float v1,v2,s;
-
-    do {
-        v1 = 2.0 * ((float) rand()/RAND_MAX) - 1;
-	    v2 = 2.0 * ((float) rand()/RAND_MAX) - 1;
-
-	        s = v1*v1 + v2*v2;
-		  } while ( s >= 1.0 );
-
-		    if (s == 0.0)
-		        return 0.0;
-			  else
-			      return (v1*sqrt(-2.0 * log(s) / s));
-			      }
 
 void kFastNoise(CUmodule* module, CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseVal, CudaArray& randomIndex, CudaArray& oldpos, float stepSize ) {
 	int atoms = cu->getNumAtoms();
