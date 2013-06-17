@@ -152,6 +152,7 @@ if( BUILD_GPU )
 
 		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h  )
 		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
+	        include_directories( "include/LTMD/CUDA/" )
 
 		file( GLOB LTMD_CUDA_SOURCES src/LTMD/CUDA/*.cpp )
 		source_group( "src\\LTMD\\CUDA" FILES ${LTMD_CUDA_SOURCES} )
