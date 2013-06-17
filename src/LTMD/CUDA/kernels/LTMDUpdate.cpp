@@ -43,7 +43,6 @@ using namespace OpenMM;
 void kNMLUpdate(CUmodule* module, CudaContext* cu, float deltaT, float tau, float kT, int numModes, int& iterations, CudaArray& modes, CudaArray& modeWeights, CudaArray& noiseVal, CudaArray& randomIndex ) {
 	int atoms = cu->getNumAtoms();
 	int paddednumatoms = cu->getPaddedNumAtoms();
-	printf("Calling NMLUpdate with these values: %f %f %f\n", deltaT, tau, kT);
 	void* update1Args[] = {&atoms, &paddednumatoms, &tau, &deltaT, &kT, 
                             &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &atoms }; // # of random numbers equal to the number of atoms? TMC
 	CUfunction update1Kernel, update2Kernel, update3Kernel;
