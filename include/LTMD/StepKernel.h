@@ -69,7 +69,6 @@ virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrat
 				
 				virtual void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) = 0;
 				virtual double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) = 0;
-				virtual void updateState( OpenMM::ContextImpl &context ) = 0;
 		};
 	}
 }
