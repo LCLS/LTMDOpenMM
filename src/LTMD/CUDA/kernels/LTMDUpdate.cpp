@@ -31,10 +31,12 @@
 #include "CudaArray.h"
 #include <stdio.h>
 #include <cuda.h>
+#include <math.h>
 #include <vector_functions.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>
+#include <stdlib.h>
 using namespace std;
 using namespace OpenMM;
 
@@ -43,12 +45,13 @@ using namespace OpenMM;
 void kNMLUpdate(CUmodule* module, CudaContext* cu, float deltaT, float tau, float kT, int numModes, int& iterations, CudaArray& modes, CudaArray& modeWeights, CudaArray& noiseVal, CudaArray& randomIndex ) {
 	int atoms = cu->getNumAtoms();
 	int paddednumatoms = cu->getPaddedNumAtoms();
+	int numrand = cu->getIntegrationUtilities().getRandom().getSize();
+
 	void* update1Args[] = {&atoms, &paddednumatoms, &tau, &deltaT, &kT, 
-                            &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &atoms }; // # of random numbers equal to the number of atoms? TMC
+                            &cu->getPosq().getDevicePointer(), &noiseVal.getDevicePointer(), &cu->getVelm().getDevicePointer(), &cu->getForce().getDevicePointer(), &cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &numrand }; // # of random numbers equal to the number of atoms? TMC
 	CUfunction update1Kernel, update2Kernel, update3Kernel;
         update1Kernel = cu->getKernel(*module, "kNMLUpdate1_kernel");
 	cu->executeKernel(update1Kernel, update1Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize);
-
 
         void* update2Args[] = {&atoms, &numModes, &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer()};
 	update2Kernel = cu->getKernel(*module, "kNMLUpdate2_kernel");
@@ -57,13 +60,15 @@ void kNMLUpdate(CUmodule* module, CudaContext* cu, float deltaT, float tau, floa
         void* update3Args[] = {&atoms, &numModes, &deltaT, &cu->getPosq().getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer(), &noiseVal.getDevicePointer()};
 	update3Kernel = cu->getKernel(*module, "kNMLUpdate3_kernel");
 	cu->executeKernel(update3Kernel, update3Args, cu->getNumThreadBlocks()*cu->ThreadBlockSize, cu->ThreadBlockSize, numModes*sizeof(float)); 
+
 }
 
 #ifdef FAST_NOISE
 void kFastNoise(CUmodule* module, CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseVal, CudaArray& randomIndex, CudaArray& oldpos, float stepSize ) {
 	int atoms = cu->getNumAtoms();
 	int paddednumatoms = cu->getPaddedNumAtoms();
-	void* fastnoise1Args[] = {&atoms, &paddednumatoms, &numModes, &kT, &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer(),&cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &paddednumatoms, &maxEigenvalue, &stepSize};
+	int numrand = cu->getIntegrationUtilities().getRandom().getSize();
+	void* fastnoise1Args[] = {&atoms, &paddednumatoms, &numModes, &kT, &oldpos.getDevicePointer(), &cu->getVelm().getDevicePointer(), &modes.getDevicePointer(), &modeWeights.getDevicePointer(),&cu->getIntegrationUtilities().getRandom().getDevicePointer(), &randomIndex.getDevicePointer(), &numrand, &maxEigenvalue, &stepSize};
 	CUfunction fastnoise1Kernel, fastnoise2Kernel;
 	
 	

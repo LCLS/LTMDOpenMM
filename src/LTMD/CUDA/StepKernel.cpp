@@ -27,7 +27,7 @@
 #include "LTMD/CUDA/StepKernel.h"
 
 #include <cmath>
-
+#include "SimTKUtilities/SimTKOpenMMUtilities.h"
 #include "OpenMM.h"
 #include "CudaIntegrationUtilities.h"
 #include "CudaKernels.h"
@@ -36,7 +36,7 @@
 #include "openmm/internal/ContextImpl.h"
 #include "CudaLTMDKernelSources.h"
 #include "LTMD/Integrator.h"
-
+#include <stdlib.h>
 #include <iostream>
 using namespace std;
 
@@ -49,6 +49,15 @@ void kNMLAcceptMinimizationStep(CUmodule* module, CudaContext* gpu, CudaArray& o
 void kNMLLinearMinimize(CUmodule* module, CudaContext* gpu, int numModes, float maxEigenvalue, CudaArray& oldpos, CudaArray& modes, CudaArray& modeWeights );
 void kNMLQuadraticMinimize(CUmodule* module, CudaContext* gpu, float maxEigenvalue, float currentPE, float lastPE, CudaArray& oldpos, CudaArray& slopeBuffer, CudaArray& lambdaval );
 void kFastNoise(CUmodule* module, CudaContext* cu, int numModes, float kT, int& iterations, CudaArray& modes, CudaArray& modeWeights, float maxEigenvalue, CudaArray& noiseVal, CudaArray& randomIndex, CudaArray& oldpos, float stepSize );
+
+double drand()   /* uniform distribution, (0..1] */
+{
+  return (rand()+1.0)/(RAND_MAX+1.0);
+}
+double random_normal()  /* normal distribution, centered on 0, std dev 1 */
+{
+  return sqrt(-2*log(drand())) * cos(2*M_PI*drand());
+}
 
 
 namespace OpenMM {
@@ -79,8 +88,13 @@ namespace OpenMM {
 				minmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::minimizationSteps);
 				linmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::linearMinimizers);
 				quadmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::quadraticMinimizers);
+#ifdef FAST_NOISE
 				fastmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::fastnoises);
 				updatemodule = data.contexts[0]->createModule(CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=1");
+#else
+				updatemodule = data.contexts[0]->createModule(CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=0");
+#endif
+
 				MinimizeLambda = new CudaArray( *(data.contexts[0]), 1, sizeof(float), "MinimizeLambda" );
 				//data.contexts[0]->getPlatformData().initializeContexts(system);
 				mParticles = data.contexts[0]->getNumAtoms();
@@ -102,9 +116,24 @@ namespace OpenMM {
 
 				//gpuInitializeRandoms( data.gpu );
 				//gpuInitializeRandoms( data.contexts[0] ); // Not sure about this, TMC
+				//
+				// Since we want a normal distribution, we have to first initialize the GPU vector to be the right size
+				// And set all applicable members of the IntegrationUtilities.
+				// Then we must REPOPULATE with a normal distribution
+				// Annoying, but that's the best way I've seen to do it.
 				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(seed);				
-
-				randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
+				//randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
+			 	SimTKOpenMMUtilities::setRandomNumberSeed(seed);
+				int paddednumatoms = data.contexts[0]->getPaddedNumAtoms();
+				std::vector<float4> tmp2(paddednumatoms*32);
+				for (size_t i = 0; i < 32*paddednumatoms; i++) {
+					tmp2[i] = make_float4(SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber());
+				}
+				randomPos = paddednumatoms; // OpenMM did this as well
+				data.contexts[0]->getIntegrationUtilities().getRandom().upload(tmp2);
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
@@ -177,14 +206,26 @@ namespace OpenMM {
 				// If we want to change it, it should be a parameter for our integrator.
 				int randomIterations = 20;
         			if( iterations == randomIterations ) {
-                 			randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers( data.contexts[0]->getPaddedNumAtoms()  );
+				//randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
+				int paddednumatoms = data.contexts[0]->getPaddedNumAtoms();
+				std::vector<float4> tmp2(paddednumatoms*32);
+				for (size_t i = 0; i < 32*paddednumatoms; i++) {
+				     //tmp2[i] = make_float4(random_normal(), random_normal(), random_normal(), random_normal()); 
+					tmp2[i] = make_float4(SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber());
+				}
+				randomPos = paddednumatoms; // OpenMM did this as well
+				data.contexts[0]->getIntegrationUtilities().getRandom().upload(tmp2);
+                 		//	randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers( data.contexts[0]->getPaddedNumAtoms()  );
 					int numModes = integrator.getNumProjectionVectors();;
 				        int numrandpos = (numModes > data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize ? numModes : data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize);
-				       vector<int> tmp2(numrandpos, randomPos);
-				        randomIndex->upload(tmp2);
+				       vector<int> tmp3(numrandpos, randomPos);
+				        randomIndex->upload(tmp3);
                				iterations = 0;
         			}
-        context.updateContextState();        
+        context.updateContextState();  
 				// Do Step
 				kNMLUpdate(&updatemodule,
 					data.contexts[0], 
@@ -197,11 +238,23 @@ namespace OpenMM {
 				// Our code does not change it, so I am assuming a value of 20.
 				// If we want to change it, it should be a parameter for our integrator.
         			if( iterations == randomIterations ) {
-                 			randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers( data.contexts[0]->getPaddedNumAtoms()  );
+				//randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
+				int paddednumatoms = data.contexts[0]->getPaddedNumAtoms();
+				std::vector<float4> tmp2(paddednumatoms*32);
+				for (size_t i = 0; i < 32*paddednumatoms; i++) {
+				     //tmp2[i] = make_float4(random_normal(), random_normal(), random_normal(), random_normal()); 
+					tmp2[i] = make_float4(SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
+								SimTKOpenMMUtilities::getNormallyDistributedRandomNumber());
+				}
+				randomPos = paddednumatoms; // OpenMM did this as well
+				data.contexts[0]->getIntegrationUtilities().getRandom().upload(tmp2);
+                 			//randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers( data.contexts[0]->getPaddedNumAtoms()  );
 					int numModes = integrator.getNumProjectionVectors();;
 				        int numrandpos = (numModes > data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize ? numModes : data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize);
-				       vector<int> tmp2(numrandpos, randomPos);
-				        randomIndex->upload(tmp2);
+				       vector<int> tmp3(numrandpos, randomPos);
+				        randomIndex->upload(tmp3);
                				iterations = 0;
         			}
 			}

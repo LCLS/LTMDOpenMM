@@ -77,20 +77,13 @@ namespace OpenMM {
 		}
 
 		void Integrator::initialize( ContextImpl &contextRef ) {
-			cout << "A" << endl;
 			context = &contextRef;
-			cout << "B" << endl;
 			if( context->getSystem().getNumConstraints() > 0 ) {
 				throw OpenMMException( "LTMD Integrator does not support constraints" );
 			}
-			cout << "C: " << StepKernel::Name() << endl;
 			kernel = context->getPlatform().createKernel( StepKernel::Name(), contextRef );
-			cout << "D: " << endl;
-			cout << "DD" << endl;
-			cout << kernel.getImpl().getName() << endl;
 			((StepKernel &)( kernel.getImpl() )).initialize( contextRef.getSystem(), *this );
 			//(dynamic_cast<StepKernel &>( kernel.getImpl() )).initialize( contextRef.getSystem(), *this );
-			cout << "E" << endl;
 		}
 
 		std::vector<std::string> Integrator::getKernelNames() {
@@ -145,16 +138,13 @@ namespace OpenMM {
 		/* Save before integration for DiagonalizeMinimize and add test to make
 			sure its not done twice */
 		bool Integrator::DoStep() {
-			context->updateContextState();
+			//context->updateContextState();
 			if( eigenvectors.size() == 0 || stepsSinceDiagonalize % mParameters.rediagFreq == 0 ) {
 				DiagonalizeMinimize();
 			}
 			stepsSinceDiagonalize++;
-			//std::cout << "Z CALCULATING FORCES..." << std::endl;
-			context->updateContextState();
+			//context->updateContextState();
 			context->calcForcesAndEnergy( true, false );
-			//cout << "PLATFORM: " << context->getPlatform().getName() << endl;
-			//std::cout << "Z DONE CALCULATING FORCES..." << std::endl;
 			IntegrateStep();
 			SetProjectionChanged( false );
 			if( !minimize( mParameters.MaximumMinimizationIterations ) ){
@@ -165,8 +155,8 @@ namespace OpenMM {
 						DiagonalizeMinimize();
 					}
 				}
-			}
-
+			
+}
 			//((StepKernel &)( kernel.getImpl() )).updateState( *context );
 			TimeAndCounterStep();
 			return true;
@@ -194,9 +184,7 @@ namespace OpenMM {
 
 			SaveStep();
 
-			//std::cout << "B CALCULATING FORCES..." << std::endl;
 			double initialPE = context->calcForcesAndEnergy( true, true );
-			//std::cout << "B CALCULATING FORCES..." << std::endl;
 			((StepKernel &)( kernel.getImpl() )).setOldPositions();
 
 			//context->getPositions(oldPos); // I need to get old positions here 
@@ -207,6 +195,7 @@ namespace OpenMM {
 				SetProjectionChanged( false );
 				simpleSteps++;
 				double currentPE = LinearMinimize( initialPE );
+				//printf("ENERGY BEFORE: %f\n", currentPE);
 				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
 					quadraticSteps++;
 
@@ -234,9 +223,7 @@ namespace OpenMM {
 					initialPE = currentPE;
 				} else {
 					RevertStep();
-			//std::cout << "C CALCULATING FORCES..." << std::endl;
 					context->calcForcesAndEnergy( true, false );
-			//std::cout << "C CALCULATING FORCES..." << std::endl;
 
 					maxEigenvalue *= 2;
 				}
@@ -303,9 +290,7 @@ namespace OpenMM {
 			gettimeofday( &start, 0 );
 #endif
 			((StepKernel &)( kernel.getImpl() )).LinearMinimize( *context, *this, energy );
-			//std::cout << "D CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
-			//std::cout << "D CALCULATING FORCES..." << std::endl;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
@@ -323,9 +308,7 @@ namespace OpenMM {
 #ifdef KERNEL_VALIDATION
 			std::cout << "[OpenMM::Integrator::Minimize] Lambda: " << lambda << " Ratio: " << ( lambda / maxEigenvalue ) << std::endl;
 #endif
-			//std::cout << "E CALCULATING FORCES..." << std::endl;
 			double retVal = context->calcForcesAndEnergy( true, true );
-			//std::cout << "E CALCULATING FORCES..." << std::endl;
 #ifdef PROFILE_INTEGRATOR
 			gettimeofday( &end, 0 );
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
