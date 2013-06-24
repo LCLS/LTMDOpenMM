@@ -89,7 +89,7 @@ namespace OpenMM {
 				linmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::linearMinimizers);
 				quadmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::quadraticMinimizers);
 #ifdef FAST_NOISE
-				fastmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::fastnoises);
+				fastmodule = data.contexts[0]->createModule(CudaLTMDKernelSources::fastnoises, "-DFAST_NOISE=1");
 				updatemodule = data.contexts[0]->createModule(CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=1");
 #else
 				updatemodule = data.contexts[0]->createModule(CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=0");
