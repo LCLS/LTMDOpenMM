@@ -182,6 +182,10 @@ namespace OpenMM {
 				SetProjectionChanged( false );
 
 				if( mParameters.ShouldUseMetropolisMinimization ){
+					if(initialPE < mMetropolisPE) {
+						break;
+					}
+
 					simpleSteps++;
 					const double currentPE = LinearMinimize( initialPE );
 					if(currentPE < mMetropolisPE) {
