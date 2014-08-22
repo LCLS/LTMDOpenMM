@@ -127,8 +127,7 @@ namespace OpenMM {
 			}
 			stepsSinceDiagonalize++;
 
-			mMetropolisPE = context->calcForcesAndEnergy( false, true );
-			context->calcForcesAndEnergy( true, false );
+			mMetropolisPE = context->calcForcesAndEnergy( true, true );
 
 			IntegrateStep();
 			SetProjectionChanged( false );
