@@ -35,6 +35,8 @@
 
 #include <sys/time.h>
 
+#include "SimTKUtilities/SimTKOpenMMUtilities.h"
+
 #include "openmm/System.h"
 #include "openmm/Context.h"
 #include "openmm/kernels.h"
@@ -125,6 +127,7 @@ namespace OpenMM {
 			}
 			stepsSinceDiagonalize++;
 
+			mMetropolisPE = context->calcForcesAndEnergy( false, true );
 			context->calcForcesAndEnergy( true, false );
 
 			IntegrateStep();
@@ -178,40 +181,55 @@ namespace OpenMM {
 			for( unsigned int i = 0; i < max; i++ ){
 				SetProjectionChanged( false );
 
-				simpleSteps++;
-				double currentPE = LinearMinimize( initialPE );
-				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
-					quadraticSteps++;
-
-					double lambda = 0.0;
-					currentPE = QuadraticMinimize( currentPE, lambda );
-					if( currentPE > initialPE ){
-						std::cout << "Quadratic Minimization Failed Energy Test [" << currentPE << ", " << initialPE << "] - Forcing Rediagonalization" << std::endl;
-						computeProjectionVectors();
+				if( mParameters.ShouldUseMetropolisMinimization ){
+					simpleSteps++;
+					const double currentPE = LinearMinimize( initialPE );
+					if(currentPE < mMetropolisPE) {
 						break;
-					}else{
-						if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
-							std::cout << "Quadratic Minimization Failed Lambda Test [" << lambda << ", " << 1.0 / maxEigenvalue << "] - Forcing Rediagonalization" << std::endl;
+					}
+
+		            const double prob = exp(-(1.0 / (0.001987191 * temperature)) * (currentPE - mMetropolisPE));
+		            if(SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() < prob){
+						break;
+					}
+
+					SaveStep();
+				}else{
+					simpleSteps++;
+					double currentPE = LinearMinimize( initialPE );
+					if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
+						quadraticSteps++;
+
+						double lambda = 0.0;
+						currentPE = QuadraticMinimize( currentPE, lambda );
+						if( currentPE > initialPE ){
+							std::cout << "Quadratic Minimization Failed Energy Test [" << currentPE << ", " << initialPE << "] - Forcing Rediagonalization" << std::endl;
 							computeProjectionVectors();
 							break;
+						}else{
+							if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
+								std::cout << "Quadratic Minimization Failed Lambda Test [" << lambda << ", " << 1.0 / maxEigenvalue << "] - Forcing Rediagonalization" << std::endl;
+								computeProjectionVectors();
+								break;
+							}
 						}
 					}
-				}
 
-				//break if satisfies end condition
-				const double diff = initialPE - currentPE;
-				if( diff < getMinimumLimit() && diff >= 0.0 ) {
-					break;
-				}
+					//break if satisfies end condition
+					const double diff = initialPE - currentPE;
+					if( diff < getMinimumLimit() && diff >= 0.0 ) {
+						break;
+					}
 
-				if( diff > 0.0 ) {
-					SaveStep();
-					initialPE = currentPE;
-				} else {
-					RevertStep();
-					context->calcForcesAndEnergy( true, false );
+					if( diff > 0.0 ) {
+						SaveStep();
+						initialPE = currentPE;
+					} else {
+						RevertStep();
+						context->calcForcesAndEnergy( true, false );
 
-					maxEigenvalue *= 2;
+						maxEigenvalue *= 2;
+					}
 				}
 			}
 
