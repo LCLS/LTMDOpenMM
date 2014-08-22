@@ -290,37 +290,23 @@ namespace OpenMM {
 #endif
 		}
 
+
 		double Integrator::LinearMinimize( const double energy ) {
 #ifdef PROFILE_INTEGRATOR
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
 			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
-			double retVal = context->calcForcesAndEnergy( true, true );
-#ifdef PROFILE_INTEGRATOR
-			gettimeofday( &end, 0 );
-			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
-			std::cout << "[OpenMM::Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
-#endif
-			return retVal;
-		}
-
-double Integrator::LinearMinimize( const double energy ) {
-#ifdef PROFILE_INTEGRATOR
-			timeval start, end;
-			gettimeofday( &start, 0 );
-#endif
-			dynamic_cast<StepKernel &>( kernel.getImpl() ).LinearMinimize( *context, *this, energy );
 #ifdef METROPOLIS_NOISE
-			double step = sqrt(2.0 * 0.05 * 0.001987191 * temperature / maxEigenvalue);
+			const double step = sqrt(2.0 * 0.05 * 0.001987191 * temperature / maxEigenvalue);
 
-			std::vector<Vec3> positions = context.getOwner().getState( State::Positions ).getPositions();
+			std::vector<Vec3> positions = context->getOwner().getState( State::Positions ).getPositions();
 			for( size_t i = 0; i < positions.size(); i++ ){
 				positions[i][0] += step;
 				positions[i][1] += step;
 				positions[i][2] += step;
 			}
-			context->setPositions( blockPositions );
+			context->setPositions( positions );
 #endif
 			double retVal = context->calcForcesAndEnergy( true, true );
 #ifdef PROFILE_INTEGRATOR

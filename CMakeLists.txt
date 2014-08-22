@@ -116,7 +116,7 @@ if( BUILD_FIRST_ORDER )
 	add_definitions( "-DFIRST_ORDER" )
 endif( BUILD_FIRST_ORDER )
 
-option( BUILD_METROPOLIS_NOISE "Build with noise addition for metropolis", Off)
+option( BUILD_METROPOLIS_NOISE "Build with noise addition for metropolis" Off)
 if( BUILD_METROPOLIS_NOISE )
 	add_definitions( "-DMETROPOLIS_NOISE" )
 endif( BUILD_METROPOLIS_NOISE )
