@@ -101,13 +101,13 @@ namespace OpenMM {
 					return eigVecChanged;
 				}
 
-				const std::vector<std::vector<OpenMM::Vec3> >& getProjectionVectors() const {
+				const std::vector<std::vector<OpenMM::Vec3> > &getProjectionVectors() const {
 					return eigenvectors;
 				}
 
 				void SetProjectionChanged( bool value );
 
-				void setProjectionVectors( const std::vector<std::vector<OpenMM::Vec3> >& vectors ) {
+				void setProjectionVectors( const std::vector<std::vector<OpenMM::Vec3> > &vectors ) {
 					eigenvectors = vectors;
 					SetProjectionChanged( true );
 					stepsSinceDiagonalize = 0;
@@ -116,9 +116,9 @@ namespace OpenMM {
 				double getMaxEigenvalue() const {
 					return maxEigenvalue;
 				}
-                                double computeKineticEnergy();
+				double computeKineticEnergy();
 				//double computeKineticEnergy() {
-//dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );	
+//dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );
 				//	return kernel.getAs<OpenMM::LTMD::StepKernel>().computeKineticEnergy(*context, *this);
 				//}
 				/**
@@ -146,7 +146,7 @@ namespace OpenMM {
 				 * @param steps   the number of time steps to take
 				 */
 				void step( int steps = 1 );
-				
+
 				unsigned int CompletedSteps() const;
 
 				bool minimize( const unsigned int upperbound );
@@ -157,15 +157,15 @@ namespace OpenMM {
 			private:
 				bool DoStep();
 				void DiagonalizeMinimize();
-			
-				void Minimize( const unsigned int max, unsigned int& simpleSteps, unsigned int& quadraticSteps );
-				
+
+				void Minimize( const unsigned int max, unsigned int &simpleSteps, unsigned int &quadraticSteps );
+
 				// Kernel Functions
 				void IntegrateStep();
 				void TimeAndCounterStep();
 
 				double LinearMinimize( const double energy );
-				double QuadraticMinimize( const double energy, double& lambda );
+				double QuadraticMinimize( const double energy, double &lambda );
 
 				void SaveStep();
 				void RevertStep();

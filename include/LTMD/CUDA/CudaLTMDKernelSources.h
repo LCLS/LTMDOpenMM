@@ -32,21 +32,21 @@
 
 namespace OpenMM {
 
-/**
- * This class is a central holding place for the source code of CUDA kernels.
- * The CMake build script inserts declarations into it based on the .cu files in the
- * kernels subfolder.
- */
+	/**
+	 * This class is a central holding place for the source code of CUDA kernels.
+	 * The CMake build script inserts declarations into it based on the .cu files in the
+	 * kernels subfolder.
+	 */
 
-class OPENMM_EXPORT CudaLTMDKernelSources {
-public:
-static const std::string NMLupdates;
-static const std::string fastnoises;
-static const std::string minimizationSteps;
-static const std::string linearMinimizers;
-static const std::string quadraticMinimizers;
+	class OPENMM_EXPORT CudaLTMDKernelSources {
+		public:
+			static const std::string NMLupdates;
+			static const std::string fastnoises;
+			static const std::string minimizationSteps;
+			static const std::string linearMinimizers;
+			static const std::string quadraticMinimizers;
 
-};
+	};
 
 } // namespace OpenMM
 

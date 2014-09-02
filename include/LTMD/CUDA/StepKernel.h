@@ -57,34 +57,34 @@ namespace OpenMM {
 					void initialize( const OpenMM::System &system, const Integrator &integrator );
 
 					void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator );
-					void UpdateTime(  const Integrator &integrator );
+					void UpdateTime( const Integrator &integrator );
 					void setOldPositions( );
 					void AcceptStep( OpenMM::ContextImpl &context );
 					void RejectStep( OpenMM::ContextImpl &context );
-					
+
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
-virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) {
-        
-	//return context.calcKineticEnergy();
-	return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-    //return ((CudaContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-    //return context.getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-}
+					virtual double computeKineticEnergy( OpenMM::ContextImpl &context, const Integrator &integrator ) {
+
+						//return context.calcKineticEnergy();
+						return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy( 0.5 * integrator.getStepSize() );
+						//return ((CudaContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
+						//return context.getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
+					}
 
 
-         			private:
+				private:
 					void ProjectionVectors( const Integrator &integrator );
 				private:
 					unsigned int mParticles;
 					OpenMM::CudaPlatform::PlatformData &data;
 					CudaArray *modes, *NoiseValues;
-					CudaArray* modeWeights;
-					CudaArray* randomIndex;
-					CudaArray* minimizerScale;
-					CudaArray* MinimizeLambda;
-					CudaArray* oldpos;
-					CudaArray* pPosqP;
+					CudaArray *modeWeights;
+					CudaArray *randomIndex;
+					CudaArray *minimizerScale;
+					CudaArray *MinimizeLambda;
+					CudaArray *oldpos;
+					CudaArray *pPosqP;
 					//CUDAStream<float4> *modes, *NoiseValues;
 					//CUDAStream<float>* modeWeights;
 					//CUDAStream<float>* minimizerScale;

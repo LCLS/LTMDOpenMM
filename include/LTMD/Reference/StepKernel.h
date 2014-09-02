@@ -39,27 +39,27 @@
 #include "SimTKUtilities/RealVec.h"
 //#include "ReferenceContext.h"
 
-static std::vector<OpenMM::RealVec>& extractVelocities(OpenMM::ContextImpl& context) {
-    OpenMM::ReferencePlatform::PlatformData* data = reinterpret_cast<OpenMM::ReferencePlatform::PlatformData*>(context.getPlatformData());
-    return *((std::vector<OpenMM::RealVec>*) data->velocities);
+static std::vector<OpenMM::RealVec> &extractVelocities( OpenMM::ContextImpl &context ) {
+	OpenMM::ReferencePlatform::PlatformData *data = reinterpret_cast<OpenMM::ReferencePlatform::PlatformData *>( context.getPlatformData() );
+	return *( ( std::vector<OpenMM::RealVec> * ) data->velocities );
 }
 
-static std::vector<OpenMM::RealVec>& extractForces(OpenMM::ContextImpl& context) {
-    OpenMM::ReferencePlatform::PlatformData* data = reinterpret_cast<OpenMM::ReferencePlatform::PlatformData*>(context.getPlatformData());
-    return *((std::vector<OpenMM::RealVec>*) data->forces);
+static std::vector<OpenMM::RealVec> &extractForces( OpenMM::ContextImpl &context ) {
+	OpenMM::ReferencePlatform::PlatformData *data = reinterpret_cast<OpenMM::ReferencePlatform::PlatformData *>( context.getPlatformData() );
+	return *( ( std::vector<OpenMM::RealVec> * ) data->forces );
 }
 
-static double computeShiftedKineticEnergy(OpenMM::ContextImpl& context, std::vector<double>& masses, double timeShift) {
-    std::vector<OpenMM::RealVec>& velData = extractVelocities(context);
-    std::vector<OpenMM::RealVec>& forceData = extractForces(context);
-    double energy = 0.0;
-    for (int i = 0; i < (int) masses.size(); ++i) {
-        if (masses[i] > 0) {
-            OpenMM::RealVec v = velData[i]+forceData[i]*(timeShift/masses[i]);
-            energy += masses[i]*(v.dot(v));
-        }
-    }
-    return 0.5*energy;
+static double computeShiftedKineticEnergy( OpenMM::ContextImpl &context, std::vector<double> &masses, double timeShift ) {
+	std::vector<OpenMM::RealVec> &velData = extractVelocities( context );
+	std::vector<OpenMM::RealVec> &forceData = extractForces( context );
+	double energy = 0.0;
+	for( int i = 0; i < ( int ) masses.size(); ++i ) {
+		if( masses[i] > 0 ) {
+			OpenMM::RealVec v = velData[i] + forceData[i] * ( timeShift / masses[i] );
+			energy += masses[i] * ( v.dot( v ) );
+		}
+	}
+	return 0.5 * energy;
 }
 
 
@@ -68,7 +68,7 @@ namespace OpenMM {
 		namespace Reference {
 			typedef std::vector<double> DoubleArray;
 			typedef std::vector<OpenMM::RealVec> VectorArray;
-			
+
 			class StepKernel : public LTMD::StepKernel {
 				public:
 					StepKernel( std::string name, const OpenMM::Platform &platform, OpenMM::ReferencePlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
@@ -83,26 +83,26 @@ namespace OpenMM {
 					 * @param integrator the NMLIntegrator this kernel will be used for
 					 */
 					void initialize( const OpenMM::System &system, const Integrator &integrator );
-					
+
 					void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator );
-					void UpdateTime(  const Integrator &integrator );
+					void UpdateTime( const Integrator &integrator );
 
 					void AcceptStep( OpenMM::ContextImpl &context );
 					void RejectStep( OpenMM::ContextImpl &context );
 
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
-void updateState (OpenMM::ContextImpl &context ) {}
-virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) {
+					void updateState( OpenMM::ContextImpl &context ) {}
+					virtual double computeKineticEnergy( OpenMM::ContextImpl &context, const Integrator &integrator ) {
 //return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
 //return context.calcKineticEnergy();
-    //return ((ReferenceContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-return computeShiftedKineticEnergy(context, mMasses, 0.5*integrator.getStepSize());
-}
+						//return ((ReferenceContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
+						return computeShiftedKineticEnergy( context, mMasses, 0.5 * integrator.getStepSize() );
+					}
 
 
 				private:
-					void Project( const Integrator &integrator, const VectorArray& in, VectorArray& out, const DoubleArray& scale, const DoubleArray& inverseScale, const bool compliment );
+					void Project( const Integrator &integrator, const VectorArray &in, VectorArray &out, const DoubleArray &scale, const DoubleArray &inverseScale, const bool compliment );
 				private:
 					unsigned int mParticles;
 					double mPreviousEnergy, mMinimizerScale;

@@ -6,7 +6,7 @@
 
 namespace OpenMM {
 	namespace LTMD {
-		namespace Preference{
+		namespace Preference {
 			enum EPlatform { Reference, OpenCL, CUDA };
 		}
 
@@ -39,7 +39,7 @@ namespace OpenMM {
 
 			double MinimumLambdaValue;
 
-            int DeviceID;
+			int DeviceID;
 			bool ShouldProtoMolDiagonalize;
 
 			Parameters();

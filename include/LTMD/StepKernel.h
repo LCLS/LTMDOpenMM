@@ -49,7 +49,7 @@ namespace OpenMM {
 					return "IntegrateNMLStep";
 				}
 				StepKernel( std::string name, const OpenMM::Platform &platform ) : KernelImpl( name, platform ) { }
-				
+
 				/**
 				 * Initialize the kernel.
 				 *
@@ -59,14 +59,14 @@ namespace OpenMM {
 				virtual void initialize( const OpenMM::System &system, const Integrator &integrator ) = 0;
 
 				virtual void Integrate( OpenMM::ContextImpl &context, const Integrator &integrator ) = 0;
-				virtual void UpdateTime(  const Integrator &integrator ) = 0;
-				
-virtual double computeKineticEnergy(OpenMM::ContextImpl& context, const Integrator& integrator) = 0;
+				virtual void UpdateTime( const Integrator &integrator ) = 0;
+
+				virtual double computeKineticEnergy( OpenMM::ContextImpl &context, const Integrator &integrator ) = 0;
 
 				virtual void setOldPositions( ) { }
 				virtual void AcceptStep( OpenMM::ContextImpl &context ) = 0;
 				virtual void RejectStep( OpenMM::ContextImpl &context ) = 0;
-				
+
 				virtual void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) = 0;
 				virtual double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) = 0;
 		};
