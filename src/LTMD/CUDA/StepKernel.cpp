@@ -27,7 +27,7 @@
 #include "LTMD/CUDA/StepKernel.h"
 
 #include <cmath>
-#include "SimTKUtilities/SimTKOpenMMUtilities.h"
+#include "SimTKOpenMMUtilities.h"
 #include "OpenMM.h"
 #include "CudaIntegrationUtilities.h"
 #include "CudaKernels.h"
@@ -107,31 +107,7 @@ namespace OpenMM {
 				}
 				NoiseValues->upload( tmp );
 
-				// From what I see this is no longer there, TMC
-				// I could be wrong...
-				//data.contexts[0]->seed = ( unsigned long ) integrator.getRandomNumberSeed();
-				int seed = ( unsigned long ) integrator.getRandomNumberSeed();
-
-				//gpuInitializeRandoms( data.gpu );
-				//gpuInitializeRandoms( data.contexts[0] ); // Not sure about this, TMC
-				//
-				// Since we want a normal distribution, we have to first initialize the GPU vector to be the right size
-				// And set all applicable members of the IntegrationUtilities.
-				// Then we must REPOPULATE with a normal distribution
-				// Annoying, but that's the best way I've seen to do it.
-				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator( seed );
-				//randomPos = data.contexts[0]->getIntegrationUtilities().prepareRandomNumbers(data.contexts[0]->getPaddedNumAtoms());
-				SimTKOpenMMUtilities::setRandomNumberSeed( seed );
-				int paddednumatoms = data.contexts[0]->getPaddedNumAtoms();
-				std::vector<float4> tmp2( paddednumatoms * 32 );
-				for( size_t i = 0; i < 32 * paddednumatoms; i++ ) {
-					tmp2[i] = make_float4( SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
-										   SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
-										   SimTKOpenMMUtilities::getNormallyDistributedRandomNumber(),
-										   SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() );
-				}
-				randomPos = paddednumatoms; // OpenMM did this as well
-				data.contexts[0]->getIntegrationUtilities().getRandom().upload( tmp2 );
+			    data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(integrator.getRandomNumberSeed());
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {

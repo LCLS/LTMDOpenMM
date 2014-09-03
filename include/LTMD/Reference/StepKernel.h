@@ -36,8 +36,7 @@
 #include "LTMD/StepKernel.h"
 
 #include "ReferencePlatform.h"
-#include "SimTKUtilities/RealVec.h"
-//#include "ReferenceContext.h"
+#include "RealVec.h"
 
 static std::vector<OpenMM::RealVec> &extractVelocities( OpenMM::ContextImpl &context ) {
 	OpenMM::ReferencePlatform::PlatformData *data = reinterpret_cast<OpenMM::ReferencePlatform::PlatformData *>( context.getPlatformData() );
@@ -94,9 +93,6 @@ namespace OpenMM {
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					void updateState( OpenMM::ContextImpl &context ) {}
 					virtual double computeKineticEnergy( OpenMM::ContextImpl &context, const Integrator &integrator ) {
-//return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-//return context.calcKineticEnergy();
-						//return ((ReferenceContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
 						return computeShiftedKineticEnergy( context, mMasses, 0.5 * integrator.getStepSize() );
 					}
 
@@ -115,4 +111,3 @@ namespace OpenMM {
 }
 
 #endif // OPENMM_LTMD_REFERENCE_STEPKERNEL_H_
-

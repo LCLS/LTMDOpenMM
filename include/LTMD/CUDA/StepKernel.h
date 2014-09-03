@@ -65,11 +65,7 @@ namespace OpenMM {
 					void LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					double QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy );
 					virtual double computeKineticEnergy( OpenMM::ContextImpl &context, const Integrator &integrator ) {
-
-						//return context.calcKineticEnergy();
 						return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy( 0.5 * integrator.getStepSize() );
-						//return ((CudaContext&)context).getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
-						//return context.getIntegrationUtilities().computeKineticEnergy(0.5*integrator.getStepSize());
 					}
 
 

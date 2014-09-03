@@ -131,7 +131,6 @@ namespace OpenMM {
 
 		double Integrator::computeKineticEnergy() {
 			return ( ( StepKernel & )( kernel.getImpl() ) ).computeKineticEnergy( *context, *this );
-			//	return kernel.getAs<OpenMM::LTMD::StepKernel>().computeKineticEnergy(*context, *this);
 		}
 		unsigned int Integrator::CompletedSteps() const {
 			return mLastCompleted;

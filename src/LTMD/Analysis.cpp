@@ -127,9 +127,9 @@ namespace OpenMM {
 			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_s_matrix, tp_q, tp_u;
 
 			gettimeofday( &tp_begin, NULL );
-			Context &context = contextImpl.getOwner();
-			State state = context.getState( State::Positions | State::Forces );
-			std::vector<Vec3> positions = state.getPositions();
+
+			std::vector<Vec3> positions;
+ 			contextImpl.getPositions(positions);
 
 			/*********************************************************************/
 			/*                                                                   */
@@ -145,7 +145,7 @@ namespace OpenMM {
 			// need it to parallelize.
 
 			if( !mInitialized ) {
-				Initialize( context, params );
+				Initialize( contextImpl, params );
 			}
 
 			int n = 3 * mParticleCount;
@@ -153,7 +153,7 @@ namespace OpenMM {
 			// Copy the positions.
 			std::vector<Vec3> blockPositions;
 			for( unsigned int i = 0; i < mParticleCount; i++ ) {
-				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
+				Vec3 atom( positions[i][0], positions[i][1], positions[i][2] );
 				blockPositions.push_back( atom );
 			}
 
@@ -342,7 +342,8 @@ namespace OpenMM {
 			std::vector<Vec3> tmppos( positions );
 
 #ifdef FIRST_ORDER
-			std::vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
+			std::vector<Vec3> forces_start;
+ 			contextImpl.getForces(forces_start);
 #endif
 
 			// Loop over i.
@@ -357,10 +358,11 @@ namespace OpenMM {
 						pos++;
 					}
 				}
-				context.setPositions( tmppos );
+				contextImpl.setPositions( tmppos );
 
 				// Calculate F(xi).
-				std::vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_forward;
+				contextImpl.getForces(forces_forward);
 
 #ifndef FIRST_ORDER
 				// backward perturbations
@@ -369,10 +371,11 @@ namespace OpenMM {
 						tmppos[i][j] = positions[i][j] - eps * E( 3 * i + j, k ) / sqrt( mParticleMass[i] );
 					}
 				}
-				context.setPositions( tmppos );
+				contextImpl.setPositions( tmppos );
 
 				// Calculate forces
-				std::vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_backward;
+				contextImpl.getForces(forces_backward);
 #endif
 
 				for( int i = 0; i < n; i++ ) {
@@ -395,7 +398,7 @@ namespace OpenMM {
 
 			// *****************************************************************
 			// restore unperturbed positions
-			context.setPositions( positions );
+			contextImpl.setPositions( positions );
 
 			gettimeofday( &tp_s, NULL );
 
@@ -463,17 +466,20 @@ namespace OpenMM {
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
 		}
 
-		void Analysis::Initialize( Context &context, const Parameters &params ) {
+		void Analysis::Initialize( ContextImpl &context, const Parameters &params ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
 
 			// Get Current System
-			System &system = context.getSystem();
+			const System &system = context.getSystem();
 
 			// Store Particle Information
-			mParticleCount = context.getState( State::Positions ).getPositions().size();
+			std::vector<Vec3> positions;
+			context.getPositions(positions);
+
+			mParticleCount = positions.size();
 
 			mParticleMass.reserve( mParticleCount );
 			for( unsigned int i = 0; i < mParticleCount; i++ ) {
@@ -520,8 +526,9 @@ namespace OpenMM {
 			for( int i = 0; i < params.forces.size(); i++ ) {
 				std::string forcename = params.forces[i].name;
 				std::cout << "Adding force " << forcename << " at index " << params.forces[i].index << std::endl;
-				if( forcename == "CenterOfMass" ) {
-					blockSystem->addForce( &system.getForce( params.forces[i].index ) );
+				if( forcename == "RemoveCMMotion" ) {
+					const CMMotionRemover *cm = dynamic_cast<const CMMotionRemover *>(  &system.getForce( params.forces[i].index ) );
+					blockSystem->addForce( new CMMotionRemover( cm->getFrequency() ));
 				} else if( forcename == "Bond" ) {
 					// Create a new harmonic bond force.
 					// This only contains pairs of atoms which are in the same block.
@@ -674,7 +681,9 @@ namespace OpenMM {
 					sPlatform = "CUDA";
 					break;
 			}
+			sPlatform = "Reference";
 
+			std::cout << "Platform" << sPlatform << std::endl;
 			OpenMM::Platform &platform = OpenMM::Platform::getPlatformByName( sPlatform );
 
 			if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ) {

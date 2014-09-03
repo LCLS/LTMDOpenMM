@@ -74,7 +74,7 @@ namespace OpenMM {
 				const Matrix CalculateU( const Matrix &E, const Matrix &Q ) const;
 				static std::vector<EigenvalueColumn> SortEigenvalues( const EigenvalueArray &values );
 
-				void Initialize( Context &context, const Parameters &ltmd );
+				void Initialize( ContextImpl &context, const Parameters &ltmd );
 				void DiagonalizeBlocks( const Matrix &hessian, const std::vector<Vec3> &positions, std::vector<double> &eval, Matrix &evec );
 				static void DiagonalizeBlock( const Block &block, const std::vector<Vec3> &positions, const std::vector<double> &Mass, std::vector<double> &eval, Matrix &evec );
 				static void GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3> &positions, const std::vector<double> &Mass, std::vector<double> &eval, Matrix &evec );

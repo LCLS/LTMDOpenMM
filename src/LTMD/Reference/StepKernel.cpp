@@ -33,8 +33,8 @@
 #include "LTMD/Reference/StepKernel.h"
 #include "openmm/HarmonicAngleForce.h"
 #include "openmm/internal/ContextImpl.h"
-#include "SimTKReference/ReferenceCCMAAlgorithm.h"
-#include "SimTKUtilities/SimTKOpenMMUtilities.h"
+#include "ReferenceCCMAAlgorithm.h"
+#include "SimTKOpenMMUtilities.h"
 #include <vector>
 
 namespace OpenMM {
@@ -324,4 +324,3 @@ namespace OpenMM {
 		}
 	}
 }
-

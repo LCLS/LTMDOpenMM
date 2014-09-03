@@ -116,6 +116,7 @@ namespace OpenMM {
 				double getMaxEigenvalue() const {
 					return maxEigenvalue;
 				}
+
 				double computeKineticEnergy();
 				//double computeKineticEnergy() {
 //dynamic_cast<StepKernel &>( kernel.getImpl() ).UpdateTime( *this );
