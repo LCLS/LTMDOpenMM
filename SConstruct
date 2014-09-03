@@ -53,6 +53,7 @@ if openmm_source:
 
 	include_directories( openmm_source + "/platforms/cuda/src" )
 	include_directories( openmm_source + "/platforms/cuda/include" )
+        include_directories( openmm_source + "/libraries/lepton/include" )
 
 link_directories( "." )
 
@@ -65,11 +66,13 @@ if not conf.CheckLib('OpenMM'):
 	Exit( 1 )
 
 cuda = env.get( 'cuda', 0 )
-if cuda and not conf.CheckLib( 'OpenMMCuda'):
-	print 'Unable to find OpenMM Cuda Library'
-	Exit( 1 )
+#if cuda and not conf.CheckLib( 'OpenMMCUDA'):
+#	print 'Unable to find OpenMM Cuda Library'
+#	Exit( 1 )
 
 conf.Finish()
+
+include_directories ('src/LTMD/CUDA/')
 
 reference_sources = Glob( 'src/LTMD/Reference/*.cpp' )
 env.SharedLibrary( 'LTMDReference', reference_sources, LIBS = ['OpenMM','OpenMMLTMD'] )
@@ -79,6 +82,7 @@ if cuda:
 		env.AppendUnique( NVCCINC = ['-I' + item] )
 
 	cuda_sources = Glob( 'src/LTMD/CUDA/*.cpp' )
-	cuda_kernels = Glob( 'src/LTMD/CUDA/kernels/*.cu' )
+	#cuda_kernels = Glob( 'src/LTMD/CUDA/kernels/*.cu' )
+	cuda_kernels = Glob( 'src/LTMD/CUDA/kernels/*.cpp' )
 	env.Tool( 'cuda' )
-	env.SharedLibrary( 'LTMDCuda', cuda_sources + cuda_kernels, LIBS = ['OpenMM','OpenMMCuda','OpenMMLTMD'] )
+	env.SharedLibrary( 'LTMDCuda', cuda_sources + cuda_kernels, LIBS = ['OpenMM','OpenMMCUDA','OpenMMLTMD'] )

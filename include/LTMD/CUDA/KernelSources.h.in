@@ -1,0 +1,15 @@
+#ifndef OPENMM_LTMD_CUDA_KERNELSOURCES_H_
+#define OPENMM_LTMD_CUDA_KERNELSOURCES_H_
+
+#include <string>
+
+namespace OpenMM {
+    namespace LTMD {
+        class KernelSources {
+            public:
+                @CUDA_FILE_DECLARATIONS@
+        };
+    }
+}
+
+#endif /*OPENMM_LTMD_CUDA_KERNELSOURCES_H_*/

@@ -27,21 +27,36 @@
 #include "LTMD/CUDA/StepKernel.h"
 
 #include <cmath>
-
+#include "SimTKOpenMMUtilities.h"
 #include "OpenMM.h"
+#include "CudaIntegrationUtilities.h"
 #include "CudaKernels.h"
+#include "CudaArray.h"
+#include "CudaContext.h"
 #include "openmm/internal/ContextImpl.h"
-
+#include "LTMD/CUDA/KernelSources.h"
 #include "LTMD/Integrator.h"
+#include <stdlib.h>
+#include <iostream>
+using namespace std;
 
+using namespace OpenMM;
 
-extern void kGenerateRandoms( gpuContext gpu );
-void kNMLUpdate( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, CUDAStream<float4>& noiseValues );
-void kNMLRejectMinimizationStep( gpuContext gpu );
-void kNMLAcceptMinimizationStep( gpuContext gpu );
-void kNMLLinearMinimize( gpuContext gpu, int numModes, float maxEigenvalue, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights );
-void kNMLQuadraticMinimize( gpuContext gpu, float maxEigenvalue, float currentPE, float lastPE, CUDAStream<float>& slopeBuffer, CUDAStream<float>& lambdaval );
-void kFastNoise( gpuContext gpu, int numModes, CUDAStream<float4>& modes, CUDAStream<float>& modeWeights, float maxEigenvalue, CUDAStream<float4>& noiseValues, float stepSize );
+extern void kGenerateRandoms( CudaContext *gpu );
+void kNMLUpdate( CUmodule *module, CudaContext *gpu, float deltaT, float tau, float kT, int numModes, int &iterations, CudaArray &modes, CudaArray &modeWeights, CudaArray &noiseValues );
+void kNMLRejectMinimizationStep( CUmodule *module, CudaContext *gpu, CudaArray &oldpos );
+void kNMLAcceptMinimizationStep( CUmodule *module, CudaContext *gpu, CudaArray &oldpos );
+void kNMLLinearMinimize( CUmodule *module, CudaContext *gpu, int numModes, float maxEigenvalue, CudaArray &oldpos, CudaArray &modes, CudaArray &modeWeights );
+void kNMLQuadraticMinimize( CUmodule *module, CudaContext *gpu, float maxEigenvalue, float currentPE, float lastPE, CudaArray &oldpos, CudaArray &slopeBuffer, CudaArray &lambdaval );
+void kFastNoise( CUmodule *module, CudaContext *cu, int numModes, float kT, int &iterations, CudaArray &modes, CudaArray &modeWeights, float maxEigenvalue, CudaArray &noiseVal, CudaArray &oldpos, float stepSize );
+
+double drand() { /* uniform distribution, (0..1] */
+	return ( rand() + 1.0 ) / ( RAND_MAX + 1.0 );
+}
+double random_normal() { /* normal distribution, centered on 0, std dev 1 */
+	return sqrt( -2 * log( drand() ) ) * cos( 2 * M_PI * drand() );
+}
+
 
 namespace OpenMM {
 	namespace LTMD {
@@ -49,7 +64,10 @@ namespace OpenMM {
 			StepKernel::StepKernel( std::string name, const Platform &platform, CudaPlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
 				data( data ), modes( NULL ), modeWeights( NULL ), minimizerScale( NULL ), MinimizeLambda( 0 ) {
 
-				MinimizeLambda = new CUDAStream<float>( 1, 1, "MinimizeLambda" );
+				//MinimizeLambda = new CUDAStream<float>( 1, 1, "MinimizeLambda" );
+				//MinimizeLambda = new CudaArray( *(data.contexts[0]), 1, sizeof(float), "MinimizeLambda" );
+				iterations = 0;
+				kIterations = 0;
 			}
 
 			StepKernel::~StepKernel() {
@@ -62,22 +80,34 @@ namespace OpenMM {
 			}
 
 			void StepKernel::initialize( const System &system, const Integrator &integrator ) {
-				OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator );
+				// TMC This is done automatically when you setup a context now.
+				//OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator ); // TMC not sure how to replace
+				data.contexts[0]->initialize();
+				minmodule = data.contexts[0]->createModule( KernelSources::minimizationSteps );
+				linmodule = data.contexts[0]->createModule( KernelSources::linearMinimizers );
+				quadmodule = data.contexts[0]->createModule( KernelSources::quadraticMinimizers );
+#ifdef FAST_NOISE
+				fastmodule = data.contexts[0]->createModule( KernelSources::fastnoises, "-DFAST_NOISE=1" );
+				updatemodule = data.contexts[0]->createModule( KernelSources::NMLupdates, "-DFAST_NOISE=1" );
+#else
+				updatemodule = data.contexts[0]->createModule( KernelSources::NMLupdates, "-DFAST_NOISE=0" );
+#endif
 
-				mParticles = system.getNumParticles();
-			    NoiseValues = new CUDAStream<float4>( 1, mParticles, "NoiseValues" );
-
-				for( size_t i = 0; i < mParticles; i++ ){
+				MinimizeLambda = new CudaArray( *( data.contexts[0] ), 1, sizeof( float ), "MinimizeLambda" );
+				//data.contexts[0]->getPlatformData().initializeContexts(system);
+				mParticles = data.contexts[0]->getNumAtoms();
+				//NoiseValues = new CUDAStream<float4>( 1, mParticles, "NoiseValues" );
+				NoiseValues = new CudaArray( *( data.contexts[0] ), mParticles, sizeof( float4 ), "NoiseValues" );
+				/*for( size_t i = 0; i < mParticles; i++ ){
 					(*NoiseValues)[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+				}*/
+				std::vector<float4> tmp( mParticles );
+				for( size_t i = 0; i < mParticles; i++ ) {
+					tmp[i] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
 				}
-				NoiseValues->Upload();
+				NoiseValues->upload( tmp );
 
-
-				data.gpu->seed = ( unsigned long ) integrator.getRandomNumberSeed();
-				gpuInitializeRandoms( data.gpu );
-
-				// Generate a first set of randoms
-				kGenerateRandoms( data.gpu );
+				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator( integrator.getRandomNumberSeed() );
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
@@ -93,28 +123,39 @@ namespace OpenMM {
 						throw OpenMMException( "Projection vector size is zero." );
 					}
 
-					if( modes != NULL && modes->_length != numModes * mParticles ) {
+					//if( modes != NULL && modes->_length != numModes * mParticles ) {
+					if( modes != NULL && modes->getSize() != numModes * mParticles ) {
 						delete modes;
 						delete modeWeights;
 						modes = NULL;
 						modeWeights = NULL;
 					}
 					if( modes == NULL ) {
-						modes = new CUDAStream<float4>( numModes * mParticles, 1, "NormalModes" );
-						modeWeights = new CUDAStream<float>( numModes > data.gpu->sim.blocks ? numModes : data.gpu->sim.blocks, 1, "NormalModeWeights" );
+						/*modes = new CUDAStream<float4>( numModes * mParticles, 1, "NormalModes" );
+						modeWeights = new CUDAStream<float>( numModes > data.gpu->sim.blocks ? numModes : data.gpu->sim.blocks, 1, "NormalModeWeights" );*/
+						//cu->getNumThreadBlocks()*cu->ThreadBlockSize
+						modes = new CudaArray( *( data.contexts[0] ), numModes * mParticles, sizeof( float4 ), "NormalModes" );
+						modeWeights = new CudaArray( *( data.contexts[0] ), ( numModes > data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize ? numModes : data.contexts[0]->getNumThreadBlocks()*data.contexts[0]->ThreadBlockSize ), sizeof( float ), "NormalModeWeights" );
+						oldpos = new CudaArray( *( data.contexts[0] ), data.contexts[0]->getPaddedNumAtoms(), sizeof( float4 ), "OldPositions" );
+						pPosqP = new CudaArray( *( data.contexts[0] ), data.contexts[0]->getPaddedNumAtoms(), sizeof( float4 ), "MidIntegPositions" );
 						modesChanged = true;
 					}
 					if( modesChanged ) {
 						int index = 0;
-						const std::vector<std::vector<Vec3> >& modeVectors = integrator.getProjectionVectors();
-						for( int i = 0; i < numModes; i++ ){
+						const std::vector<std::vector<Vec3> > &modeVectors = integrator.getProjectionVectors();
+						std::vector<float4> tmp( numModes * mParticles );;
+						for( int i = 0; i < numModes; i++ ) {
 							for( int j = 0; j < mParticles; j++ ) {
-								( *modes )[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
+								tmp[index++] = make_float4( ( float ) modeVectors[i][j][0], ( float ) modeVectors[i][j][1], ( float ) modeVectors[i][j][2], 0.0f );
 							}
 						}
-						modes->Upload();
+						modes->upload( tmp );
 					}
 				}
+			}
+
+			void StepKernel::setOldPositions() {
+				data.contexts[0]->getPosq().copyTo( *oldpos );
 			}
 
 			void StepKernel::Integrate( OpenMM::ContextImpl &context, const Integrator &integrator ) {
@@ -122,50 +163,53 @@ namespace OpenMM {
 
 #ifdef FAST_NOISE
 				// Add noise for step
-				kFastNoise( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues, integrator.getStepSize() );
+				kFastNoise( &fastmodule, data.contexts[0], integrator.getNumProjectionVectors(), ( float )( BOLTZ * integrator.getTemperature() ), iterations, *modes, *modeWeights, integrator.getMaxEigenvalue(), *NoiseValues, *pPosqP, integrator.getStepSize() );
 #endif
 
 				// Calculate Constants
-				data.gpu->sim.deltaT = integrator.getStepSize();
-				data.gpu->sim.oneOverDeltaT = 1.0f / data.gpu->sim.deltaT;
 
 				const double friction = integrator.getFriction();
-				data.gpu->sim.tau = friction == 0.0f ? 0.0f : 1.0f / friction;
-				data.gpu->sim.T = ( float ) integrator.getTemperature();
-				data.gpu->sim.kT = ( float )( BOLTZ * integrator.getTemperature() );
 
+				context.updateContextState();
 				// Do Step
-				kNMLUpdate( data.gpu, integrator.getNumProjectionVectors(), *modes, *modeWeights, *NoiseValues );
+				kNMLUpdate( &updatemodule,
+							data.contexts[0],
+							integrator.getStepSize(),
+							friction == 0.0f ? 0.0f : 1.0f / friction,
+							( float )( BOLTZ * integrator.getTemperature() ),
+							integrator.getNumProjectionVectors(), kIterations, *modes, *modeWeights, *NoiseValues );  // TMC setting parameters for this
 			}
 
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
-				data.time += integrator.getStepSize();
-				data.stepCount++;
+				data.contexts[0]->setTime( data.contexts[0]->getTime() + integrator.getStepSize() );
+				data.contexts[0]->setStepCount( data.contexts[0]->getStepCount() + 1 );
+				data.contexts[0]->reorderAtoms();
 			}
 
 			void StepKernel::AcceptStep( OpenMM::ContextImpl &context ) {
-				kNMLAcceptMinimizationStep( data.gpu );
+				kNMLAcceptMinimizationStep( &minmodule, data.contexts[0], *oldpos );
 			}
 
 			void StepKernel::RejectStep( OpenMM::ContextImpl &context ) {
-				kNMLRejectMinimizationStep( data.gpu );
+				kNMLRejectMinimizationStep( &minmodule, data.contexts[0], *oldpos );
 			}
 
 			void StepKernel::LinearMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) {
 				ProjectionVectors( integrator );
 
 				lastPE = energy;
-				kNMLLinearMinimize( data.gpu, integrator.getNumProjectionVectors(), integrator.getMaxEigenvalue(), *modes, *modeWeights );
+				kNMLLinearMinimize( &linmodule, data.contexts[0], integrator.getNumProjectionVectors(), integrator.getMaxEigenvalue(), *pPosqP, *modes, *modeWeights );
 			}
 
 			double StepKernel::QuadraticMinimize( OpenMM::ContextImpl &context, const Integrator &integrator, const double energy ) {
 				ProjectionVectors( integrator );
 
-				kNMLQuadraticMinimize( data.gpu, integrator.getMaxEigenvalue(), energy, lastPE, *modeWeights, *MinimizeLambda );
+				kNMLQuadraticMinimize( &quadmodule, data.contexts[0], integrator.getMaxEigenvalue(), energy, lastPE, *pPosqP, *modeWeights, *MinimizeLambda );
+				std::vector<float> tmp;
+				tmp.resize( 1 );
+				MinimizeLambda->download( tmp );
 
-				MinimizeLambda->Download();
-
-				return (*MinimizeLambda)[0];
+				return tmp[0];
 			}
 		}
 	}

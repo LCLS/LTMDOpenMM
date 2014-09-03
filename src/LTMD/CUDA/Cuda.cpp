@@ -45,7 +45,7 @@ extern "C" void registerPlatforms() {
 extern "C" void registerKernelFactories() {
 	printf( "LTMD looking for CUDA plugin...\n" );
 	try {
-		Platform &platform = Platform::getPlatformByName( "Cuda" );
+		Platform &platform = Platform::getPlatformByName( "CUDA" );
 		printf( "LTMD found CUDA platform...\n" );
 		platform.registerKernelFactory( LTMD::StepKernel::Name(), new LTMD::CUDA::KernelFactory() );
 		printf( "LTMD registered CUDA plugin ... \n" );
