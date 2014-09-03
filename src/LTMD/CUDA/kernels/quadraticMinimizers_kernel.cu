@@ -8,9 +8,9 @@ extern "C" __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, int padd
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const Real invMass = velm[atom].w;
 		const float4 xp = posqP[atom];
-			const float fx = (float)force[atom] / (float)0x100000000;
-			const float fy = (float)force[atom+1*paddedNumAtoms] / (float)0x100000000;
-			const float fz = (float)force[atom+2*paddedNumAtoms] / (float)0x100000000;
+		const float fx = ( float )force[atom] / ( float )0x100000000;
+		const float fy = ( float )force[atom + 1 * paddedNumAtoms] / ( float )0x100000000;
+		const float fz = ( float )force[atom + 2 * paddedNumAtoms] / ( float )0x100000000;
 
 		slope -= invMass * ( xp.x * fx + xp.y * fy + xp.z * fz );
 	}
@@ -24,8 +24,7 @@ extern "C" __global__ void kNMLQuadraticMinimize1_kernel( int numAtoms, int padd
 	}
 }
 
-extern "C" __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, float lastPE, float invMaxEigen, float4 *posq, float4 *posqP,
-						float4 *velm, float *blockSlope, float *lambdaval ) {
+extern "C" __global__ void kNMLQuadraticMinimize2_kernel( int numAtoms, float currentPE, float lastPE, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, float *blockSlope, float *lambdaval ) {
 	// Load the block contributions into shared memory.
 	extern __shared__ float slopeBuffer[];
 	for( int block = threadIdx.x; block < gridDim.x; block += blockDim.x ) {

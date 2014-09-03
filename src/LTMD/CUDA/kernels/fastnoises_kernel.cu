@@ -1,19 +1,17 @@
 typedef float Real;
 
 #ifdef FAST_NOISE
-extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes,
- 					float *modeWeights, float4 *random, int *randomPosition, int totalRandoms, float maxEigenvalue, float stepSize ) {
+extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, const float4 *__restrict__ random, unsigned int randomIndex, float maxEigenvalue, float stepSize ) {
 	extern __shared__ float dotBuffer[];
 	const Real val = stepSize / 0.002;
 	const Real noisescale = sqrt( 2 * kT * 1.0f / maxEigenvalue );
 
-	int rpos = randomPosition[blockIdx.x];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
 		Real dot = 0.0f;
-               unsigned int seed=100;
+		unsigned int seed = 100;
 
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
-			const float4 n = random[rpos + atom];
+			const float4 n = random[randomIndex + blockIdx.x * blockDim.x + threadIdx.x];
 			const float4 randomNoise = make_float4( n.x * noisescale, n.y * noisescale, n.z * noisescale, n.w * noisescale );
 
 			noiseVal[atom] = randomNoise;
@@ -31,12 +29,6 @@ extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms,
 				sum += dotBuffer[i];
 			}
 			modeWeights[mode] = sum;
-
-			rpos += paddedNumAtoms;
-			if( rpos > totalRandoms ) {
-				rpos -= totalRandoms;
-			}
-			randomPosition[blockIdx.x] = rpos;
 		}
 	}
 }

@@ -1,40 +1,27 @@
 typedef float Real;
 
-extern "C" __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau, float dt, float kT, float4* posq, float4* posqP, float4* velm, long long* force,
-					float4 *random, /*int randomPosition,*/ int* randomPosition, int totalRandoms ) {
+extern "C" __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau, float dt, float kT, float4 *posq, float4 *posqP, float4 *velm, long long *force, const float4 *__restrict__ random, unsigned int randomIndex ) {
 	// Update the velocity.
 	const Real vscale = exp( -dt / tau );
 	const Real fscale = ( 1.0f - vscale ) * tau;
 	const Real noisescale = sqrt( kT * ( 1 - vscale * vscale ) );
 
-	int rpos = randomPosition[blockIdx.x];
-	//int rpos = randomPosition;
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
-		//const float4 n = make_float4(0,0,0,0);
-		const float4 n = random[rpos + atom];
+		const float4 n = random[randomIndex + blockIdx.x * blockDim.x + threadIdx.x];
 		const float4 randomNoise = make_float4( n.x * noisescale, n.y * noisescale, n.z * noisescale, n.w * noisescale );
 
 		const Real sqrtInvMass = sqrt( velm[atom].w );
 
 		float4 v = velm[atom];
-		float fx = (float)force[atom] / (float)0x100000000;
-		float fy = (float)force[atom+1*paddedNumAtoms] / (float)0x100000000;
-		float fz = (float)force[atom+2*paddedNumAtoms] / (float)0x100000000;
+		float fx = ( float )force[atom] / ( float )0x100000000;
+		float fy = ( float )force[atom + 1 * paddedNumAtoms] / ( float )0x100000000;
+		float fz = ( float )force[atom + 2 * paddedNumAtoms] / ( float )0x100000000;
 
 		v.x = ( vscale * v.x ) + ( fscale * fx * v.w ) + ( randomNoise.x * sqrtInvMass );
 		v.y = ( vscale * v.y ) + ( fscale * fy * v.w ) + ( randomNoise.y * sqrtInvMass );
 		v.z = ( vscale * v.z ) + ( fscale * fz * v.w ) + ( randomNoise.z * sqrtInvMass );
 
 		velm[atom] = v;
-	}
-
-	if( threadIdx.x == 0 ) {
-		rpos += paddedNumAtoms;
-		if( rpos > totalRandoms ) {
-			rpos -= totalRandoms;
-		}
-		randomPosition[blockIdx.x] = rpos;
-		//randomPosition = rpos;
 	}
 }
 
@@ -67,8 +54,7 @@ extern "C" __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float
 	}
 }
 
-extern "C" __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes,
-					 float *modeWeights, float4 *noiseVal ) {
+extern "C" __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes, float *modeWeights, float4 *noiseVal ) {
 	// Load the weights into shared memory.
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {

@@ -76,7 +76,6 @@ namespace OpenMM {
 					OpenMM::CudaPlatform::PlatformData &data;
 					CudaArray *modes, *NoiseValues;
 					CudaArray *modeWeights;
-					CudaArray *randomIndex;
 					CudaArray *minimizerScale;
 					CudaArray *MinimizeLambda;
 					CudaArray *oldpos;

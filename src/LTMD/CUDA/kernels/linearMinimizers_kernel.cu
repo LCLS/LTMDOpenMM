@@ -9,9 +9,9 @@ extern "C" __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int paddedN
 			const Real scale = sqrt( velm[atom].w );
 			const int modePos = mode * numAtoms + atom;
 
-			float fx = (float)force[atom] / (float)0x100000000;
-			float fy = (float)force[atom+1*paddedNumAtoms] / (float)0x100000000;
-			float fz = (float)force[atom+2*paddedNumAtoms] / (float)0x100000000;
+			float fx = ( float )force[atom] / ( float )0x100000000;
+			float fy = ( float )force[atom + 1 * paddedNumAtoms] / ( float )0x100000000;
+			float fz = ( float )force[atom + 2 * paddedNumAtoms] / ( float )0x100000000;
 			float4 m = modes[modePos];
 
 			dot += scale * ( fx * m.x + fy * m.y + fz * m.z );
@@ -29,8 +29,7 @@ extern "C" __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int paddedN
 	}
 }
 
-extern "C" __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int paddedNumAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm,
-						 long long *force, float4 *modes, float *modeWeights ) {
+extern "C" __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int paddedNumAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, long long *force, float4 *modes, float *modeWeights ) {
 	// Load the weights into shared memory.
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
@@ -54,7 +53,7 @@ extern "C" __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int paddedN
 		f.x *= sqrtInvMass;
 		f.y *= sqrtInvMass;
 		f.z *= sqrtInvMass;
-		posqP[atom] = make_float4( (float)force[atom] / (float)0x100000000 - f.x, (float)force[atom+paddedNumAtoms]/(float) 0x100000000 - f.y, (float) force[atom+2*paddedNumAtoms]/(float) 0x100000000  - f.z, 0.0f );
+		posqP[atom] = make_float4( ( float )force[atom] / ( float )0x100000000 - f.x, ( float )force[atom + paddedNumAtoms] / ( float ) 0x100000000 - f.y, ( float ) force[atom + 2 * paddedNumAtoms] / ( float ) 0x100000000  - f.z, 0.0f );
 
 		float4 pos = posq[atom];
 		pos.x += factor * posqP[atom].x;
