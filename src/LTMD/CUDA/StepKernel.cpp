@@ -34,7 +34,7 @@
 #include "CudaArray.h"
 #include "CudaContext.h"
 #include "openmm/internal/ContextImpl.h"
-#include "CudaLTMDKernelSources.h"
+#include "LTMD/CUDA/KernelSources.h"
 #include "LTMD/Integrator.h"
 #include <stdlib.h>
 #include <iostream>
@@ -83,14 +83,14 @@ namespace OpenMM {
 				// TMC This is done automatically when you setup a context now.
 				//OpenMM::cudaOpenMMInitializeIntegration( system, data, integrator ); // TMC not sure how to replace
 				data.contexts[0]->initialize();
-				minmodule = data.contexts[0]->createModule( CudaLTMDKernelSources::minimizationSteps );
-				linmodule = data.contexts[0]->createModule( CudaLTMDKernelSources::linearMinimizers );
-				quadmodule = data.contexts[0]->createModule( CudaLTMDKernelSources::quadraticMinimizers );
+				minmodule = data.contexts[0]->createModule( KernelSources::minimizationSteps );
+				linmodule = data.contexts[0]->createModule( KernelSources::linearMinimizers );
+				quadmodule = data.contexts[0]->createModule( KernelSources::quadraticMinimizers );
 #ifdef FAST_NOISE
-				fastmodule = data.contexts[0]->createModule( CudaLTMDKernelSources::fastnoises, "-DFAST_NOISE=1" );
-				updatemodule = data.contexts[0]->createModule( CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=1" );
+				fastmodule = data.contexts[0]->createModule( KernelSources::fastnoises, "-DFAST_NOISE=1" );
+				updatemodule = data.contexts[0]->createModule( KernelSources::NMLupdates, "-DFAST_NOISE=1" );
 #else
-				updatemodule = data.contexts[0]->createModule( CudaLTMDKernelSources::NMLupdates, "-DFAST_NOISE=0" );
+				updatemodule = data.contexts[0]->createModule( KernelSources::NMLupdates, "-DFAST_NOISE=0" );
 #endif
 
 				MinimizeLambda = new CudaArray( *( data.contexts[0] ), 1, sizeof( float ), "MinimizeLambda" );
