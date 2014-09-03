@@ -107,7 +107,7 @@ namespace OpenMM {
 				}
 				NoiseValues->upload( tmp );
 
-			    data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator(integrator.getRandomNumberSeed());
+				data.contexts[0]->getIntegrationUtilities().initRandomNumberGenerator( integrator.getRandomNumberSeed() );
 			}
 
 			void StepKernel::ProjectionVectors( const Integrator &integrator ) {
@@ -234,8 +234,9 @@ namespace OpenMM {
 			}
 
 			void StepKernel::UpdateTime( const Integrator &integrator ) {
-				data.time += integrator.getStepSize();
-				data.stepCount++;
+				data.contexts[0]->setTime( data.contexts[0]->getTime() + integrator.getStepSize() );
+				data.contexts[0]->setStepCount( data.contexts[0]->getStepCount() + 1 );
+				data.contexts[0]->reorderAtoms();
 			}
 
 			void StepKernel::AcceptStep( OpenMM::ContextImpl &context ) {
@@ -259,13 +260,10 @@ namespace OpenMM {
 				kNMLQuadraticMinimize( &quadmodule, data.contexts[0], integrator.getMaxEigenvalue(), energy, lastPE, *pPosqP, *modeWeights, *MinimizeLambda );
 				std::vector<float> tmp;
 				tmp.resize( 1 );
-				printf( "READY TO DOWNLOAD\n" );
 				MinimizeLambda->download( tmp );
 
-				//return (*MinimizeLambda)[0];
 				return tmp[0];
 			}
-
 		}
 	}
 }
