@@ -183,7 +183,7 @@ if( BUILD_GPU )
 			# Clean Content
 		    STRING(REGEX REPLACE "\\\\([^;])" "\\\\\\\\\\1" file_content "${file_content}")
 		    STRING(REPLACE "\"" "\\\"" file_content "${file_content}")
-			STRING(REPLACE "\n" "" file_content "${file_content}")
+			STRING(REPLACE "\n" "\\n\"\n\"" file_content "${file_content}")
 
 		    # Determine a name for the variable that will contain this file's contents
 		    FILE(RELATIVE_PATH filename ${CMAKE_SOURCE_DIR}/src/LTMD/CUDA/kernels ${file})

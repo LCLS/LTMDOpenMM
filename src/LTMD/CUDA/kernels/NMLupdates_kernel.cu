@@ -1,16 +1,14 @@
-typedef float Real;
-
 extern "C" __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms, float tau, float dt, float kT, float4 *posq, float4 *posqP, float4 *velm, long long *force, const float4 *__restrict__ random, unsigned int randomIndex ) {
-	// Update the velocity.
-	const Real vscale = exp( -dt / tau );
-	const Real fscale = ( 1.0f - vscale ) * tau;
-	const Real noisescale = sqrt( kT * ( 1 - vscale * vscale ) );
+	/* Update the velocity.*/
+	const float vscale = exp( -dt / tau );
+	const float fscale = ( 1.0f - vscale ) * tau;
+	const float noisescale = sqrt( kT * ( 1 - vscale * vscale ) );
 
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
 		const float4 n = random[randomIndex + blockIdx.x * blockDim.x + threadIdx.x];
 		const float4 randomNoise = make_float4( n.x * noisescale, n.y * noisescale, n.z * noisescale, n.w * noisescale );
 
-		const Real sqrtInvMass = sqrt( velm[atom].w );
+		const float sqrtInvMass = sqrt( velm[atom].w );
 
 		float4 v = velm[atom];
 		float fx = ( float )force[atom] / ( float )0x100000000;
@@ -28,12 +26,12 @@ extern "C" __global__ void kNMLUpdate1_kernel( int numAtoms, int paddedNumAtoms,
 extern "C" __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float4 *velm, float4 *modes, float *modeWeights ) {
 	extern __shared__ float dotBuffer[];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
-		// Compute the projection of the mass weighted velocity onto one normal mode vector.
-		Real dot = 0.0f;
+		/* Compute the projection of the mass weighted velocity onto one normal mode vector. */
+		float dot = 0.0f;
 
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
 			const int modePos = mode * numAtoms + atom;
-			const Real scale = 1.0f / sqrt( velm[atom].w );
+			const float scale = 1.0f / sqrt( velm[atom].w );
 
 			float4 v = velm[atom];
 			float4 m = modes[modePos];
@@ -45,7 +43,7 @@ extern "C" __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float
 
 		__syncthreads();
 		if( threadIdx.x == 0 ) {
-			Real sum = 0;
+			float sum = 0;
 			for( int i = 0; i < blockDim.x; i++ ) {
 				sum += dotBuffer[i];
 			}
@@ -55,16 +53,16 @@ extern "C" __global__ void kNMLUpdate2_kernel( int numAtoms, int numModes, float
 }
 
 extern "C" __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float dt, float4 *posq, float4 *velm, float4 *modes, float *modeWeights, float4 *noiseVal ) {
-	// Load the weights into shared memory.
+	/* Load the weights into shared memory. */
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
 		weightBuffer[mode] = modeWeights[mode];
 	}
 	__syncthreads();
 
-	// Compute the projected velocities and update the atom positions.
+	/* Compute the projected velocities and update the atom positions. */
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
-		const Real invMass = velm[atom].w, scale = sqrt( invMass );
+		const float invMass = velm[atom].w, scale = sqrt( invMass );
 
 		float3 v = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {
@@ -82,13 +80,13 @@ extern "C" __global__ void kNMLUpdate3_kernel( int numAtoms, int numModes, float
 
 		float4 pos = posq[atom];
 
-		// Add Step
+		/* Add Step */
 		pos.x += dt * v.x;
 		pos.y += dt * v.y;
 		pos.z += dt * v.z;
 
 #ifdef FAST_NOISE
-		// Remove Noise
+		/* Remove Noise */
 		pos.x -= noiseVal[atom].x;
 		pos.y -= noiseVal[atom].y;
 		pos.z -= noiseVal[atom].z;

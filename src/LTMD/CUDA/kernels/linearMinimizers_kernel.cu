@@ -1,12 +1,10 @@
-typedef float Real;
-
 extern "C" __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float4 *velm, long long *force, float4 *modes, float *modeWeights ) {
 	extern __shared__ float dotBuffer[];
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
-		// Compute the projection of the mass weighted force onto one normal mode vector.
-		Real dot = 0.0f;
+		/* Compute the projection of the mass weighted force onto one normal mode vector.*/
+		float dot = 0.0f;
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
-			const Real scale = sqrt( velm[atom].w );
+			const float scale = sqrt( velm[atom].w );
 			const int modePos = mode * numAtoms + atom;
 
 			float fx = ( float )force[atom] / ( float )0x100000000;
@@ -20,7 +18,7 @@ extern "C" __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int paddedN
 
 		__syncthreads();
 		if( threadIdx.x == 0 ) {
-			Real sum = 0;
+			float sum = 0;
 			for( int i = 0; i < blockDim.x; i++ ) {
 				sum += dotBuffer[i];
 			}
@@ -30,16 +28,16 @@ extern "C" __global__ void kNMLLinearMinimize1_kernel( int numAtoms, int paddedN
 }
 
 extern "C" __global__ void kNMLLinearMinimize2_kernel( int numAtoms, int paddedNumAtoms, int numModes, float invMaxEigen, float4 *posq, float4 *posqP, float4 *velm, long long *force, float4 *modes, float *modeWeights ) {
-	// Load the weights into shared memory.
+	/* Load the weights into shared memory.*/
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
 		weightBuffer[mode] = modeWeights[mode];
 	}
 	__syncthreads();
 
-	// Compute the projected forces and update the atom positions.
+	/* Compute the projected forces and update the atom positions.*/
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
-		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), factor = invMass * invMaxEigen;
+		const float invMass = velm[atom].w, sqrtInvMass = sqrt( invMass ), factor = invMass * invMaxEigen;
 
 		float3 f = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {

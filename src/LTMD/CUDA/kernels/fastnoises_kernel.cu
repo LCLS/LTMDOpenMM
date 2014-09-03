@@ -1,13 +1,11 @@
-typedef float Real;
-
 #ifdef FAST_NOISE
 extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms, int numModes, float kT, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights, const float4 *__restrict__ random, unsigned int randomIndex, float maxEigenvalue, float stepSize ) {
 	extern __shared__ float dotBuffer[];
-	const Real val = stepSize / 0.002;
-	const Real noisescale = sqrt( 2 * kT * 1.0f / maxEigenvalue );
+	const float val = stepSize / 0.002;
+	const float noisescale = sqrt( 2 * kT * 1.0f / maxEigenvalue );
 
 	for( int mode = blockIdx.x; mode < numModes; mode += gridDim.x ) {
-		Real dot = 0.0f;
+		float dot = 0.0f;
 		unsigned int seed = 100;
 
 		for( int atom = threadIdx.x; atom < numAtoms; atom += blockDim.x ) {
@@ -24,7 +22,7 @@ extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms,
 
 		__syncthreads();
 		if( threadIdx.x == 0 ) {
-			Real sum = 0;
+			float sum = 0;
 			for( int i = 0; i < blockDim.x; i++ ) {
 				sum += dotBuffer[i];
 			}
@@ -34,16 +32,16 @@ extern "C" __global__ void kFastNoise1_kernel( int numAtoms, int paddedNumAtoms,
 }
 
 extern "C" __global__ void kFastNoise2_kernel( int numAtoms, int numModes, float4 *posq, float4 *noiseVal, float4 *velm, float4 *modes, float *modeWeights ) {
-	// Load the weights into shared memory.
+	/* Load the weights into shared memory.*/
 	extern __shared__ float weightBuffer[];
 	for( int mode = threadIdx.x; mode < numModes; mode += blockDim.x ) {
 		weightBuffer[mode] = modeWeights[mode];
 	}
 	__syncthreads();
 
-	// Compute the projected forces and update the atom positions.
+	/* Compute the projected forces and update the atom positions.*/
 	for( int atom = threadIdx.x + blockIdx.x * blockDim.x; atom < numAtoms; atom += blockDim.x * gridDim.x ) {
-		const Real invMass = velm[atom].w, sqrtInvMass = sqrt( invMass );
+		const float invMass = velm[atom].w, sqrtInvMass = sqrt( invMass );
 
 		float3 r = make_float3( 0.0f, 0.0f, 0.0f );
 		for( int mode = 0; mode < numModes; mode++ ) {
