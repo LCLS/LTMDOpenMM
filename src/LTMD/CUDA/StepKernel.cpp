@@ -62,7 +62,7 @@ namespace OpenMM {
 	namespace LTMD {
 		namespace CUDA {
 			StepKernel::StepKernel( std::string name, const Platform &platform, CudaPlatform::PlatformData &data ) : LTMD::StepKernel( name, platform ),
-				data( data ), modes( NULL ), modeWeights( NULL ), minimizerScale( NULL ), MinimizeLambda( 0 ) {
+				data( data ), modes( NULL ), modeWeights( NULL ), MinimizeLambda( 0 ) {
 
 				//MinimizeLambda = new CUDAStream<float>( 1, 1, "MinimizeLambda" );
 				//MinimizeLambda = new CudaArray( *(data.contexts[0]), 1, sizeof(float), "MinimizeLambda" );

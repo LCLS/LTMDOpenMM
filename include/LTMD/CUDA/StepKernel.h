@@ -29,10 +29,9 @@
 
 #include "LTMD/StepKernel.h"
 
-#include "CudaPlatform.h"
-//#include "kernels/gputypes.h"
 #include "CudaArray.h"
 #include "CudaContext.h"
+#include "CudaPlatform.h"
 #include "CudaIntegrationUtilities.h"
 
 static const float KILO                     =    1e3;                      // Thousand
@@ -68,7 +67,6 @@ namespace OpenMM {
 						return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy( 0.5 * integrator.getStepSize() );
 					}
 
-
 				private:
 					void ProjectionVectors( const Integrator &integrator );
 				private:
@@ -76,19 +74,12 @@ namespace OpenMM {
 					OpenMM::CudaPlatform::PlatformData &data;
 					CudaArray *modes, *NoiseValues;
 					CudaArray *modeWeights;
-					CudaArray *minimizerScale;
 					CudaArray *MinimizeLambda;
 					CudaArray *oldpos;
 					CudaArray *pPosqP;
-					//CUDAStream<float4> *modes, *NoiseValues;
-					//CUDAStream<float>* modeWeights;
-					//CUDAStream<float>* minimizerScale;
-					//CUDAStream<float>* MinimizeLambda;
 					double lastPE;
-					double prevTemp, prevFriction, prevStepSize;
 					int iterations;
 					int kIterations;
-					int randomPos;
 					CUmodule minmodule;
 					CUmodule linmodule;
 					CUmodule quadmodule;

@@ -63,7 +63,7 @@ using std::endl;
 namespace OpenMM {
 	namespace LTMD {
 		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, const Parameters &params )
-			: stepsSinceDiagonalize( 0 ), mParameters( params ), maxEigenvalue( 4.34e5 ), mAnalysis( new Analysis ) {
+			: maxEigenvalue( 4.34e5 ), stepsSinceDiagonalize( 0 ), mParameters( params ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
 			setStepSize( stepSize );
