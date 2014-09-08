@@ -1,0 +1,7 @@
+#include "LTMD/CUDA/KernelSources.h"
+
+namespace OpenMM{
+    namespace LTMD{
+        @CUDA_FILE_DEFINITIONS@
+    }
+}

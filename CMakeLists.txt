@@ -104,6 +104,7 @@ if( OPENMM_SOURCE_DIR )
 	# CUDA
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/src/" )
 	include_directories( "${OPENMM_SOURCE_DIR}/platforms/cuda/include/" )
+	include_directories( "${OPENMM_SOURCE_DIR}/libraries/lepton/include" )
 endif()
 
 find_library( OPENMM_LIB "OpenMM" HINT ${OPENMM_DIR}/lib )
@@ -116,10 +117,6 @@ if( BUILD_FIRST_ORDER )
 	add_definitions( "-DFIRST_ORDER" )
 endif( BUILD_FIRST_ORDER )
 
-option( BUILD_METROPOLIS_NOISE "Build with noise addition for metropolis" Off)
-if( BUILD_METROPOLIS_NOISE )
-	add_definitions( "-DMETROPOLIS_NOISE" )
-endif( BUILD_METROPOLIS_NOISE )
 # LTMD Library
 file( GLOB LTMD_HEADERS include/LTMD/*.h )
 source_group( "include\\LTMD" FILES ${LTMD_HEADERS} )
@@ -153,13 +150,14 @@ if( BUILD_GPU )
 		find_package( CUDA REQUIRED )
 		find_library( OPENMM_CUDA_LIB "OpenMMCuda" HINT "${OPENMM_DIR}/lib/plugins/")
 
-		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h )
+		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h  )
 		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
+	        include_directories( "include/LTMD/CUDA/" )
 
 		file( GLOB LTMD_CUDA_SOURCES src/LTMD/CUDA/*.cpp )
 		source_group( "src\\LTMD\\CUDA" FILES ${LTMD_CUDA_SOURCES} )
 
-		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cu )
+		file( GLOB LTMD_CUDA_KERNELS src/LTMD/CUDA/kernels/*.cpp )
 		source_group( "Kernels\\LTMD" FILES ${LTMD_CUDA_KERNELS} )
 
 		# Fast Math
@@ -173,7 +171,40 @@ if( BUILD_GPU )
 			list( APPEND CUDA_NVCC_FLAGS "-ccbin=icc" )
 		endif()
 
-		CUDA_ADD_LIBRARY( LTMDCuda SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES} ${LTMD_CUDA_KERNELS} )
+		# Encode Cuda Files
+		FILE(GLOB CUDA_KERNELS src/LTMD/CUDA/kernels/*_kernel.cu)
+
+		SET(CUDA_FILE_DECLARATIONS)
+		SET(CUDA_FILE_DEFINITIONS)
+		FOREACH(file ${CUDA_KERNELS})
+		    # Load the file contents
+		    FILE(STRINGS ${file} file_content NEWLINE_CONSUME)
+
+			# Clean Content
+		    STRING(REGEX REPLACE "\\\\([^;])" "\\\\\\\\\\1" file_content "${file_content}")
+		    STRING(REPLACE "\"" "\\\"" file_content "${file_content}")
+			STRING(REPLACE "\n" "\\n\"\n\"" file_content "${file_content}")
+
+		    # Determine a name for the variable that will contain this file's contents
+		    FILE(RELATIVE_PATH filename ${CMAKE_SOURCE_DIR}/src/LTMD/CUDA/kernels ${file})
+		    STRING(LENGTH ${filename} filename_length)
+		    MATH(EXPR filename_length ${filename_length}-10)
+		    STRING(SUBSTRING ${filename} 0 ${filename_length} variable_name)
+
+		    # Record the variable declaration and definition.
+		    SET(CUDA_FILE_DECLARATIONS ${CUDA_FILE_DECLARATIONS}static\ const\ std::string\ ${variable_name};\n\t\t)
+			SET(CUDA_FILE_DEFINITIONS ${CUDA_FILE_DEFINITIONS}const\ std::string\ KernelSources::${variable_name}\ =\ \"${file_content}\"\;\n\n\t)
+		ENDFOREACH(file)
+
+		STRING(REGEX REPLACE "(\r?\n)+\t+$" "" CUDA_FILE_DEFINITIONS "${CUDA_FILE_DEFINITIONS}")
+		STRING(REGEX REPLACE "(\r?\n)+\t+$" "" CUDA_FILE_DECLARATIONS "${CUDA_FILE_DECLARATIONS}")
+
+		CONFIGURE_FILE(src/LTMD/CUDA/KernelSources.cpp.in ${PROJECT_BINARY_DIR}/src/LTMD/CUDA/KernelSources.cpp)
+		CONFIGURE_FILE(include/LTMD/CUDA/KernelSources.h.in ${PROJECT_BINARY_DIR}/include/LTMD/CUDA/KernelSources.h)
+
+		include_directories("${PROJECT_BINARY_DIR}/include")
+
+		CUDA_ADD_LIBRARY( LTMDCuda SHARED ${LTMD_CUDA_HEADERS} ${LTMD_CUDA_SOURCES} "${PROJECT_BINARY_DIR}/src/LTMD/CUDA/KernelSources.cpp" ${LTMD_CUDA_KERNELS} )
 		set_target_properties( LTMDCuda PROPERTIES COMPILE_FLAGS "-DNMLOPENMM_CUDA_BUILDING_SHARED_LIBRARY -DNMLOPENMM_BUILDING_SHARED_LIBRARY")
 		target_link_libraries( LTMDCuda OpenMMLTMD ${OPENMM_CUDA_LIB} )
 

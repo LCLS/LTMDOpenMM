@@ -1,34 +1,3 @@
-/* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
- * -------------------------------------------------------------------------- *
- * This is part of the OpenMM molecular simulation toolkit originating from   *
- * Simbios, the NIH National Center for Physics-Based Simulation of           *
- * Biological Structures at Stanford, funded under the NIH Roadmap for        *
- * Medical Research, grant U54 GM072970. See https://simtk.org.               *
- *                                                                            *
- * Portions copyright (c) 2010 Stanford University and the Authors.           *
- * Authors: Peter Eastman                                                     *
- * Contributors:                                                              *
- *                                                                            *
- * Permission is hereby granted, free of charge, to any person obtaining a    *
- * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
- * and/or sell copies of the Software, and to permit persons to whom the      *
- * Software is furnished to do so, subject to the following conditions:       *
- *                                                                            *
- * The above copyright notice and this permission notice shall be included in *
- * all copies or substantial portions of the Software.                        *
- *                                                                            *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
- * THE AUTHORS, CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,    *
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR      *
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE  *
- * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
- * -------------------------------------------------------------------------- */
-
 #include "openmm/OpenMMException.h"
 #include "openmm/State.h"
 #include "openmm/Vec3.h"
@@ -75,22 +44,26 @@ namespace OpenMM {
 			return true;   // They're all the same!
 		}
 
-		bool sort_func( const EigenvalueColumn& a, const EigenvalueColumn& b ) {
+		bool sort_func( const EigenvalueColumn &a, const EigenvalueColumn &b ) {
 			if( std::fabs( a.first - b.first ) < 1e-8 ) {
-				if( a.second <= b.second ) return true;
-			}else{
-				if( a.first < b.first ) return true;
+				if( a.second <= b.second ) {
+					return true;
+				}
+			} else {
+				if( a.first < b.first ) {
+					return true;
+				}
 			}
 
 			return false;
 		}
 
-		std::vector<EigenvalueColumn> Analysis::SortEigenvalues( const EigenvalueArray& values ) {
+		std::vector<EigenvalueColumn> Analysis::SortEigenvalues( const EigenvalueArray &values ) {
 			std::vector<EigenvalueColumn> retVal;
 
 			// Create Array
 			retVal.reserve( values.size() );
-			for( unsigned int i = 0; i < values.size(); i++ ){
+			for( unsigned int i = 0; i < values.size(); i++ ) {
 				retVal.push_back( std::make_pair( std::fabs( values[i] ), i ) );
 			}
 
@@ -100,12 +73,12 @@ namespace OpenMM {
 			return retVal;
 		}
 
-		const Matrix Analysis::CalculateU( const Matrix& E, const Matrix& Q ) const {
+		const Matrix Analysis::CalculateU( const Matrix &E, const Matrix &Q ) const {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-            Matrix retVal( E.Rows, Q.Columns );
+			Matrix retVal( E.Rows, Q.Columns );
 			MatrixMultiply( E, false, Q, false, retVal );
 
 #ifdef PROFILE_ANALYSIS
@@ -116,16 +89,16 @@ namespace OpenMM {
 			return retVal;
 		}
 
-		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters& params ) {
+		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters &params ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 
 			timeval tp_begin, tp_hess, tp_diag, tp_e, tp_s, tp_s_matrix, tp_q, tp_u;
 
 			gettimeofday( &tp_begin, NULL );
-			Context &context = contextImpl.getOwner();
-			State state = context.getState( State::Positions | State::Forces );
-            std::vector<Vec3> positions = state.getPositions();
+
+			std::vector<Vec3> positions;
+ 			contextImpl.getPositions(positions);
 
 			/*********************************************************************/
 			/*                                                                   */
@@ -141,15 +114,15 @@ namespace OpenMM {
 			// need it to parallelize.
 
 			if( !mInitialized ) {
-				Initialize( context, params );
+				Initialize( contextImpl, params );
 			}
 
 			int n = 3 * mParticleCount;
 
 			// Copy the positions.
-            std::vector<Vec3> blockPositions;
+			std::vector<Vec3> blockPositions;
 			for( unsigned int i = 0; i < mParticleCount; i++ ) {
-				Vec3 atom( state.getPositions()[i][0], state.getPositions()[i][1], state.getPositions()[i][2] );
+				Vec3 atom( positions[i][0], positions[i][1], positions[i][2] );
 				blockPositions.push_back( atom );
 			}
 
@@ -246,10 +219,10 @@ namespace OpenMM {
 					for( int k = start_dof; k < end_dof; k++ ) {
 #ifdef FIRST_ORDER
 						double blockscale = 1.0 / ( params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-						h(k,col) = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
+						h( k, col ) = ( forces1[k / 3][k % 3] - block_start_forces[k / 3][k % 3] ) * blockscale;
 #else
 						double blockscale = 1.0 / ( 2 * params.blockDelta * sqrt( mParticleMass[atom_to_perturb] * mParticleMass[k / 3] ) );
-						h(k,col) = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
+						h( k, col ) = ( forces1[k / 3][k % 3] - forces2[k / 3][k % 3] ) * blockscale;
 #endif
 					}
 				}
@@ -263,9 +236,9 @@ namespace OpenMM {
 			// Make sure it is exactly symmetric.
 			for( int i = 0; i < n; i++ ) {
 				for( int j = 0; j < i; j++ ) {
-					double avg = 0.5f * ( h(i,j) + h(j,i) );
-					h(i,j) = avg;
-					h(j,i) = avg;
+					double avg = 0.5f * ( h( i, j ) + h( j, i ) );
+					h( i, j ) = avg;
+					h( j, i ) = avg;
 				}
 			}
 
@@ -275,7 +248,7 @@ namespace OpenMM {
 			// Note: The eigenvalues will be placed in one large array, because
 			//       we must sort them to get k
 
-            std::vector<double> block_eigval( n );
+			std::vector<double> block_eigval( n );
 			Matrix block_eigvec( n, n );
 
 			DiagonalizeBlocks( h, positions, block_eigval, block_eigvec );
@@ -283,7 +256,7 @@ namespace OpenMM {
 			gettimeofday( &tp_diag, NULL );
 
 			const double diagElapsed = ( tp_diag.tv_sec - tp_hess.tv_sec ) * 1000.0 + ( tp_diag.tv_usec - tp_hess.tv_usec ) / 1000.0;
-            std::cout << "Time to diagonalize block hessian: " << diagElapsed << "ms" << std::endl;
+			std::cout << "Time to diagonalize block hessian: " << diagElapsed << "ms" << std::endl;
 
 			//***********************************************************
 			// This section here is only to find the cuttoff eigenvalue.
@@ -316,7 +289,7 @@ namespace OpenMM {
 			for( int i = 0; i < m; i++ ) {
 				int eig_col = selectedEigsCols[i];
 				for( int j = 0; j < n; j++ ) {
-					E(j,i) = block_eigvec(j,eig_col);
+					E( j, i ) = block_eigvec( j, eig_col );
 				}
 			}
 
@@ -338,7 +311,8 @@ namespace OpenMM {
 			std::vector<Vec3> tmppos( positions );
 
 #ifdef FIRST_ORDER
-			std::vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
+			std::vector<Vec3> forces_start;
+ 			contextImpl.getForces(forces_start);
 #endif
 
 			// Loop over i.
@@ -349,35 +323,37 @@ namespace OpenMM {
 				// forward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] + eps * E(3 * i + j,k) / sqrt( mParticleMass[i] );
+						tmppos[i][j] = positions[i][j] + eps * E( 3 * i + j, k ) / sqrt( mParticleMass[i] );
 						pos++;
 					}
 				}
-				context.setPositions( tmppos );
+				contextImpl.setPositions( tmppos );
 
 				// Calculate F(xi).
-				std::vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_forward;
+				contextImpl.getForces(forces_forward);
 
 #ifndef FIRST_ORDER
 				// backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
 					for( unsigned int j = 0; j < 3; j++ ) {
-						tmppos[i][j] = positions[i][j] - eps * E(3 * i + j,k) / sqrt( mParticleMass[i] );
+						tmppos[i][j] = positions[i][j] - eps * E( 3 * i + j, k ) / sqrt( mParticleMass[i] );
 					}
 				}
-				context.setPositions( tmppos );
+				contextImpl.setPositions( tmppos );
 
 				// Calculate forces
-				std::vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
+				std::vector<Vec3> forces_backward;
+				contextImpl.getForces(forces_backward);
 #endif
 
 				for( int i = 0; i < n; i++ ) {
 #ifdef FIRST_ORDER
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 1.0 * eps;
-					HE(i,k) = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
+					HE( i, k ) = ( forces_forward[i / 3][i % 3] - forces_start[i / 3][i % 3] ) / scaleFactor;
 #else
 					const double scaleFactor = sqrt( mParticleMass[i / 3] ) * 2.0 * eps;
-					HE(i,k) = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
+					HE( i, k ) = ( forces_forward[i / 3][i % 3] - forces_backward[i / 3][i % 3] ) / scaleFactor;
 #endif
 				}
 
@@ -391,7 +367,7 @@ namespace OpenMM {
 
 			// *****************************************************************
 			// restore unperturbed positions
-			context.setPositions( positions );
+			contextImpl.setPositions( positions );
 
 			gettimeofday( &tp_s, NULL );
 
@@ -405,9 +381,9 @@ namespace OpenMM {
 			// make S symmetric
 			for( unsigned int i = 0; i < S.Rows; i++ ) {
 				for( unsigned int j = 0; j < S.Columns; j++ ) {
-					double avg = 0.5f * ( S(i,j) + S(j,i) );
-					S(i,j) = avg;
-					S(j,i) = avg;
+					double avg = 0.5f * ( S( i, j ) + S( j, i ) );
+					S( i, j ) = avg;
+					S( j, i ) = avg;
 				}
 			}
 
@@ -417,7 +393,7 @@ namespace OpenMM {
 			std::cout << "Time to compute matrix S: " << sMatrixElapsed << "ms" << std::endl;
 
 			// Diagonalizing S by finding eigenvalues and eigenvectors...
-            std::vector<double> dS( m );
+			std::vector<double> dS( m );
 			Matrix q( m, m );
 			FindEigenvalues( S, dS, q );
 
@@ -425,9 +401,9 @@ namespace OpenMM {
 			sortedEvalues = SortEigenvalues( dS );
 
 			Matrix Q( q.Columns, q.Rows );
-			for( int i = 0; i < sortedEvalues.size(); i++ ){
+			for( int i = 0; i < sortedEvalues.size(); i++ ) {
 				for( int j = 0; j < q.Columns; j++ ) {
-					Q(j,i) = q(j,sortedEvalues[i].second);
+					Q( j, i ) = q( j, sortedEvalues[i].second );
 				}
 			}
 
@@ -450,7 +426,7 @@ namespace OpenMM {
 			eigenvectors.resize( modes, std::vector<Vec3>( mParticleCount ) );
 			for( unsigned int i = 0; i < modes; i++ ) {
 				for( unsigned int j = 0; j < mParticleCount; j++ ) {
-					eigenvectors[i][j] = Vec3( U(3 * j, i), U(3 * j + 1, i), U(3 * j + 2,i) );
+					eigenvectors[i][j] = Vec3( U( 3 * j, i ), U( 3 * j + 1, i ), U( 3 * j + 2, i ) );
 				}
 			}
 
@@ -459,20 +435,23 @@ namespace OpenMM {
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
 		}
 
-		void Analysis::Initialize( Context &context, const Parameters &params ) {
+		void Analysis::Initialize( ContextImpl &context, const Parameters &params ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
 
 			// Get Current System
-			System &system = context.getSystem();
+			const System &system = context.getSystem();
 
 			// Store Particle Information
-			mParticleCount = context.getState( State::Positions ).getPositions().size();
+			std::vector<Vec3> positions;
+			context.getPositions(positions);
+
+			mParticleCount = positions.size();
 
 			mParticleMass.reserve( mParticleCount );
-			for( unsigned int i = 0; i < mParticleCount; i++ ){
+			for( unsigned int i = 0; i < mParticleCount; i++ ) {
 				mParticleMass.push_back( system.getParticleMass( i ) );
 			}
 
@@ -516,8 +495,9 @@ namespace OpenMM {
 			for( int i = 0; i < params.forces.size(); i++ ) {
 				std::string forcename = params.forces[i].name;
 				std::cout << "Adding force " << forcename << " at index " << params.forces[i].index << std::endl;
-				if( forcename == "CenterOfMass" ) {
-					blockSystem->addForce( &system.getForce( params.forces[i].index ) );
+				if( forcename == "RemoveCMMotion" ) {
+					const CMMotionRemover *cm = dynamic_cast<const CMMotionRemover *>(  &system.getForce( params.forces[i].index ) );
+					blockSystem->addForce( new CMMotionRemover( cm->getFrequency() ));
 				} else if( forcename == "Bond" ) {
 					// Create a new harmonic bond force.
 					// This only contains pairs of atoms which are in the same block.
@@ -657,35 +637,37 @@ namespace OpenMM {
 				delete blockContext;
 			}
 
-            std::string sPlatform = "";
-            switch( params.BlockDiagonalizePlatform ){
+			std::string sPlatform = "";
+			switch( params.BlockDiagonalizePlatform ) {
 				case Preference::Reference:
 					sPlatform = "Reference";
 					break;
 				case Preference::OpenCL:
 					sPlatform = "OpenCL";
 					break;
-                case Preference::CUDA:
-                    sPlatform = "Cuda";
+				case Preference::CUDA:
+					//sPlatform = "Cuda";
+					sPlatform = "CUDA";
 					break;
 			}
 
-            OpenMM::Platform& platform = OpenMM::Platform::getPlatformByName( sPlatform );
+			std::cout << "Platform" << sPlatform << std::endl;
+			OpenMM::Platform &platform = OpenMM::Platform::getPlatformByName( sPlatform );
 
-            if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ){
-                std::ostringstream stream;
-                stream << params.DeviceID;
+			if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ) {
+				std::ostringstream stream;
+				stream << params.DeviceID;
 
-                std::cout << "OpenMM Block Device: " << params.DeviceID << std::endl;
+				std::cout << "OpenMM Block Device: " << params.DeviceID << std::endl;
 
-                if( params.BlockDiagonalizePlatform == 1 ){
-                    platform.setPropertyDefaultValue("OpenCLDeviceIndex", stream.str() );
-                }else{
-                    platform.setPropertyDefaultValue("CudaDevice", stream.str() );
-                }
-            }
+				if( params.BlockDiagonalizePlatform == 1 ) {
+					platform.setPropertyDefaultValue( "OpenCLDeviceIndex", stream.str() );
+				} else {
+					platform.setPropertyDefaultValue( "CudaDeviceIndex", stream.str() );
+				}
+			}
 
-            blockContext = new Context( *blockSystem, *integ, platform );
+			blockContext = new Context( *blockSystem, *integ, platform );
 
 			mInitialized = true;
 
@@ -696,7 +678,7 @@ namespace OpenMM {
 #endif
 		}
 
-		void Analysis::DiagonalizeBlocks( const Matrix& hessian, const std::vector<Vec3>& positions, std::vector<double>& eval, Matrix& evec ){
+		void Analysis::DiagonalizeBlocks( const Matrix &hessian, const std::vector<Vec3> &positions, std::vector<double> &eval, Matrix &evec ) {
 			std::vector<Block> HTilde( blocks.size() );
 
 			// Create Blocks
@@ -716,7 +698,7 @@ namespace OpenMM {
 				// Copy data from big hessian
 				for( int j = startatom; j <= endatom; j++ ) {
 					for( int k = startatom; k <= endatom; k++ ) {
-						HTilde[i].Data(k - startatom,j - startatom) = hessian(k,j);
+						HTilde[i].Data( k - startatom, j - startatom ) = hessian( k, j );
 					}
 				}
 			}
@@ -730,26 +712,26 @@ namespace OpenMM {
 			}
 		}
 
-		void Analysis::DiagonalizeBlock( const Block& block, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec ) {
+		void Analysis::DiagonalizeBlock( const Block &block, const std::vector<Vec3> &positions, const std::vector<double> &Mass, std::vector<double> &eval, Matrix &evec ) {
 			const unsigned int size = block.Data.Rows;
 
 			// 3. Diagonalize the block Hessian only, and get eigenvectors
-            std::vector<double> di( size );
+			std::vector<double> di( size );
 			Matrix Qi( size, size );
 			FindEigenvalues( block.Data, di, Qi );
 
 			for( int j = 0; j < size; j++ ) {
 				eval[block.StartAtom + j] = di[j];
 				for( int k = 0; k < size; k++ ) {
-					evec(block.StartAtom + k,block.StartAtom + j) = Qi(k,j);
+					evec( block.StartAtom + k, block.StartAtom + j ) = Qi( k, j );
 				}
 			}
 		}
 
-		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3>& positions, const std::vector<double>& Mass, std::vector<double>& eval, Matrix& evec ) {
+		void Analysis::GeometricDOF( const int size, const int start, const int end, const std::vector<Vec3> &positions, const std::vector<double> &Mass, std::vector<double> &eval, Matrix &evec ) {
 			// find geometric dof
-            std::vector<double> values( size );
-			for( int i = 0; i < size; i++ ){
+			std::vector<double> values( size );
+			for( int i = 0; i < size; i++ ) {
 				values[i] = eval[start + i];
 			}
 
@@ -779,9 +761,9 @@ namespace OpenMM {
 				double factor = sqrt( mass ) / norm;
 
 				// translational
-				Qi_gdof(j,0)   = factor;
-				Qi_gdof(j + 1,1) = factor;
-				Qi_gdof(j + 2,2) = factor;
+				Qi_gdof( j, 0 )   = factor;
+				Qi_gdof( j + 1, 1 ) = factor;
+				Qi_gdof( j + 2, 2 ) = factor;
 
 				// rotational
 				// cross product of rotation axis and vector to center of molecule
@@ -790,28 +772,28 @@ namespace OpenMM {
 				// z-axis (b3=1) ia2-ja1
 				Vec3 diff = positions[atom_index] - pos_center;
 				// x
-				Qi_gdof(j + 1,3) =  diff[2] * factor;
-				Qi_gdof(j + 2,3) = -diff[1] * factor;
+				Qi_gdof( j + 1, 3 ) =  diff[2] * factor;
+				Qi_gdof( j + 2, 3 ) = -diff[1] * factor;
 
 				// y
-				Qi_gdof(j,4)   = -diff[2] * factor;
-				Qi_gdof(j + 2,4) =  diff[0] * factor;
+				Qi_gdof( j, 4 )   = -diff[2] * factor;
+				Qi_gdof( j + 2, 4 ) =  diff[0] * factor;
 
 				// z
-				Qi_gdof(j,5)   =  diff[1] * factor;
-				Qi_gdof(j + 1,5) = -diff[0] * factor;
+				Qi_gdof( j, 5 )   =  diff[1] * factor;
+				Qi_gdof( j + 1, 5 ) = -diff[0] * factor;
 			}
 
 			// normalize first rotational vector
 			double rotnorm = 0.0;
 			for( int j = 0; j < size; j++ ) {
-				rotnorm += Qi_gdof(j,3) * Qi_gdof(j,3);
+				rotnorm += Qi_gdof( j, 3 ) * Qi_gdof( j, 3 );
 			}
 
 			rotnorm = 1.0 / sqrt( rotnorm );
 
 			for( int j = 0; j < size; j++ ) {
-				Qi_gdof(j,3) = Qi_gdof(j,3) * rotnorm;
+				Qi_gdof( j, 3 ) = Qi_gdof( j, 3 ) * rotnorm;
 			}
 
 			// orthogonalize rotational vectors 2 and 3
@@ -819,23 +801,23 @@ namespace OpenMM {
 				for( int k = 3; k < j; k++ ) { // <-- vectors we're orthognalizing against
 					double dot_prod = 0.0;
 					for( int l = 0; l < size; l++ ) {
-						dot_prod += Qi_gdof(l,k) * Qi_gdof(l,j);
+						dot_prod += Qi_gdof( l, k ) * Qi_gdof( l, j );
 					}
 					for( int l = 0; l < size; l++ ) {
-						Qi_gdof(l,j) = Qi_gdof(l,j) - Qi_gdof(l,k) * dot_prod;
+						Qi_gdof( l, j ) = Qi_gdof( l, j ) - Qi_gdof( l, k ) * dot_prod;
 					}
 				}
 
 				// normalize residual vector
 				double rotnorm = 0.0;
 				for( int l = 0; l < size; l++ ) {
-					rotnorm += Qi_gdof(l,j) * Qi_gdof(l,j);
+					rotnorm += Qi_gdof( l, j ) * Qi_gdof( l, j );
 				}
 
 				rotnorm = 1.0 / sqrt( rotnorm );
 
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof(l,j) = Qi_gdof(l,j) * rotnorm;
+					Qi_gdof( l, j ) = Qi_gdof( l, j ) * rotnorm;
 				}
 			}
 
@@ -860,7 +842,7 @@ namespace OpenMM {
 
 				// copy original vector to Qi_gdof -- updated in place
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof(l,curr_evec) = evec(start+l,start+col);
+					Qi_gdof( l, curr_evec ) = evec( start + l, start + col );
 				}
 
 				// get dot products with previous vectors
@@ -869,19 +851,19 @@ namespace OpenMM {
 					// orthogonalized vectors
 					double dot_prod = 0.0;
 					for( int l = 0; l < size; l++ ) {
-						dot_prod += Qi_gdof(l,k) * evec(start+l,start+col);
+						dot_prod += Qi_gdof( l, k ) * evec( start + l, start + col );
 					}
 
 					// subtract from current vector -- update in place
 					for( int l = 0; l < size; l++ ) {
-						Qi_gdof(l,curr_evec) = Qi_gdof(l,curr_evec) - Qi_gdof(l,k) * dot_prod;
+						Qi_gdof( l, curr_evec ) = Qi_gdof( l, curr_evec ) - Qi_gdof( l, k ) * dot_prod;
 					}
 				}
 
 				//normalize residual vector
 				double norm = 0.0;
 				for( int l = 0; l < size; l++ ) {
-					norm += Qi_gdof(l,curr_evec) * Qi_gdof(l,curr_evec);
+					norm += Qi_gdof( l, curr_evec ) * Qi_gdof( l, curr_evec );
 				}
 
 				// if norm less than 1/20th of original
@@ -895,7 +877,7 @@ namespace OpenMM {
 				// scale vector
 				norm = sqrt( norm );
 				for( int l = 0; l < size; l++ ) {
-					Qi_gdof(l,curr_evec) = Qi_gdof(l,curr_evec) / norm;
+					Qi_gdof( l, curr_evec ) = Qi_gdof( l, curr_evec ) / norm;
 				}
 
 				curr_evec++;
@@ -911,7 +893,7 @@ namespace OpenMM {
 
 				// orthogonalized eigenvectors already sorted by eigenvalue
 				for( int k = 0; k < size; k++ ) {
-					evec(start + k,start + j) = Qi_gdof(k,j);
+					evec( start + k, start + j ) = Qi_gdof( k, j );
 				}
 			}
 		}
