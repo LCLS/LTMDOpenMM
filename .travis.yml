@@ -20,3 +20,6 @@ script:
   - cmake -DCMAKE_INSTALL_PREFIX=$HOME/LTMDOpenMM -DOPENMM_DIR=$HOME/OpenMM -DOPENMM_SOURCE_DIR=openmm .
   - make
   - make install
+
+notifications:
+  email: false
