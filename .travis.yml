@@ -16,7 +16,7 @@ before_install:
   - sudo apt-get install -qq doxygen
   - sudo apt-get install -qq liblapack-dev
   - sudo apt-get install -qq libblas-dev
-  - sudo apt-get install -qq cuda-toolkit-6-5
+  - sudo apt-get install -qq cuda-5-5
 
 script:
   - git clone --depth 1 --branch 6.1 https://github.com/SimTk/openmm.git
