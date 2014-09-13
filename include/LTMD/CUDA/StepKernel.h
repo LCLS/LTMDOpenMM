@@ -1,38 +1,11 @@
 #ifndef OPENMM_LTMD_CUDA_KERNELS_H_
 #define OPENMM_LTMD_CUDA_KERNELS_H_
 
-/* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
- * -------------------------------------------------------------------------- *
- * This is part of the OpenMM molecular simulation toolkit originating from   *
- * Simbios, the NIH National Center for Physics-Based Simulation of           *
- * Biological Structures at Stanford, funded under the NIH Roadmap for        *
- * Medical Research, grant U54 GM072970. See https://simtk.org.               *
- *                                                                            *
- * Portions copyright (c) 2009-2010 Stanford University and the Authors.      *
- * Authors: Chris Sweet                                                       *
- * Contributors: Christopher Bruns                                            *
- *                                                                            *
- * This program is free software: you can redistribute it and/or modify       *
- * it under the terms of the GNU Lesser General Public License as published   *
- * by the Free Software Foundation, either version 3 of the License, or       *
- * (at your option) any later version.                                        *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU Lesser General Public License for more details.                        *
- *                                                                            *
- * You should have received a copy of the GNU Lesser General Public License   *
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.      *
- * -------------------------------------------------------------------------- */
-
 #include "LTMD/StepKernel.h"
 
-#include "CudaPlatform.h"
-//#include "kernels/gputypes.h"
 #include "CudaArray.h"
 #include "CudaContext.h"
+#include "CudaPlatform.h"
 #include "CudaIntegrationUtilities.h"
 
 static const float KILO                     =    1e3;                      // Thousand
@@ -68,7 +41,6 @@ namespace OpenMM {
 						return data.contexts[0]->getIntegrationUtilities().computeKineticEnergy( 0.5 * integrator.getStepSize() );
 					}
 
-
 				private:
 					void ProjectionVectors( const Integrator &integrator );
 				private:
@@ -76,19 +48,12 @@ namespace OpenMM {
 					OpenMM::CudaPlatform::PlatformData &data;
 					CudaArray *modes, *NoiseValues;
 					CudaArray *modeWeights;
-					CudaArray *minimizerScale;
 					CudaArray *MinimizeLambda;
 					CudaArray *oldpos;
 					CudaArray *pPosqP;
-					//CUDAStream<float4> *modes, *NoiseValues;
-					//CUDAStream<float>* modeWeights;
-					//CUDAStream<float>* minimizerScale;
-					//CUDAStream<float>* MinimizeLambda;
 					double lastPE;
-					double prevTemp, prevFriction, prevStepSize;
 					int iterations;
 					int kIterations;
-					int randomPos;
 					CUmodule minmodule;
 					CUmodule linmodule;
 					CUmodule quadmodule;

@@ -1,34 +1,3 @@
-/* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
- * -------------------------------------------------------------------------- *
- * This is part of the OpenMM molecular simulation toolkit originating from   *
- * Simbios, the NIH National Center for Physics-Based Simulation of           *
- * Biological Structures at Stanford, funded under the NIH Roadmap for        *
- * Medical Research, grant U54 GM072970. See https://simtk.org.               *
- *                                                                            *
- * Portions copyright (c) 2009 Stanford University and the Authors.           *
- * Authors: Chris Sweet                                                       *
- * Contributors: Christopher Bruns                                            *
- *                                                                            *
- * Permission is hereby granted, free of charge, to any person obtaining a    *
- * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
- * and/or sell copies of the Software, and to permit persons to whom the      *
- * Software is furnished to do so, subject to the following conditions:       *
- *                                                                            *
- * The above copyright notice and this permission notice shall be included in *
- * all copies or substantial portions of the Software.                        *
- *                                                                            *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
- * THE AUTHORS, CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,    *
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR      *
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE  *
- * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
- * -------------------------------------------------------------------------- */
-
 #include <ctime>
 #include <string>
 #include <iostream>
@@ -45,25 +14,15 @@
 #include "LTMD/Integrator.h"
 #include "LTMD/StepKernel.h"
 
-/*#include "CudaLTMDKernelSources.h"
-#include "CudaIntegrationUtilities.h"
-#include "CudaContext.h"
-#include "CudaArray.h"*/
 #include <stdio.h>
-#include <cuda.h>
-#include <vector_functions.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>
 
-using std::cout;
-using std::endl;
-#include <stdio.h>
-
 namespace OpenMM {
 	namespace LTMD {
 		Integrator::Integrator( double temperature, double frictionCoeff, double stepSize, const Parameters &params )
-			: stepsSinceDiagonalize( 0 ), mParameters( params ), maxEigenvalue( 4.34e5 ), mAnalysis( new Analysis ) {
+			: maxEigenvalue( 4.34e5 ), stepsSinceDiagonalize( 0 ), mParameters( params ), mAnalysis( new Analysis ) {
 			setTemperature( temperature );
 			setFriction( frictionCoeff );
 			setStepSize( stepSize );
@@ -249,7 +208,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			mAnalysis->computeEigenvectorsFull( *context, mParameters );
+			mAnalysis->computeEigenvectorsFull( context->getOwner(), mParameters );
 			setProjectionVectors( mAnalysis->getEigenvectors() );
 			stepsSinceDiagonalize = 0;
 #ifdef PROFILE_INTEGRATOR
