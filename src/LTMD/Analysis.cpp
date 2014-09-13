@@ -89,7 +89,7 @@ namespace OpenMM {
 			return retVal;
 		}
 
-		void Analysis::computeEigenvectorsFull( ContextImpl &contextImpl, const Parameters &params ) {
+		void Analysis::computeEigenvectorsFull( Context &context, const Parameters &params ) {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 
@@ -97,8 +97,7 @@ namespace OpenMM {
 
 			gettimeofday( &tp_begin, NULL );
 
-			std::vector<Vec3> positions;
- 			contextImpl.getPositions(positions);
+			std::vector<Vec3> positions = context.getState( State::Positions ).getPositions();
 
 			/*********************************************************************/
 			/*                                                                   */
@@ -114,7 +113,7 @@ namespace OpenMM {
 			// need it to parallelize.
 
 			if( !mInitialized ) {
-				Initialize( contextImpl, params );
+				Initialize( context, params );
 			}
 
 			int n = 3 * mParticleCount;
@@ -130,7 +129,7 @@ namespace OpenMM {
 			/*********************************************************************/
 
 #ifdef FIRST_ORDER
-			std::vector<Vec3> block_start_forces = blockContext->getState( State::Forces ).getForces();
+			const std::vector<Vec3> block_start_forces = blockContext->getState( State::Forces ).getForces();
 #endif
 
 			Matrix h( n, n );
@@ -154,7 +153,7 @@ namespace OpenMM {
 				}
 
 				blockContext->setPositions( blockPositions );
-				std::vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
+				const std::vector<Vec3> forces1 = blockContext->getState( State::Forces ).getForces();
 
 #ifndef FIRST_ORDER
 				// Now, do it again...
@@ -174,7 +173,7 @@ namespace OpenMM {
 				}
 
 				blockContext->setPositions( blockPositions );
-				std::vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
+				const std::vector<Vec3> forces2 = blockContext->getState( State::Forces ).getForces();
 #endif
 
 				// revert block positions
@@ -241,8 +240,6 @@ namespace OpenMM {
 					h( j, i ) = avg;
 				}
 			}
-
-			//WriteHessian( h );
 
 			// Diagonalize each block Hessian, get Eigenvectors
 			// Note: The eigenvalues will be placed in one large array, because
@@ -311,8 +308,7 @@ namespace OpenMM {
 			std::vector<Vec3> tmppos( positions );
 
 #ifdef FIRST_ORDER
-			std::vector<Vec3> forces_start;
- 			contextImpl.getForces(forces_start);
+			const std::vector<Vec3> forces_start = context.getState( State::Forces ).getForces();
 #endif
 
 			// Loop over i.
@@ -327,12 +323,10 @@ namespace OpenMM {
 						pos++;
 					}
 				}
-				contextImpl.setPositions( tmppos );
+				context.setPositions( tmppos );
 
 				// Calculate F(xi).
-				std::vector<Vec3> forces_forward;
-				contextImpl.getForces(forces_forward);
-
+				const std::vector<Vec3> forces_forward = context.getState( State::Forces ).getForces();
 #ifndef FIRST_ORDER
 				// backward perturbations
 				for( unsigned int i = 0; i < mParticleCount; i++ ) {
@@ -340,11 +334,10 @@ namespace OpenMM {
 						tmppos[i][j] = positions[i][j] - eps * E( 3 * i + j, k ) / sqrt( mParticleMass[i] );
 					}
 				}
-				contextImpl.setPositions( tmppos );
+				context.setPositions( tmppos );
 
 				// Calculate forces
-				std::vector<Vec3> forces_backward;
-				contextImpl.getForces(forces_backward);
+				const std::vector<Vec3> forces_backward = context.getState( State::Forces ).getForces();
 #endif
 
 				for( int i = 0; i < n; i++ ) {
@@ -367,7 +360,7 @@ namespace OpenMM {
 
 			// *****************************************************************
 			// restore unperturbed positions
-			contextImpl.setPositions( positions );
+			context.setPositions( positions );
 
 			gettimeofday( &tp_s, NULL );
 
@@ -375,8 +368,6 @@ namespace OpenMM {
 			std::cout << "Time to compute S: " << sElapsed << "ms" << std::endl;
 
 			MatrixMultiply( E, true, HE, false, S );
-
-			//WriteS(S);
 
 			// make S symmetric
 			for( unsigned int i = 0; i < S.Rows; i++ ) {
@@ -420,9 +411,6 @@ namespace OpenMM {
 			std::cout << "Time to compute U: " << uElapsed << "ms" << std::endl;
 
 			const unsigned int modes = params.modes;
-
-			//WriteModes( U, modes );
-
 			eigenvectors.resize( modes, std::vector<Vec3>( mParticleCount ) );
 			for( unsigned int i = 0; i < modes; i++ ) {
 				for( unsigned int j = 0; j < mParticleCount; j++ ) {
@@ -435,7 +423,7 @@ namespace OpenMM {
 			std::cout << "[Analysis] Compute Eigenvectors: " << elapsed << "ms" << std::endl;
 		}
 
-		void Analysis::Initialize( ContextImpl &context, const Parameters &params ) {
+		void Analysis::Initialize( Context &context, const Parameters &params ) {
 #ifdef PROFILE_ANALYSIS
 			timeval start, end;
 			gettimeofday( &start, 0 );
@@ -445,8 +433,7 @@ namespace OpenMM {
 			const System &system = context.getSystem();
 
 			// Store Particle Information
-			std::vector<Vec3> positions;
-			context.getPositions(positions);
+			std::vector<Vec3> positions = context.getState( State::Positions ).getPositions();
 
 			mParticleCount = positions.size();
 
@@ -650,11 +637,12 @@ namespace OpenMM {
 					sPlatform = "CUDA";
 					break;
 			}
+			sPlatform = "Reference";
 
 			std::cout << "Platform" << sPlatform << std::endl;
 			OpenMM::Platform &platform = OpenMM::Platform::getPlatformByName( sPlatform );
 
-			if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ) {
+			/*if( params.BlockDiagonalizePlatform != 0 && params.DeviceID != -1 ) {
 				std::ostringstream stream;
 				stream << params.DeviceID;
 
@@ -665,7 +653,7 @@ namespace OpenMM {
 				} else {
 					platform.setPropertyDefaultValue( "CudaDeviceIndex", stream.str() );
 				}
-			}
+			}*/
 
 			blockContext = new Context( *blockSystem, *integ, platform );
 

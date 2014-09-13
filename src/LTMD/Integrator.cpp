@@ -16,20 +16,10 @@
 #include "LTMD/Integrator.h"
 #include "LTMD/StepKernel.h"
 
-/*#include "CudaLTMDKernelSources.h"
-#include "CudaIntegrationUtilities.h"
-#include "CudaContext.h"
-#include "CudaArray.h"*/
 #include <stdio.h>
-#include <cuda.h>
-#include <vector_functions.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>
-
-using std::cout;
-using std::endl;
-#include <stdio.h>
 
 namespace OpenMM {
 	namespace LTMD {
@@ -241,7 +231,7 @@ namespace OpenMM {
 			timeval start, end;
 			gettimeofday( &start, 0 );
 #endif
-			mAnalysis->computeEigenvectorsFull( *context, mParameters );
+			mAnalysis->computeEigenvectorsFull( context->getOwner(), mParameters );
 			setProjectionVectors( mAnalysis->getEigenvectors() );
 			stepsSinceDiagonalize = 0;
 #ifdef PROFILE_INTEGRATOR
