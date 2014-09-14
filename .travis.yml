@@ -12,11 +12,13 @@ before_install:
   - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1204/x86_64/cuda-repo-ubuntu1204_6.5-14_amd64.deb
   - sudo dpkg -i cuda-repo-ubuntu1204_6.5-14_amd64.deb
   - sudo apt-get update -qq
+  - sudo apt-get install -qq cuda-5-5
+  - export PATH=/usr/local/cuda-5.5/bin:$PATH
+  - export LD_LIBRARY_PATH=/usr/local/cuda-5.5/lib64:$LD_LIBRARY_PATH
   - sudo apt-get install -qq gromacs
   - sudo apt-get install -qq doxygen
   - sudo apt-get install -qq liblapack-dev
   - sudo apt-get install -qq libblas-dev
-  - sudo apt-get install -qq cuda-5-5
 
 script:
   - git clone --depth 1 --branch 6.1 https://github.com/SimTk/openmm.git
