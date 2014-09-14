@@ -3,16 +3,6 @@ include_directories( include ../include )
 set( TEST_HEADERS "include/AnalysisTest.h" "include/MathTest.h" )
 set( TEST_SOURCES "src/AnalysisTest.cpp" "src/MathTest.cpp" )
 
-# OpenMM
-set( OPENMM_DIR "" CACHE PATH "OpenMM Install Directory")
-if( OPENMM_DIR )
-	link_directories( "${OPENMM_DIR}/lib/" )
-	include_directories( "${OPENMM_DIR}/include/" )
-endif()
-
-find_library( OPENMM_SERIALIAZE_LIB "OpenMMSerialization" HINT "${OPENMM_DIR}/lib" )
-list( APPEND LIBS ${OPENMM_SERIALIAZE_LIB} )
-
 # CPPUnit
 set( CPPUNIT_DIR "" CACHE PATH "CPPUnit Install Directory" )
 if( CPPUNIT_DIR )
@@ -24,7 +14,13 @@ find_library( CPPUNIT_LIB "cppunit" hint "${CPPUNIT_DIR}/lib" )
 list( APPEND LIBS ${CPPUNIT_LIB} )
 
 # Build
-add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} )
+if( BUILD_GPU_CUDA )
+	cuda_add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} ${CUDA_KERNELS} )
+else( BUILD_GPU_CUDA )
+	add_executable( LTMDTest main.cpp ${TEST_SOURCES} ${TEST_HEADERS} )
+endif( BUILD_GPU_CUDA )
+
+# Link
 target_link_libraries( LTMDTest "OpenMMLTMD" ${LIBS})
 
 # Copy files

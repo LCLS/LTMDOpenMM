@@ -19,6 +19,7 @@ before_install:
   - sudo apt-get install -qq doxygen
   - sudo apt-get install -qq liblapack-dev
   - sudo apt-get install -qq libblas-dev
+  - sudo apt-get install -qq libcppunit-dev
 
 script:
   - git clone --depth 1 --branch 6.1 https://github.com/SimTk/openmm.git
@@ -27,7 +28,7 @@ script:
   - make
   - make install
   - cd ..
-  - cmake -DCMAKE_INSTALL_PREFIX=$HOME/LTMDOpenMM -DOPENMM_DIR=$HOME/OpenMM -DOPENMM_SOURCE_DIR=openmm -DBUILD_FIRST_ORDER=$FIRST_ORDER -DBUILD_GPU=ON -DBUILD_GPU_CUDA=ON .
+  - cmake -DCMAKE_INSTALL_PREFIX=$HOME/LTMDOpenMM -DOPENMM_DIR=$HOME/OpenMM -DOPENMM_SOURCE_DIR=openmm -DBUILD_TESTING=ON -DBUILD_FIRST_ORDER=$FIRST_ORDER -DBUILD_GPU=ON -DBUILD_GPU_CUDA=ON .
   - make
   - make install
 
