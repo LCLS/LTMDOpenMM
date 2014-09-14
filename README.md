@@ -1,4 +1,4 @@
-LTMD OpenMM Plugin
+LTMD OpenMM Plugin [![Build Status](https://travis-ci.org/LCLS/LTMDOpenMM.svg?branch=master)](https://travis-ci.org/LCLS/LTMDOpenMM)
 ==================
 
 Long Timestep Molecular Dynamics (LTMD) allows taking timesteps up to 100x larger than traditional MD.  LTMD is written as a plugin for OpenMM.
