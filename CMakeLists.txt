@@ -148,7 +148,7 @@ if( BUILD_GPU )
 	option( BUILD_GPU_CUDA "Build Cuda GPU code" Off )
 	if( BUILD_GPU_CUDA )
 		find_package( CUDA REQUIRED )
-		find_library( OPENMM_CUDA_LIB "OpenMMCuda" HINT "${OPENMM_DIR}/lib/plugins/")
+		find_library( OPENMM_CUDA_LIB "OpenMMCUDA" HINT "${OPENMM_DIR}/lib/plugins")
 
 		file( GLOB LTMD_CUDA_HEADERS include/LTMD/CUDA/*.h  )
 		source_group( "include\\LTMD\\CUDA" FILES ${LTMD_CUDA_HEADERS} )
