@@ -12,7 +12,8 @@ env:
 
 matrix:
   allow_failures:
-    - env: OPENMM_VERSION=HEAD
+    - env: FIRST_ORDER=ON OPENMM_VERSION=HEAD
+    - env: FIRST_ORDER=OFF OPENMM_VERSION=HEAD
 
 before_install:
   - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1204/x86_64/cuda-repo-ubuntu1204_6.5-14_amd64.deb
