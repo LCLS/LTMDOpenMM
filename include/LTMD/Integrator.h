@@ -149,6 +149,7 @@ namespace OpenMM {
 				bool eigVecChanged;
 				double minimumLimit;
 				double temperature, friction;
+				double mMetropolisPE;
 				int stepsSinceDiagonalize, randomNumberSeed;
 				OpenMM::ContextImpl *context;
 				OpenMM::Kernel kernel;

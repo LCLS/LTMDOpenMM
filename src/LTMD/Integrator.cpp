@@ -4,6 +4,8 @@
 
 #include <sys/time.h>
 
+#include "SimTKOpenMMUtilities.h"
+
 #include "openmm/System.h"
 #include "openmm/Context.h"
 #include "openmm/kernels.h"
@@ -103,8 +105,8 @@ namespace OpenMM {
 				DiagonalizeMinimize();
 			}
 			stepsSinceDiagonalize++;
-			//context->updateContextState();
-			context->calcForcesAndEnergy( true, false );
+
+			mMetropolisPE = context->calcForcesAndEnergy( true, true );
 			IntegrateStep();
 			SetProjectionChanged( false );
 			if( !minimize( mParameters.MaximumMinimizationIterations ) ) {
@@ -155,39 +157,60 @@ namespace OpenMM {
 
 			for( unsigned int i = 0; i < max; i++ ) {
 				SetProjectionChanged( false );
-				simpleSteps++;
-				double currentPE = LinearMinimize( initialPE );
-				//printf("ENERGY BEFORE: %f\n", currentPE);
-				if( mParameters.isAlwaysQuadratic || currentPE > initialPE ) {
-					quadraticSteps++;
 
-					double lambda = 0.0;
-					currentPE = QuadraticMinimize( currentPE, lambda );
-					if( currentPE > initialPE ) {
-						std::cout << "Quadratic Minimization Failed Energy Test [" << currentPE << ", " << initialPE << "] - Forcing Rediagonalization" << std::endl;
-						computeProjectionVectors();
+				if( mParameters.ShouldUseMetropolisMinimization ){
+					if(initialPE < mMetropolisPE) {
 						break;
-					} else {
-						if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue ) {
-							std::cout << "Quadratic Minimization Failed Lambda Test [" << lambda << ", " << 1.0 / maxEigenvalue << "] - Forcing Rediagonalization" << std::endl;
+					}
+
+					simpleSteps++;
+					const double currentPE = LinearMinimize( initialPE );
+					if(currentPE < mMetropolisPE) {
+						break;
+					}
+
+		            const double prob = exp(-(1.0 / (0.001987191 * temperature)) * (currentPE - mMetropolisPE));
+		            if(SimTKOpenMMUtilities::getUniformlyDistributedRandomNumber() < prob){
+						break;
+					}
+
+					SaveStep();
+				}else{
+					simpleSteps++;
+					double currentPE = LinearMinimize( initialPE );
+					if( mParameters.isAlwaysQuadratic || currentPE > initialPE ){
+						quadraticSteps++;
+
+						double lambda = 0.0;
+						currentPE = QuadraticMinimize( currentPE, lambda );
+						if( currentPE > initialPE ){
+							std::cout << "Quadratic Minimization Failed Energy Test [" << currentPE << ", " << initialPE << "] - Forcing Rediagonalization" << std::endl;
 							computeProjectionVectors();
 							break;
+						}else{
+							if( mParameters.ShouldForceRediagOnQuadraticLambda && lambda < 1.0 / maxEigenvalue){
+								std::cout << "Quadratic Minimization Failed Lambda Test [" << lambda << ", " << 1.0 / maxEigenvalue << "] - Forcing Rediagonalization" << std::endl;
+								computeProjectionVectors();
+								break;
+							}
 						}
 					}
-				}
-				//break if satisfies end condition
-				const double diff = initialPE - currentPE;
-				if( diff < getMinimumLimit() && diff >= 0.0 ) {
-					break;
-				}
-				if( diff > 0.0 ) {
-					SaveStep();
-					initialPE = currentPE;
-				} else {
-					RevertStep();
-					context->calcForcesAndEnergy( true, false );
 
-					maxEigenvalue *= 2;
+					//break if satisfies end condition
+					const double diff = initialPE - currentPE;
+					if( diff < getMinimumLimit() && diff >= 0.0 ) {
+						break;
+					}
+
+					if( diff > 0.0 ) {
+						SaveStep();
+						initialPE = currentPE;
+					} else {
+						RevertStep();
+						context->calcForcesAndEnergy( true, false );
+
+						maxEigenvalue *= 2;
+					}
 				}
 			}
 
@@ -246,6 +269,7 @@ namespace OpenMM {
 #endif
 		}
 
+
 		double Integrator::LinearMinimize( const double energy ) {
 #ifdef PROFILE_INTEGRATOR
 			timeval start, end;
@@ -258,8 +282,8 @@ namespace OpenMM {
 			double elapsed = ( end.tv_sec - start.tv_sec ) * 1000.0 + ( end.tv_usec - start.tv_usec ) / 1000.0;
 			std::cout << "[OpenMM::Integrator] Linear Minimize: " << elapsed << "ms" << std::endl;
 #endif
-			return retVal;
-		}
+		return retVal;
+}
 
 		double Integrator::QuadraticMinimize( const double energy, double &lambda ) {
 #ifdef PROFILE_INTEGRATOR

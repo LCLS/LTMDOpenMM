@@ -28,6 +28,7 @@ namespace OpenMM {
 			double minLimit;
 
 			bool isAlwaysQuadratic;
+			bool ShouldUseMetropolisMinimization;
 
 			bool ShouldForceRediagOnMinFail;
 			bool ShouldForceRediagOnQuadratic;
