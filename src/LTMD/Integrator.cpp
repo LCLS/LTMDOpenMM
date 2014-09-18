@@ -4,7 +4,7 @@
 
 #include <sys/time.h>
 
-#include "SimTKUtilities/SimTKOpenMMUtilities.h"
+#include "SimTKOpenMMUtilities.h"
 
 #include "openmm/System.h"
 #include "openmm/Context.h"
@@ -170,7 +170,7 @@ namespace OpenMM {
 					}
 
 		            const double prob = exp(-(1.0 / (0.001987191 * temperature)) * (currentPE - mMetropolisPE));
-		            if(SimTKOpenMMUtilities::getNormallyDistributedRandomNumber() < prob){
+		            if(SimTKOpenMMUtilities::getUniformlyDistributedRandomNumber() < prob){
 						break;
 					}
 
