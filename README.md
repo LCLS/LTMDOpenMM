@@ -10,7 +10,7 @@ To use LTMD, you'll need to install:
 * CMake
 * OpenMM (revision 3324 from SVN -- other versions try to take over all available OpenCL devices and don't respect commands to do otherwise.)
 * Gromacs 4.5 (used by ProtoMol to read TPR files)
-* [ProtoMol](http://sourceforge.net/projects/protomol/) (used to read TPR files, set up forcefield and simulation parameters) -- take latest from SVN
+* [ProtoMol](https://github.com/LCLS/ProtoMol) (used to read TPR files, set up forcefield and simulation parameters) -- take latest from SVN
 * LAPACK
 * OpenMP (optional)
 
@@ -18,7 +18,7 @@ Installation
 --------------
 
 1. Compile and install Gromacs 4.5 -- you do not need to compile it against OpenMM 
-2. Compile and install OpenMM r3324
+2. Compile and install OpenMM
    1. Enable OpenCL and CUDA support
    2.Make sure that it finds the OpenCL.so file. OpenMM will compile without it, but it won't run.  You may need to toggle the advanced options in CMake to see the appropriate field.
 3. Compile and install LAPACK
